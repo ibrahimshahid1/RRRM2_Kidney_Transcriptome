@@ -1,0 +1,79 @@
+# Data files (too large for git)
+data/raw/*
+data/processed/*
+data/external/single_cell_atlases/*
+data/external/phosphoproteomics/*
+data/networks/*
+!data/raw/README.md
+!data/*/.gitkeep
+
+# Results (generated files)
+results/embeddings/*
+results/models/*
+results/figures/*
+results/tables/*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large data formats
+*.h5ad
+*.h5
+*.hdf5
+*.emb
+*.pkl
+*.pickle
+*.rds
+*.parquet
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+temp/
+tmp/

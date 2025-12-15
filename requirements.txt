@@ -1,0 +1,59 @@
+# Core scientific computing
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.11.0
+
+# Machine learning
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+
+# Bioinformatics
+pydeseq2>=0.4.0
+scanpy>=1.9.0
+anndata>=0.9.0
+bioinfokit>=2.1.0
+
+# Network analysis & embeddings
+networkx>=3.1
+pecanpy>=2.1.0
+node2vec>=0.4.6
+karateclub>=1.3.0
+
+# Dimensionality reduction
+umap-learn>=0.5.4
+hdbscan>=0.8.33
+
+# Statistical analysis
+statsmodels>=0.14.0
+pingouin>=0.5.3
+
+# Enrichment analysis
+gseapy>=1.0.0
+goatools>=1.3.0
+gprofiler-official>=1.0.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.17.0
+altair>=5.1.0
+adjustText>=0.8
+
+# Data formats
+pyarrow>=13.0.0
+
+# Utilities
+pyyaml>=6.0
+tqdm>=4.66.0
+joblib>=1.3.0
+click>=8.1.0
+
+# Jupyter
+jupyter
+jupyterlab
+ipykernel
+
+# Development
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
