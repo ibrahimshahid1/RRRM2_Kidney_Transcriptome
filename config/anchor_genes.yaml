@@ -1,0 +1,68 @@
+# Pre-Registered Anchor Genes for Procrustes Alignment
+
+# Anchor Selection Criteria:
+# 1. Low coefficient of variation (CV < 0.2 across all samples)
+# 2. Not differentially expressed (DE FDR > 0.2 for all contrasts)
+# 3. Stable across technical batches and biological conditions
+
+anchors:
+  housekeeping:
+    description: "Classical housekeeping genes - stable expression"
+    genes:
+      - Gapdh   # Glyceraldehyde-3-phosphate dehydrogenase
+      - Actb    # Beta-actin
+      - B2m     # Beta-2-microglobulin
+      - Hprt    # Hypoxanthine phosphoribosyltransferase
+      - Pgk1    # Phosphoglycerate kinase 1
+      - Ppia    # Peptidylprolyl isomerase A (cyclophilin A)
+      - Rplp0   # Ribosomal protein lateral stalk subunit P0
+      - Tbp     # TATA-box binding protein
+      - Ubc     # Ubiquitin C
+      - Ywhaz   # Tyrosine 3-monooxygenase/tryptophan 5-monooxygenase
+  
+  ribosomal:
+    description: "Ribosomal proteins - constitutive expression"
+    genes:
+      - Rpl3    # Ribosomal protein L3
+      - Rpl5    # Ribosomal protein L5
+      - Rpl13a  # Ribosomal protein L13a
+      - Rpl19   # Ribosomal protein L19
+      - Rpl32   # Ribosomal protein L32
+      - Rps3    # Ribosomal protein S3
+      - Rps5    # Ribosomal protein S5
+      - Rps18   # Ribosomal protein S18
+      - Rps23   # Ribosomal protein S23
+      - Rps29   # Ribosomal protein S29
+  
+  metabolism:
+    description: "Core metabolism - consistent across conditions"
+    genes:
+      - Pkm     # Pyruvate kinase M1/2
+      - Eno1    # Enolase 1
+      - Ldha    # Lactate dehydrogenase A
+      - Pgam1   # Phosphoglycerate mutase 1
+      - Aldoa   # Aldolase A
+      - Tpi1    # Triosephosphate isomerase 1
+      - Gpi1    # Glucose-6-phosphate isomerase
+
+# Selection Parameters
+selection_criteria:
+  max_cv: 0.2              # Maximum coefficient of variation
+  min_de_fdr: 0.2          # Minimum FDR for any contrast (not DE)
+  min_expression_tpm: 10   # Minimum TPM to avoid noise
+  max_batch_effect: 0.1    # Maximum variance explained by batch
+  
+# Validation
+validation:
+  minimum_anchors: 20   # Error if < 20 genes pass criteria
+  warn_threshold: 50    # Warning if < 50 genes pass
+
+# Usage Notes
+notes: |
+  Anchors are selected at the start of the pipeline and frozen.
+  During cross-validation, anchors are reselected within each training fold.
+  
+  If a gene is not present in the filtered gene panel, it is silently skipped.
+  
+  Alignment quality should be assessed via Procrustes error (Frobenius norm).
+  High error (> 0.5) indicates poor anchor stability and requires investigation.

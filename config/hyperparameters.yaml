@@ -1,0 +1,156 @@
+# Hyperparameters for Network Analysis and node2vec
+
+# Gene Panel Selection (Phase 0)
+gene_panel:
+  min_gene_count: 1000
+  max_gene_count: 3000
+  
+  selection_method: "hvg"  # highly variable genes
+  hvg_parameters:
+    n_top_genes: 2000
+    flavor: "seurat_v3"
+    
+  additional_genes:
+    include_pathway_genes: true  # Always include DCT/NCC-WNK
+    include_positive_controls: true  # Spaceflight pathways
+    
+  filtering:
+    min_cpm: 1
+    min_sample_fraction: 0.2  # Express in >20% samples
+
+# Network Construction (Phase 2)
+network:
+  topology_method: "topk"  # "topk" or "partial_corr" or "glasso"
+  
+  topk:
+    k: 50  # Top 50 neighbors per gene
+    use_abs: true  # Use |correlation| for neighbor selection
+    
+  partial_corr:
+    threshold: 0.1  # Minimum |partial correlation|
+    max_edges: 200000
+    shrinkage: "ledoit_wolf"
+    
+  glasso:
+    alpha: 0.01  # Regularization strength
+    max_iter: 100
+    
+  edge_weighting:
+    use_ranks: false  # If true, Spearman-like (rank-transform then Pearson)
+    fisher_z_transform: true  # For regression modeling
+
+# LIONESS (Phase 3)
+lioness:
+  method: "naive"  # "naive" or "fast" (fast not yet implemented)
+  show_progress: true
+  
+# Edge-Wise Regression (Phase 4)
+edge_regression:
+  empirical_bayes: true  # limma-style variance moderation
+  prior_df: 2.0  # Prior degrees of freedom for EB
+  
+  contrasts:
+    reference_arm: "ISS-T"
+    reference_group: "HGC"
+    reference_age: "Young"
+
+# node2vec Embeddings (Phase 5)
+node2vec:
+  dimensions: 128
+  walk_length: 80
+  num_walks: 200
+  p: 0.25  # Return parameter (lower = more BFS-like)
+  q: 4.0   # In-out parameter (higher = more DFS-like)
+  
+  window: 10  # Skip-gram window size
+  min_count: 1
+  batch_words: 4
+  
+  workers: 1  # Single worker for reproducibility
+  
+  multi_seed:
+    n_seeds: 10
+    base_seed: 42
+    
+  signed_edges:
+    mode: "pos"  # "pos", "neg", or "abs"
+    # If "pos" and "neg", embed separately and report both
+
+# Procrustes Alignment (Phase 5)
+alignment:
+  method: "orthogonal_procrustes"
+  anchor_selection:
+    from_config: true  # Use anchor_genes.yaml
+    min_anchors: 20
+    
+  consensus:
+    reference_seed: 0
+    method: "mean"  # Average across aligned seeds
+
+# Rewiring Metrics (Phase 6)
+rewiring:
+  primary_metric: "cosine_distance"  # 1 - cos(v1, v2)
+  
+  silent_shifter:
+    delta_percentile: 90
+    log2fc_threshold: 0.3
+    de_fdr_threshold: 0.2
+    delta_fdr_threshold: 0.1
+
+# Statistical Testing (Phase 6)
+statistics:
+  bootstrap:
+    n_iterations: 2000
+    alpha: 0.05
+    method: "percentile"  # or "bca" (bias-corrected accelerated)
+    rebuild_topology: false  # Keep E fixed (default)
+    rebuild_every_n: 100  # Rebuild E every N bootstrap (if rebuild_topology=true)
+    
+  permutation:
+    n_iterations: 2000
+    stratify_by: ["Age", "Arm"]  # Preserve balance
+    fdr_method: "bh"  # Benjamini-Hochberg
+    strict_fdr: "westfall_young"  # For top candidates
+    
+# Cross-Validation (Phase 7)
+cross_validation:
+  n_folds: 5
+  stratify_col: "EnvironmentGroup"
+  random_state: 42
+  
+  classifier:
+    class: "RandomForest"
+    params:
+      n_estimators: 100
+      max_depth: null
+      min_samples_split: 5
+      random_state: 42
+      
+  features:
+    pathway_strength: true  # Mean edge weight in NCC-WNK
+    node_strength: true     # Strength of candidate genes
+    shifter_connectivity: true
+    pca: true
+    pca_n_components: 10
+
+# Computational Resources
+compute:
+  n_cores: 4
+  memory_limit_gb: 16
+  use_gpu: false
+  
+  cache:
+    enabled: true
+    cache_dir: "./cache"
+    
+# Output Settings
+output:
+  save_intermediate: true
+  intermediate_dir: "./results/intermediate"
+  
+  formats:
+    networks: "gpickle"  # NetworkX format
+    matrices: "parquet"  # Compressed columnar
+    embeddings: "npy"
+    
+  verbosity: 1  # 0=quiet, 1=normal, 2=verbose

@@ -1,0 +1,18 @@
+CD45
+CD45    B cell
+CD45    NK cell
+CD45    T cell
+CD45    macrophage
+CD45    plasma cell
+Epcam     kidney distal convoluted tubule epithelial cell
+Epcam    brush cell
+Epcam    kidney collecting duct principal cell
+Epcam    kidney proximal convoluted tubule epithelial cell
+Epcam    podocyte
+Epcam    proximal tube epithelial cell
+Epcam    thick ascending tube S epithelial cell
+Pecam    Kidney cortex artery cell
+Pecam    fenestrated capillary endothelial
+Pecam    kidney capillary endothelial cell
+Stroma    fibroblast
+Stroma    kidney mesangial cell

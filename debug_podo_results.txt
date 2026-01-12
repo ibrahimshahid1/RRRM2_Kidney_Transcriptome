@@ -1,0 +1,38 @@
+
+Found  4  of  4  target genes in matrix rows.
+[1] "ENSMUSG00000006649" "ENSMUSG00000026602" "ENSMUSG00000016458"
+[4] "ENSMUSG00000043079"
+
+Found  124  Podocyte cells.
+
+--- Expression in Podocytes (Raw Counts) ---
+Gene Nphs1 (ENSMUSG00000006649):
+  Non-zero cells: 13 / 124 (10.5%)
+  Mean count: 0.5726
+  Max count:  28
+Gene Nphs2 (ENSMUSG00000026602):
+  Non-zero cells: 7 / 124 (5.6%)
+  Mean count: 1.7419
+  Max count:  82
+Gene Wt1 (ENSMUSG00000016458):
+  Non-zero cells: 31 / 124 (25.0%)
+  Mean count: 1.4677
+  Max count:  32
+Gene Synpo (ENSMUSG00000043079):
+  Non-zero cells: 38 / 124 (30.6%)
+  Mean count: 0.8790
+  Max count:  25
+
+--- Expression in random NON-podocytes (Control) ---
+Gene Nphs1 (ENSMUSG00000006649):
+  Non-zero cells: 2 / 1000 (0.2%)
+  Mean count: 0.0020
+Gene Nphs2 (ENSMUSG00000026602):
+  Non-zero cells: 4 / 1000 (0.4%)
+  Mean count: 0.0040
+Gene Wt1 (ENSMUSG00000016458):
+  Non-zero cells: 3 / 1000 (0.3%)
+  Mean count: 0.0050
+Gene Synpo (ENSMUSG00000043079):
+  Non-zero cells: 35 / 1000 (3.5%)
+  Mean count: 0.0500

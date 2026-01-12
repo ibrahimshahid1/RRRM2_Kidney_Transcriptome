@@ -1,0 +1,102 @@
+# Metadata Design Specification for OSD-771 RRRM-2 Kidney Transcriptome
+
+# Full Factorial Design (n=80) - PRIMARY for all inference
+design:
+  factors:
+    Age:
+      - Young  # 16 weeks
+      - Old    # 34 weeks
+    
+    Arm:
+      - ISS-T  # ISS Terminal (euthanized on ISS)
+      - LAR    # Live Animal Return (euthanized on Earth)
+    
+    EnvironmentGroup:
+      - FLT     # Flight (ISS 35-day mission)
+      - HGC     # Hardware Ground Control (same hardware, Earth)
+      - VIV     # Vivarium Control (standard housing)
+      - BSL     # Basal (pre-flight baseline)
+  
+  samples_per_cell: 5  # 5 mice per age within each Age×Arm×Group cell
+  total_samples: 80    # 2 ages × 2 arms × 4 groups × 5 mice per age
+
+# Note on Euthanasia Location (not an independent factor):
+# ISS-T FLT: on ISS
+# ISS-T controls (HGC/VIV/BSL): on Earth
+# LAR all groups: on Earth
+# Therefore, euthanasia location is confounded with Arm×Group interaction
+
+# Four-Bin Legacy View (n=40) - SECONDARY for sensitivity/summary only
+four_bin_legacy:
+  description: "Pooled view across arms for continuity with earlier drafts. Not used for primary causal inference."
+  bins:
+    YC:
+      age: Young
+      condition: "Ground Control (GC + VIV pooled across arms)"
+      samples: 10
+      
+    YF:
+      age: Young
+      condition: "Flight (FLT pooled across arms)"
+      samples: 10
+      
+    OC:
+      age: Old
+      condition: "Ground Control (GC + VIV pooled across arms)"
+      samples: 10
+      
+    OF:
+      age: Old
+      condition: "Flight (FLT pooled across arms)"
+      samples: 10
+
+# Contrasts of Interest (from full factorial design)
+contrasts:
+  primary:
+    - name: "ISS-T young flight effect"
+      formula: "(Young, ISS-T, FLT) - (Young, ISS-T, HGC)"
+      
+    - name: "ISS-T old flight effect"
+      formula: "(Old, ISS-T, FLT) - (Old, ISS-T, HGC)"
+      
+    - name: "Age-dependent flight rewiring (ISS-T)"
+      formula: "|(Old FLT - Old HGC) - (Young FLT - Young HGC)|"
+      
+    - name: "LAR young flight effect"
+      formula: "(Young, LAR, FLT) - (Young, LAR, HGC)"
+      
+    - name: "LAR old flight effect"
+      formula: "(Old, LAR, FLT) - (Old, LAR, HGC)"
+      
+    - name: "Arm comparison (persistence vs recovery)"
+      formula: "ISS-T flight effects vs LAR flight effects"
+  
+  secondary:
+    - name: "Age effect in controls (ISS-T)"
+      formula: "(Old, ISS-T, HGC) - (Young, ISS-T, HGC)"
+      
+    - name: "VIV vs HGC baseline differences"
+      formula: "VIV - HGC (within Age×Arm)"
+
+# Expected metadata columns
+metadata_columns:
+  required:
+    - sample_id
+    - Age
+    - Arm
+    - EnvironmentGroup
+    - sex  # All female C57BL/6NTac
+    
+  technical:
+    - batch
+    - lane
+    - shipment
+    - RIN  # RNA quality
+    - library_size
+    - mapping_rate
+    
+  compositional:
+    - DCT_proportion  # from deconvolution
+    - PT_proportion
+    - CD_proportion
+    - Glom_proportion

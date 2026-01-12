@@ -1,0 +1,130 @@
+# Gene Sets and Pathways for Enrichment Analysis
+
+# DCT/NCC-WNK Pathway (Primary Target)
+dct_ncc_wnk:
+  description: "Distal convoluted tubule ion transport regulation"
+  genes:
+    kinases:
+      - WNK1    # WNK lysine deficient protein kinase 1
+      - WNK4    # WNK lysine deficient protein kinase 4
+      - STK39   # Serine/threonine kinase 39 (SPAK)
+      - OXSR1   # Oxidative stress responsive 1
+      
+    channels:
+      - SLC12A3  # Solute carrier family 12 member 3 (NCC)
+      - KCNJ10   # Potassium inwardly rectifying channel subfamily J member 10
+      - KCNJ16   # Potassium inwardly rectifying channel subfamily J member 16
+      - SCNN1A   # Sodium channel epithelial 1 alpha subunit (ENaC)
+      - SCNN1B   # Sodium channel epithelial 1 beta subunit
+      - SCNN1G   # Sodium channel epithelial 1 gamma subunit
+      
+    regulators:
+      - NEDD4L   # Neural precursor cell expressed developmentally down-regulated 4-like
+      - SGK1     # Serum/glucocorticoid regulated kinase 1
+      - KLHL3    # Kelch like family member 3
+      - CUL3     # Cullin 3
+      - CABP28   # Calcium binding protein 28 (Calbindin)
+
+# Spaceflight Positive Controls
+spaceflight_pathways:
+  ecm_remodeling:
+    description: "Extracellular matrix remodeling (known spaceflight response)"
+    genes:
+      - COL1A1, COL1A2, COL3A1, COL4A1, COL4A2
+      - FN1     # Fibronectin 1
+      - LAMA1, LAMA2, LAMB1, LAMB2
+      - MMP2, MMP9, MMP14
+      - TIMP1, TIMP2
+      - TGFB1, TGFB2
+      
+  oxidative_stress:
+    description: "Oxidative stress and ROS handling"
+    genes:
+      - SOD1, SOD2, SOD3
+      - CAT     # Catalase
+      - GPX1, GPX3, GPX4
+      - PRDX1, PRDX2, PRDX3
+      - NQO1    # NAD(P)H quinone dehydrogenase 1
+      - NRF2    # Nuclear factor erythroid 2-related factor 2
+      
+  calcium_handling:
+    description: "Calcium homeostasis and signaling"
+    genes:
+      - ATP2B1, ATP2B2  # Plasma membrane Ca2+ ATPase
+      - SLC8A1  # Na+/Ca2+ exchanger
+      - TRPV5   # Transient receptor potential cation channel subfamily V member 5
+      - CALB1   # Calbindin 1
+      - S100A1  # S100 calcium binding protein A1
+      - CAMK2A, CAMK2B
+      
+  lipid_metabolism:
+    description: "Lipid metabolism alterations"
+    genes:
+      - FASN    # Fatty acid synthase
+      - ACACA   # Acetyl-CoA carboxylase alpha
+      - SCD1    # Stearoyl-CoA desaturase 1
+      - FABP4   # Fatty acid binding protein 4
+      - PLIN2   # Perilipin 2
+      - PPARA, PPARG
+
+# Kidney-Specific Cell Type Markers
+kidney_markers:
+  dct:
+    description: "Distal convoluted tubule markers"
+    genes:
+      - SLC12A3  # NCC (definitive DCT marker)
+      - TRPM6    # Transient receptor potential cation channel subfamily M member 6
+      - CALB1    # Calbindin 1
+      - PV       # Parvalbumin
+      
+  proximal_tubule:
+    description: "Proximal tubule markers"
+    genes:
+      - SLC34A1  # Sodium-phosphate cotransporter
+      - LRP2     # Megalin
+      - CUBN     # Cubilin
+      - SLC5A2   # SGLT2
+      - SLC22A6  # OAT1
+      
+  collecting_duct:
+    description: "Collecting duct markers"
+    genes:
+      - AQP2    # Aquaporin 2
+      - ATP6V1B1 # V-ATPase subunit B1
+      - SLC26A4 # Pendrin
+      - AQP3    # Aquaporin 3
+      
+  glomerulus:
+    description: "Glomerular markers"
+    genes:
+      - NPHS1   # Nephrin
+      - NPHS2   # Podocin
+      - WT1     # Wilms tumor 1
+      - PECAM1  # CD31 (endothelial)
+
+# Gene Set Enrichment Databases
+enrichment_databases:
+  use:
+    - GO_Biological_Process
+    - GO_Molecular_Function
+    - KEGG_Pathways
+    - Reactome
+    - WikiPathways
+    
+  parameters:
+    min_set_size: 10
+    max_set_size: 500
+    FDR_threshold: 0.05
+
+# Silent Shifter Prioritization
+silent_shifter_criteria:
+  delta_percentile: 90      # Top 10% rewiring
+  log2fc_threshold: 0.3     # |log2FC| < 0.3
+  de_fdr_threshold: 0.2     # FDR > 0.2 (not significant DE)
+  delta_fdr_threshold: 0.1  # FDR < 0.1 (significant rewiring)
+
+# Module Detection
+module_detection:
+  method: "kmeans"
+  n_clusters: [5, 10, 15, 20]  # Try multiple k values
+  cluster_stability: true       # Use consensus clustering
