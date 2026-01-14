@@ -656,9 +656,12 @@ message(paste(rep("=", 60), collapse = ""))
 # Must include PT
 print(table(colData(sce2)$segment_use))
 
-# Must match clusters.type names
+# Must match clusters.type names (PLAN B: Proximal/Distal split)
 print(names(table(colData(sce2)$segment_use)))
-print(clusters.type$Tubule)
+message("clusters.type structure:")
+print(names(clusters.type))
+message("Proximal segments: ", paste(clusters.type$Proximal, collapse = ", "))
+message("Distal segments: ", paste(clusters.type$Distal, collapse = ", "))
 
 # ============================================================
 # In-silico pseudo-bulk test for MuSiC
@@ -1590,6 +1593,73 @@ if (length(dct_genes) > 0) {
 } else {
   message("WARNING: No DCT markers found in bulk data for validation.")
 }
+
+# ---------------------------
+# IMMUNE MARKER VALIDATION (Critical for Phase 1 Covariates)
+# ---------------------------
+message("\n", paste(rep("=", 60), collapse = ""))
+message("IMMUNE PROPORTION DIAGNOSTIC (Is Immune ~0 real?)")
+message(paste(rep("=", 60), collapse = ""))
+
+# 1. Check variance of Immune proportion
+immune_prop <- prop_seg[, "Immune"]
+message(sprintf(
+  "Immune proportion: mean=%.4f, sd=%.4f, range=[%.5f, %.4f]",
+  mean(immune_prop), sd(immune_prop), min(immune_prop), max(immune_prop)
+))
+
+immune_near_zero <- mean(immune_prop < 0.01)
+message(sprintf("Samples with Immune < 1%%: %.1f%%", immune_near_zero * 100))
+
+# 2. Compute immune marker scores from bulk
+immune_markers <- c("Ptprc", "Lyz2", "Tyrobp", "Ctss", "Fcer1g", "Cd68", "Cd3d", "Cd3e", "Ms4a1", "Lst1")
+immune_genes <- resolve_markers_to_matrix(immune_markers, rownames(bulk_cpm))
+message("Immune markers found in bulk: ", paste(immune_genes, collapse = ", "))
+
+if (length(immune_genes) >= 2) {
+  immune_score <- colMeans(log1p(bulk_cpm[immune_genes, , drop = FALSE]))
+
+  # Check if immune marker score has variance
+  message(sprintf(
+    "Immune marker score: mean=%.2f, sd=%.2f, range=[%.2f, %.2f]",
+    mean(immune_score), sd(immune_score), min(immune_score), max(immune_score)
+  ))
+
+  # 3. Correlate score vs proportion
+  immune_cor <- cor.test(immune_prop, immune_score, method = "spearman")
+  message(sprintf(
+    "\nImmune proportion vs Immune marker score: rho=%.3f, p=%.4g",
+    immune_cor$estimate, immune_cor$p.value
+  ))
+
+  # 4. Interpretation
+  if (sd(immune_score) < 0.5) {
+    message("→ Bulk immune marker scores have LOW variance (flat/absent).")
+    message("  CONCLUSION: Low immune proportion is likely REAL (kidney has few immune cells).")
+    message("  ACTION: Safe to use Immune covariate, but consider merging Immune+Stroma for stability.")
+  } else if (immune_cor$estimate > 0.3 && immune_cor$p.value < 0.05) {
+    message("→ Immune score correlates with proportion.")
+    message("  CONCLUSION: MuSiC is capturing immune variation correctly.")
+  } else if (immune_cor$estimate < 0.1 && sd(immune_score) > 1.0) {
+    message("→ WARNING: Bulk immune markers VARY but proportion stays ~0!")
+    message("  CONCLUSION: Immune may be UNDERESTIMATED.")
+    message("  ACTION: Check reference immune cell count and markers. Consider excluding from CLR.")
+  } else {
+    message("→ Inconclusive. Manual review recommended.")
+  }
+
+  # Save diagnostic
+  immune_diag <- data.frame(
+    sample = names(immune_score),
+    immune_prop = immune_prop,
+    immune_marker_score = immune_score
+  )
+  write.csv(immune_diag, file.path(outdir, "immune_diagnostic.csv"), row.names = FALSE)
+  message("Wrote immune diagnostic to: ", file.path(outdir, "immune_diagnostic.csv"))
+} else {
+  message("WARNING: Too few immune markers found. Cannot validate immune proportion.")
+}
+message(paste(rep("=", 60), collapse = ""))
 
 # Summary statistics
 good_segments <- validation_results$segment[!is.na(validation_results$spearman_rho) &

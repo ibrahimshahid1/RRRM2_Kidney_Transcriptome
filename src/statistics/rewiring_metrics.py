@@ -1,233 +1,309 @@
+# src/statistics/rewiring_metrics.py
 """
 Rewiring Metrics and Silent Shifter Detection
 
-Quantifies network rewiring as cosine distance shifts between aligned embeddings.
-Defines "silent shifters" as genes with high rewiring but low differential expression.
+Quantifies network rewiring from LIONESS edge differences and embedding shifts.
+Includes permutation testing for significance.
 
 Key Functions:
-    - cosine_distance: Compute cosine distance between vectors
-    - compute_rewiring_metrics: Primary factorial design metrics
-    - compute_legacy_metrics: 4-bin pooled metrics
-    - identify_silent_shifters: High Δ, low DE genes
+    - node_rewiring_from_delta_edges: Per-gene rewiring from edge differences
+    - top_differential_edges: Top edges by delta
+    - delta_edges_from_samples: Compute deltas from LIONESS matrix
+    - permutation_test_node_rewiring_abs: Permutation test for significance
+    - embedding_shift_table: Per-gene embedding shifts
 """
+from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Literal, Optional
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Tuple, Optional
-from scipy.spatial.distance import cosine
 
 
-def cosine_distance(v1: np.ndarray, v2: np.ndarray) -> float:
-    """
-    Compute cosine distance: 1 - cos(v1, v2).
-    
-    Parameters
-    ----------
-    v1, v2 : np.ndarray
-        Embedding vectors
-        
-    Returns
-    -------
-    distance : float
-        Cosine distance in [0, 2]
-    """
-    return cosine(v1, v2)
+@dataclass(frozen=True)
+class EdgeIndex:
+    """Index structure for edge vectors."""
+    gene_names: list
+    triu_i: np.ndarray
+    triu_j: np.ndarray
 
 
-def compute_rewiring_metrics(
-    embeddings: Dict[str, np.ndarray],
-    gene_names: List[str]
+# ============================================================================
+# EDGE-BASED REWIRING (for LIONESS networks)
+# ============================================================================
+
+def node_rewiring_from_delta_edges(
+    delta_edges: np.ndarray,
+    edge_index: EdgeIndex,
 ) -> pd.DataFrame:
     """
-    Compute primary rewiring metrics over factorial design.
+    Compute per-gene rewiring scores from edge-level differences.
+    
+    Given delta_edges = mean(groupA edges) - mean(groupB edges), compute
+    how much each node's connectivity changed.
     
     Parameters
     ----------
-    embeddings : dict
-        {condition_name: embedding_array}
-        Expected keys (ISS-T):
-            - 'Young_ISST_FLT', 'Young_ISST_HGC'
-            - 'Old_ISST_FLT', 'Old_ISST_HGC'
-        And similarly for LAR
-    gene_names : list of str
-        Gene identifiers
+    delta_edges : np.ndarray, shape (n_edges,)
+        Difference in edge weights between two groups
+    edge_index : EdgeIndex
+        Edge index structure with triu_i, triu_j, gene_names
         
     Returns
     -------
-    metrics : pd.DataFrame
-        Columns: gene, Δ_flt_young_ISST, Δ_flt_old_ISST, Δ_interaction_ISST, ...
-        
-    Notes
-    -----
-    Primary metrics (model-based):
-        Δ_ISS-T_flt,young = cosine_dist(Young_ISST_FLT, Young_ISST_HGC)
-        Δ_ISS-T_flt,old = cosine_dist(Old_ISST_FLT, Old_ISST_HGC)
-        Δ_interaction = |Δ_old - Δ_young|
+    pd.DataFrame
+        Columns: gene, rewiring_abs, rewiring_signed
+        Sorted by rewiring_abs descending
     """
-    n_genes = len(gene_names)
-    
-    metrics = {
-        'gene': gene_names
-    }
-    
-    # ISS-T flight effects
-    if all(k in embeddings for k in ['Young_ISST_FLT', 'Young_ISST_HGC']):
-        delta_young_isst = np.zeros(n_genes)
-        for g in range(n_genes):
-            v_flt = embeddings['Young_ISST_FLT'][g, :]
-            v_hgc = embeddings['Young_ISST_HGC'][g, :]
-            delta_young_isst[g] = cosine_distance(v_flt, v_hgc)
-        metrics['delta_flt_young_ISST'] = delta_young_isst
-    
-    if all(k in embeddings for k in ['Old_ISST_FLT', 'Old_ISST_HGC']):
-        delta_old_isst = np.zeros(n_genes)
-        for g in range(n_genes):
-            v_flt = embeddings['Old_ISST_FLT'][g, :]
-            v_hgc = embeddings['Old_ISST_HGC'][g, :]
-            delta_old_isst[g] = cosine_distance(v_flt, v_hgc)
-        metrics['delta_flt_old_ISST'] = delta_old_isst
-    
-    # Interaction
-    if 'delta_flt_young_ISST' in metrics and 'delta_flt_old_ISST' in metrics:
-        metrics['delta_interaction_ISST'] = np.abs(
-            metrics['delta_flt_old_ISST'] - metrics['delta_flt_young_ISST']
-        )
-    
-    # Repeat for LAR (if available)
-    # TODO: Add LAR metrics similarly
-    
-    return pd.DataFrame(metrics)
+    delta_edges = np.asarray(delta_edges, dtype=np.float64)
+    triu_i = edge_index.triu_i
+    triu_j = edge_index.triu_j
+    genes = edge_index.gene_names
+    p = len(genes)
+
+    abs_delta = np.abs(delta_edges)
+
+    # Absolute rewiring: sum of |Δw| for all edges incident to node
+    abs_score = (
+        np.bincount(triu_i, weights=abs_delta, minlength=p) +
+        np.bincount(triu_j, weights=abs_delta, minlength=p)
+    )
+
+    # Signed rewiring: sum of Δw (directional, can cancel)
+    signed_score = (
+        np.bincount(triu_i, weights=delta_edges, minlength=p) +
+        np.bincount(triu_j, weights=delta_edges, minlength=p)
+    )
+
+    df = pd.DataFrame({
+        "gene": genes,
+        "rewiring_abs": abs_score,
+        "rewiring_signed": signed_score,
+    })
+    return df.sort_values("rewiring_abs", ascending=False).reset_index(drop=True)
 
 
-def compute_legacy_metrics(
-    embeddings: Dict[str, np.ndarray],
-    gene_names: List[str]
+def top_differential_edges(
+    delta_edges: np.ndarray,
+    edge_index: EdgeIndex,
+    top_n: int = 200,
+    sort_by: Literal["abs", "signed"] = "abs",
 ) -> pd.DataFrame:
     """
-    Compute legacy 4-bin pooled metrics for sensitivity/summary.
+    Return top differential edges from delta vector.
     
     Parameters
     ----------
-    embeddings : dict
-        Expected keys: YC, YF, OC, OF (pooled across arms)
-    gene_names : list of str
+    delta_edges : np.ndarray
+        Edge-level differences
+    edge_index : EdgeIndex
+        Edge index structure
+    top_n : int
+        Number of top edges to return
+    sort_by : str
+        "abs": top by |delta|
+        "signed": top by delta (positive first)
         
     Returns
     -------
-    metrics : pd.DataFrame
-        Columns: gene, delta_age_ctrl, delta_age_flt, delta_flt_young, delta_flt_old
-        
-    Notes
-    -----
-    Legacy metrics (4-bin):
-        Δ_age,ctrl = cosine_dist(OC, YC)
-        Δ_age,flt = cosine_dist(OF, YF)
-        Δ_flt,young = cosine_dist(YF, YC)
-        Δ_flt,old = cosine_dist(OF, OC)
+    pd.DataFrame
+        Columns: gene_u, gene_v, delta, abs_delta, u, v
     """
-    n_genes = len(gene_names)
-    
-    metrics = {
-        'gene': gene_names
-    }
-    
-    # Age effect in controls
-    if 'OC' in embeddings and 'YC' in embeddings:
-        delta_age_ctrl = np.array([
-            cosine_distance(embeddings['OC'][g, :], embeddings['YC'][g, :])
-            for g in range(n_genes)
-        ])
-        metrics['delta_age_ctrl'] = delta_age_ctrl
-    
-    # Age effect in flight
-    if 'OF' in embeddings and 'YF' in embeddings:
-        delta_age_flt = np.array([
-            cosine_distance(embeddings['OF'][g, :], embeddings['YF'][g, :])
-            for g in range(n_genes)
-        ])
-        metrics['delta_age_flt'] = delta_age_flt
-    
-    # Flight effect in young
-    if 'YF' in embeddings and 'YC' in embeddings:
-        delta_flt_young = np.array([
-            cosine_distance(embeddings['YF'][g, :], embeddings['YC'][g, :])
-            for g in range(n_genes)
-        ])
-        metrics['delta_flt_young'] = delta_flt_young
-    
-    # Flight effect in old
-    if 'OF' in embeddings and 'OC' in embeddings:
-        delta_flt_old = np.array([
-            cosine_distance(embeddings['OF'][g, :], embeddings['OC'][g, :])
-            for g in range(n_genes)
-        ])
-        metrics['delta_flt_old'] = delta_flt_old
-    
-    return pd.DataFrame(metrics)
+    delta_edges = np.asarray(delta_edges, dtype=np.float64)
+    triu_i = edge_index.triu_i
+    triu_j = edge_index.triu_j
+    genes = edge_index.gene_names
 
+    absd = np.abs(delta_edges)
+    if top_n <= 0:
+        return pd.DataFrame(columns=["gene_u", "gene_v", "delta", "abs_delta", "u", "v"])
 
-def identify_silent_shifters(
-    rewiring_df: pd.DataFrame,
-    de_results: pd.DataFrame,
-    delta_col: str = 'delta_flt_young_ISST',
-    delta_percentile: float = 90,
-    log2fc_threshold: float = 0.3,
-    de_fdr_threshold: float = 0.2,
-    delta_fdr_col: Optional[str] = None,
-    delta_fdr_threshold: float = 0.1
-) -> pd.DataFrame:
-    """
-    Identify silent shifters: high rewiring + low differential expression.
-    
-    Parameters
-    ----------
-    rewiring_df : pd.DataFrame
-        Output from compute_rewiring_metrics
-    de_results : pd.DataFrame
-        Differential expression results (must have: gene, log2FC, FDR)
-    delta_col : str
-        Which Δ metric to use
-    delta_percentile : float
-        Percentile threshold for high rewiring (e.g., 90 = top 10%)
-    log2fc_threshold : float
-        Maximum |log2FC| for "low DE"
-    de_fdr_threshold : float
-        Minimum FDR for "not significantly DE"
-    delta_fdr_col : str, optional
-        Column name for rewiring FDR (if available)
-    delta_fdr_threshold : float
-        Maximum FDR for significant rewiring
-        
-    Returns
-    -------
-    silent_shifters : pd.DataFrame
-        Genes meeting silent shifter criteria
-    """
-    # Merge rewiring and DE
-    merged = rewiring_df.merge(de_results, on='gene', how='inner')
-    
-    # High rewiring criterion
-    delta_threshold = np.percentile(merged[delta_col], delta_percentile)
-    high_rewiring = merged[delta_col] >= delta_threshold
-    
-    # Low DE criterion
-    low_de = (np.abs(merged['log2FC']) < log2fc_threshold) & (merged['FDR'] > de_fdr_threshold)
-    
-    # Significant rewiring (if FDR available)
-    if delta_fdr_col is not None and delta_fdr_col in merged.columns:
-        sig_rewiring = merged[delta_fdr_col] < delta_fdr_threshold
+    if sort_by == "abs":
+        idx = np.argsort(absd)[::-1][:top_n]
+    elif sort_by == "signed":
+        idx = np.argsort(delta_edges)[::-1][:top_n]
     else:
-        sig_rewiring = high_rewiring  # Use percentile only
+        raise ValueError("sort_by must be 'abs' or 'signed'")
+
+    uu = triu_i[idx].astype(np.int32)
+    vv = triu_j[idx].astype(np.int32)
+
+    df = pd.DataFrame({
+        "u": uu,
+        "v": vv,
+        "gene_u": [genes[i] for i in uu],
+        "gene_v": [genes[j] for j in vv],
+        "delta": delta_edges[idx].astype(np.float32),
+        "abs_delta": absd[idx].astype(np.float32),
+    })
+    if sort_by == "abs":
+        df = df.sort_values("abs_delta", ascending=False)
+    else:
+        df = df.sort_values("delta", ascending=False)
+    return df.reset_index(drop=True)
+
+
+def delta_edges_from_samples(
+    lioness_edges: np.ndarray,
+    idx_A: np.ndarray,
+    idx_B: np.ndarray,
+) -> np.ndarray:
+    """
+    Compute delta_edges = mean(A) - mean(B) from LIONESS edge matrix.
     
-    # Combine criteria
-    silent_shifters = merged[high_rewiring & low_de & sig_rewiring].copy()
+    Parameters
+    ----------
+    lioness_edges : np.ndarray, shape (n_samples, n_edges)
+        LIONESS edge matrix
+    idx_A, idx_B : np.ndarray
+        Sample indices for groups A and B
+        
+    Returns
+    -------
+    np.ndarray
+        Delta edges, shape (n_edges,)
+    """
+    A = lioness_edges[idx_A].mean(axis=0)
+    B = lioness_edges[idx_B].mean(axis=0)
+    return (A - B).astype(np.float32)
+
+
+def embedding_shift_table(
+    gene_names: list,
+    shift_values: np.ndarray,
+    label: str = "shift_l2",
+) -> pd.DataFrame:
+    """
+    Create a shift table from pre-computed shift values.
     
-    # Sort by rewiring magnitude
-    silent_shifters = silent_shifters.sort_values(delta_col, ascending=False)
+    Parameters
+    ----------
+    gene_names : list
+        Gene names
+    shift_values : np.ndarray
+        Per-gene shift values
+    label : str
+        Column name for the shift values
+        
+    Returns
+    -------
+    pd.DataFrame
+        Sorted by shift descending
+    """
+    df = pd.DataFrame({"gene": gene_names, label: np.asarray(shift_values, dtype=np.float64)})
+    return df.sort_values(label, ascending=False).reset_index(drop=True)
+
+
+def permutation_test_node_rewiring_abs(
+    lioness_edges: np.ndarray,
+    edge_index: EdgeIndex,
+    idx_A: np.ndarray,
+    idx_B: np.ndarray,
+    n_perm: int = 200,
+    seed: int = 0,
+    verbose: bool = True,
+) -> pd.DataFrame:
+    """
+    Permutation test for node rewiring_abs significance.
     
-    return silent_shifters
+    This is simple (and computationally intensive for large n_perm),
+    but works well for p~1200 and n_perm~200.
+    
+    Parameters
+    ----------
+    lioness_edges : np.ndarray, shape (n_samples, n_edges)
+        LIONESS edge matrix
+    edge_index : EdgeIndex
+        Edge index structure
+    idx_A, idx_B : np.ndarray
+        Sample indices for groups A and B
+    n_perm : int
+        Number of permutations
+    seed : int
+        Random seed
+    verbose : bool
+        Print progress
+        
+    Returns
+    -------
+    pd.DataFrame
+        Columns: gene, rewiring_abs_observed, p_value
+    """
+    rng = np.random.default_rng(seed)
+    n = lioness_edges.shape[0]
+    all_idx = np.arange(n)
+
+    idx_A = np.asarray(idx_A, dtype=int)
+    idx_B = np.asarray(idx_B, dtype=int)
+    nA = len(idx_A)
+    nB = len(idx_B)
+
+    # Observed statistic
+    obs_delta = delta_edges_from_samples(lioness_edges, idx_A, idx_B).astype(np.float64)
+    obs = node_rewiring_from_delta_edges(obs_delta, edge_index)["rewiring_abs"].values
+
+    perm_ge = np.zeros_like(obs, dtype=np.int32)
+
+    for i in range(n_perm):
+        if verbose and i % 50 == 0:
+            print(f"  Permutation {i+1}/{n_perm}", end="\r")
+        
+        perm = rng.permutation(all_idx)
+        pA = perm[:nA]
+        pB = perm[nA:nA+nB]
+        d = delta_edges_from_samples(lioness_edges, pA, pB).astype(np.float64)
+        s = node_rewiring_from_delta_edges(d, edge_index)["rewiring_abs"].values
+        perm_ge += (s >= obs).astype(np.int32)
+
+    if verbose:
+        print(f"  Completed {n_perm} permutations" + " " * 20)
+
+    pvals = (perm_ge + 1) / (n_perm + 1)
+
+    out = pd.DataFrame({
+        "gene": edge_index.gene_names,
+        "rewiring_abs_observed": obs,
+        "p_value": pvals,
+    }).sort_values("rewiring_abs_observed", ascending=False).reset_index(drop=True)
+
+    return out
+
+
+# ============================================================================
+# LEGACY COMPATIBILITY - keep old function signatures working
+# ============================================================================
+
+def node_rewiring_from_delta_edges_legacy(
+    delta_edges: np.ndarray,
+    triu_i: np.ndarray,
+    triu_j: np.ndarray,
+    gene_names: list,
+) -> pd.DataFrame:
+    """
+    Legacy interface - wraps new EdgeIndex-based function.
+    """
+    edge_index = EdgeIndex(gene_names=gene_names, triu_i=triu_i, triu_j=triu_j)
+    return node_rewiring_from_delta_edges(delta_edges, edge_index)
 
 
 if __name__ == "__main__":
-    print("Rewiring metrics module loaded successfully")
-    print("Key functions: compute_rewiring_metrics, identify_silent_shifters")
+    # Quick test
+    np.random.seed(42)
+    p = 100
+    n_edges = p * (p - 1) // 2
+    
+    delta = np.random.randn(n_edges).astype(np.float32)
+    triu_i, triu_j = np.triu_indices(p, k=1)
+    genes = [f"gene_{i}" for i in range(p)]
+    
+    edge_index = EdgeIndex(gene_names=genes, triu_i=triu_i, triu_j=triu_j)
+    
+    df = node_rewiring_from_delta_edges(delta, edge_index)
+    print(f"Rewiring table: {len(df)} genes")
+    print(df.head())
+    
+    top = top_differential_edges(delta, edge_index, top_n=10)
+    print(f"\nTop differential edges: {len(top)} edges")
+    print(top)
+    
+    print("\nrewiring_metrics module loaded successfully")

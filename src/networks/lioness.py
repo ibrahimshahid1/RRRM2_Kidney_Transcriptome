@@ -15,6 +15,171 @@ Key Functions:
 
 import numpy as np
 from typing import List, Tuple
+from dataclasses import dataclass
+from pathlib import Path
+
+
+# ============================================================================
+# DENSE LIONESS IMPLEMENTATION (full correlation networks)
+# ============================================================================
+
+@dataclass(frozen=True)
+class LionessIndex:
+    """Index structure for reconstructing matrices from edge vectors."""
+    gene_names: list
+    triu_i: np.ndarray  # (n_edges,) row indices of upper triangle
+    triu_j: np.ndarray  # (n_edges,) column indices of upper triangle
+
+
+def _corr_from_summaries(sum_x: np.ndarray, cross: np.ndarray, n: int, eps: float = 1e-12) -> np.ndarray:
+    """
+    Compute Pearson correlation matrix from sufficient statistics.
+    
+    This allows efficient leave-one-out computation without recomputing
+    the full correlation matrix from scratch.
+    
+    Parameters
+    ----------
+    sum_x : np.ndarray
+        Column sums of the data matrix, shape (p,)
+    cross : np.ndarray
+        Cross-product matrix X.T @ X, shape (p, p)
+    n : int
+        Number of samples
+    eps : float
+        Small constant to prevent division by zero
+        
+    Returns
+    -------
+    np.ndarray
+        Correlation matrix, shape (p, p)
+    """
+    outer = np.outer(sum_x, sum_x) / float(n)
+    S = cross - outer
+    cov = S / float(n - 1)
+
+    var = np.clip(np.diag(cov), eps, None)
+    sd = np.sqrt(var)
+    denom = sd[:, None] * sd[None, :]
+    corr = cov / denom
+
+    corr = np.clip(corr, -1.0, 1.0)
+    np.fill_diagonal(corr, 0.0)
+    return corr
+
+
+def lioness_correlation_edges(
+    X: np.ndarray,
+    gene_names: list,
+    dtype=np.float32,
+    verbose: bool = True,
+) -> tuple:
+    """
+    Compute LIONESS sample-specific networks using Pearson correlation.
+    
+    Uses full dense correlation matrices. Suitable for ~800-1500 genes.
+    
+    Parameters
+    ----------
+    X : np.ndarray
+        Expression matrix, shape (n_samples, p_genes)
+    gene_names : list
+        Gene names corresponding to columns of X
+    dtype : np.dtype
+        Output dtype for edge weights
+    verbose : bool
+        Print progress
+        
+    Returns
+    -------
+    edges : np.ndarray, shape (n_samples, n_edges)
+    index : LionessIndex
+    """
+    if X.ndim != 2:
+        raise ValueError(f"X must be 2D (n_samples x p_genes). Got {X.shape}")
+
+    n, p = X.shape
+    if n < 4:
+        raise ValueError("Need at least 4 samples for stable correlation / leave-one-out.")
+
+    if len(gene_names) != p:
+        raise ValueError("gene_names length must match number of columns in X.")
+
+    if verbose:
+        n_edges = p * (p - 1) // 2
+        print(f"LIONESS: {n} samples × {p} genes → {n_edges:,} edges per network")
+
+    X = np.asarray(X, dtype=np.float64)
+    sum_x = X.sum(axis=0)
+    cross = X.T @ X
+
+    W_all = _corr_from_summaries(sum_x, cross, n)
+
+    triu_i, triu_j = np.triu_indices(p, k=1)
+    W_all_edges = W_all[triu_i, triu_j]
+
+    n_edges = W_all_edges.shape[0]
+    edges = np.empty((n, n_edges), dtype=dtype)
+
+    for i in range(n):
+        if verbose and i % 10 == 0:
+            print(f"  Processing sample {i+1}/{n}", end="\r")
+        
+        xi = X[i, :]
+        sum_x_m = sum_x - xi
+        cross_m = cross - np.outer(xi, xi)
+        W_m = _corr_from_summaries(sum_x_m, cross_m, n - 1)
+        W_m_edges = W_m[triu_i, triu_j]
+
+        Wi_edges = n * (W_all_edges - W_m_edges) + W_m_edges
+        edges[i, :] = Wi_edges.astype(dtype, copy=False)
+
+    if verbose:
+        print(f"  Completed all {n} samples" + " " * 20)
+
+    index = LionessIndex(gene_names=gene_names, triu_i=triu_i, triu_j=triu_j)
+    return edges, index
+
+
+def edges_to_matrix(edges: np.ndarray, index: LionessIndex) -> np.ndarray:
+    """Reconstruct symmetric adjacency matrix from edge vector."""
+    p = len(index.gene_names)
+    mat = np.zeros((p, p), dtype=edges.dtype)
+    mat[index.triu_i, index.triu_j] = edges
+    mat[index.triu_j, index.triu_i] = edges
+    return mat
+
+
+def save_lioness_bundle(outdir, edges: np.ndarray, index: LionessIndex) -> None:
+    """Save LIONESS results: lioness_edges.npy, triu_i.npy, triu_j.npy, genes.txt"""
+    outdir = Path(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    np.save(outdir / "lioness_edges.npy", edges)
+    np.save(outdir / "triu_i.npy", index.triu_i)
+    np.save(outdir / "triu_j.npy", index.triu_j)
+    (outdir / "genes.txt").write_text("\n".join(index.gene_names) + "\n", encoding="utf-8")
+    
+    print(f"Saved LIONESS bundle to {outdir}:")
+    print(f"  - lioness_edges.npy: {edges.shape}")
+    print(f"  - triu_i.npy, triu_j.npy: {len(index.triu_i):,} edges")
+    print(f"  - genes.txt: {len(index.gene_names)} genes")
+
+
+def load_lioness_bundle(indir):
+    """Load LIONESS results from disk."""
+    indir = Path(indir)
+    edges = np.load(indir / "lioness_edges.npy")
+    triu_i = np.load(indir / "triu_i.npy")
+    triu_j = np.load(indir / "triu_j.npy")
+    gene_names = (indir / "genes.txt").read_text(encoding="utf-8").strip().split("\n")
+    index = LionessIndex(gene_names=gene_names, triu_i=triu_i, triu_j=triu_j)
+    return edges, index
+
+
+# ============================================================================
+# SPARSE LIONESS IMPLEMENTATION (original - for fixed edge skeletons)
+# ============================================================================
 
 
 def edge_corrs(
