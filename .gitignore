@@ -1,21 +1,64 @@
-@ -1,81 +0,0 @@
-@ -1,79 +1 @@
-# Data files (too large for git)
+# ===============================================
+# RRRM-2 Kidney Transcriptome .gitignore
+# ===============================================
+
+# -----------------------------------------------
+# Large Data Directories (Generated Results)
+# -----------------------------------------------
+# Processed data (embeddings, networks, residuals)
+data/processed/
+data/external/
+data/networks/
+
+# Raw data except README
 data/raw/*
-data/processed/*
-data/external/single_cell_atlases/*
-data/external/phosphoproteomics/*
-data/networks/*
 !data/raw/README.md
-!data/*/.gitkeep
 
-# Results (generated files)
-results/embeddings/*
-results/models/*
-results/figures/*
-results/tables/*
+# Exports snapshots (large intermediate outputs)
+exports/
 
-# Python
+# -----------------------------------------------
+# Large File Formats (regardless of location)
+# -----------------------------------------------
+# Scientific data formats
+*.h5ad
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.mtx
+*.rds
+*.parquet
+*.pkl
+*.pickle
+*.emb
+
+# Large CSVs (generated results over 10MB)
+# Note: keeping smaller tables and metadata CSVs
+
+# -----------------------------------------------
+# Results - Exclude embeddings/models, keep figures/tables
+# -----------------------------------------------
+results/embeddings/
+results/models/
+
+# Keep results/figures/ and results/tables/ (small visualization outputs)
+# Do NOT add results/figures/ or results/tables/ here
+
+# -----------------------------------------------
+# KEEP: plots/ directory (paper figures ~12MB)
+# -----------------------------------------------
+# Do NOT exclude plots/ - these are important outputs
+
+# -----------------------------------------------
+# Python Environment
+# -----------------------------------------------
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -37,46 +80,36 @@ wheels/
 .installed.cfg
 *.egg
 
+# -----------------------------------------------
 # Jupyter Notebook
-.ipynb_checkpoints
+# -----------------------------------------------
+.ipynb_checkpoints/
 */.ipynb_checkpoints/*
 
-# Environment
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# IDEs
+# -----------------------------------------------
+# IDEs and Editors
+# -----------------------------------------------
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
+# -----------------------------------------------
+# Operating System
+# -----------------------------------------------
 .DS_Store
 Thumbs.db
 
-# Large data formats
-*.h5ad
-*.h5
-*.hdf5
-*.emb
-*.pkl
-*.pickle
-*.rds
-*.parquet
-
-# Logs
+# -----------------------------------------------
+# Logs and Temporary Files
+# -----------------------------------------------
 *.log
 logs/
-
-# Temporary files
 *.tmp
 temp/
 tmp/
-=
+
+# Debug logs in root (from deconvolution runs)
+debug_*.txt
+deconv_log*.txt

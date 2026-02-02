@@ -5,13 +5,16 @@ This document provides the complete methodological framework for the age-depende
 ## Overview
 
 This pipeline analyzes the NASA GeneLab OSD-771 (Rodent Research Reference Mission 2) kidney transcriptome dataset using a novel combination of:
-- Cell-type deconvolution
+- Cell-type deconvolution (**MuSiC** with Tabula Muris Senis kidney reference)
 - Cell-standardized shared topology construction (prevents Simpson's paradox)
 - LIONESS sample-specific network inference
 - Edge-wise regression over full factorial design
-- node2vec graph embeddings with Procrustes alignment
+- **PecanPy** node2vec graph embeddings with Procrustes alignment
 - "Silent shifter" detection (high rewiring, low differential expression)
-- Leakage-safe cross-validation
+- Permutation and bootstrap uncertainty estimation
+- Biological grounding via gene set enrichment
+
+> **Note:** In the current implementation, Phase 4 (edge regression) is integrated into Phase 2. The pipeline runs phases {0, 1, 2, 3, 5, 6, 7}.
 
 ---
 
@@ -40,9 +43,9 @@ Each cell (Age × Arm × Group) contains 5 mice per age level.
 - **Filtering**: Remove genes with CPM < 1 in > 80% of samples
 
 ### Cell-Type Deconvolution
-- **Reference**: Murine kidney single-cell atlases (Tabula Muris Senis, Park et al. 2018)
-- **Method**: Ridge regression or NNLS
-- **Output**: Nephron segment proportions (DCT, PT, CD, Glom)
+- **Reference**: Tabula Muris Senis kidney atlas
+- **Method**: **MuSiC** (Multi-Subject Single Cell Deconvolution)
+- **Output**: Nephron segment proportions (DCT, PT, CD, Glom, Immune, Stroma)
 - **Transformation**: Centered log-ratio (CLR) to avoid collinearity
 
 ### Quality Control
@@ -71,7 +74,7 @@ Y_g ~ batch + lane + shipment + SVs + CLR(DCT) + CLR(PT) + CLR(CD) + CLR(Glom)
 
 ---
 
-## Phase 2: Cell-Standardized Shared Topology
+## Phase 2: Network Construction (Shared Topology + LIONESS + Edge Regression)
 
 **Critical Innovation**: Prevent Simpson's paradox in edge selection.
 
@@ -84,17 +87,11 @@ R*_ig = (R_ig - μ_cg) / σ_cg
 Pool all R* across cells → use for topology selection.
 
 ### Edge Selection Methods
-1. **Top-k neighbors** (default: k=50)
-2. **Partial correlations** (Ledoit-Wolf shrinkage + precision matrix)
-3. **Graphical lasso** (sparse precision estimation)
+- **Method**: Ledoit-Wolf shrinkage → precision matrix → partial correlations
+- **Top-k neighbors**: k=50-80 per gene (union of all top-k gives skeleton **E**)
+- **Output**: Fixed edge list **E** (50k-200k edges on 1k-3k gene panel)
 
-### Output
-Fixed edge list **E** (50k-200k edges on 1k-3k gene panel).
-
----
-
-## Phase 3: LIONESS Sample-Specific Networks
-
+### LIONESS Sample-Specific Networks
 **LIONESS formula**:
 ```
 w_e(s) = N · w_e(all) - (N-1) · w_e(-s)
@@ -105,46 +102,44 @@ Where:
 - `w_e(-s)`: leave-one-out correlation excluding sample s
 - `N`: number of samples
 
-### Fisher z-Transform
+**Fisher z-Transform**:
 ```
 z = atanh(r)
 ```
 Approximates normal distribution for regression modeling.
 
-### Output
+**Output**:
 - **W_samp**: Sample-specific edge weights (n_samples × |E|)
 - **Z_samp**: Fisher z-transformed weights
 
----
-
-## Phase 4: Edge-Wise Regression
-
-### Model (per edge e)
+### Edge-Wise Regression
+**Model (per edge e)**:
 ```
 z_e ~ Age + Arm + Group + Age:Group + Arm:Group + Age:Arm + Age:Arm:Group + batch + SVs + cell_props
 ```
 
-### Empirical Bayes Variance Moderation
+**Empirical Bayes Variance Moderation**:
 - Borrow information across edges (limma-style)  
 - Moderated variance: `σ²_mod = (d₀·s₀² + df·σ²) / (d₀ + df)`
 - Improves stability with high-dimensional edge data
 
-### Predicted Contrast Networks
+**Predicted Contrast Networks**:
 For target condition profile P, predict each edge weight:
 ```
 ẑ_e(P) = X(P) · β̂_e
 ```
-
 Assemble weighted graph using E and predicted weights.
 
 ---
 
-## Phase 5: node2vec Embeddings & Alignment
+## Phase 3: node2vec Embeddings & Procrustes Alignment
 
-### Multi-Seed node2vec
+### Multi-Seed PecanPy node2vec
+- **Implementation**: PecanPy (fast Python node2vec)
 - **Dimensions**: 128
 - **Parameters**: p=0.25 (return), q=4.0 (in-out)
 - **Random seeds**: 10 (for stability assessment)
+- **Walk length**: 80, **Walks per node**: 200
 
 ### Procrustes Alignment
 Using pre-registered anchor genes:
@@ -155,27 +150,62 @@ Using pre-registered anchor genes:
 ### Consensus Embedding
 Average across 10 aligned embeddings.
 
----
-
-## Phase 6: Rewiring Metrics & Statistics
-
 ### Cosine Distance Rewiring
 ```
 Δ(P₁, P₂; g) = 1 - cos(v_P₁(g), v_P₂(g))
 ```
 
+---
+
+## Phase 5: Silent Shifters & Interaction Metrics
+
 ### Silent Shifter Criteria
 - **High rewiring**: Δ in top 10% AND FDR < 0.1
 - **Low DE**: |log₂FC| < 0.3 AND DE FDR > 0.2
 
-### Statistical Inference
-- **Bootstrap** (n=2000): CIs for Δ, topology fixed
-- **Permutation** (n=2000): stratified within Age/Arm
-- **FDR correction**: Benjamini-Hochberg + Westfall-Young for top hits
+### Interaction Persistence
+- Compare rewiring across contrasts (ISS-T vs LAR, Young vs Old)
+- Identify genes with consistent vs variable network changes
 
 ---
 
-## Phase 7: Leakage-Safe Cross-Validation
+## Phase 6: Uncertainty Estimation & Full Regression
+
+### Statistical Inference
+- **Permutation** (n=2000): stratified within Age/Arm
+- **Bootstrap** (n=2000): CIs for Δ, topology fixed
+- **FDR correction**: Benjamini-Hochberg + Westfall-Young for top hits
+
+### Full Factorial Regression (n=80)
+- Edge-wise regression on all 80 samples
+- Used for final contrast network prediction
+
+### Gene-Level Differential Expression
+- limma for per-gene DE analysis
+- Used for silent shifter classification
+
+---
+
+## Phase 7: Biological Grounding
+
+### Gene Set Enrichment
+- GO biological process, molecular function, cellular component
+- KEGG pathway analysis
+- Reactome pathway analysis
+
+### Pre-Registered Gene Sets
+- **DCT/NCC-WNK pathway**: WNK1, WNK4, STK39, SLC12A3, KCNJ10, etc.
+- **Positive controls**: ECM remodeling, oxidative stress, calcium handling, lipid metabolism
+
+### Module Analysis
+- k-means clustering on embeddings
+- GO/KEGG/Reactome enrichment for high-Δ modules
+
+---
+
+## Validation: Leakage-Safe Cross-Validation
+
+**Note**: This is implemented in `src/validation/` but not run as part of the main pipeline by default.
 
 ### Fold-Wise Operations (5-fold stratified CV)
 **For each fold:**
@@ -214,9 +244,11 @@ RandomForest (100 trees) predicting Environment Group.
 1. Kuijjer et al. (2019) LIONESS. *iScience*.
 2. Grover & Leskovec (2016) node2vec. *KDD*.
 3. Smyth (2004) limma empirical Bayes. *Stat Appl Genet Mol Biol*.
-4. NASA GeneLab OSD-771 dataset.
+4. Wang et al. (2019) MuSiC. *Nature Communications*.
+5. NASA GeneLab OSD-771 dataset.
+6. Tabula Muris Consortium (2020) Tabula Muris Senis. *Nature*.
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: 2026-01-07
+**Document Version**: 2.0  
+**Last Updated**: 2026-02-01

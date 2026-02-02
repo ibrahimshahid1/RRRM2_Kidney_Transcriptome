@@ -23,9 +23,7 @@ import numpy as np
 import pandas as pd
 
 
-# ===============================================================
 # Numerical stabilization constants
-# ===============================================================
 CLIP_R = 0.9995   # Clip correlations before atanh to prevent explosion from r≈±1
 ZCAP = 20.0       # Final cap on LIONESS z to catch outlier pathology
 
@@ -117,7 +115,7 @@ def main():
     # Extract gene matrix - only Phase 2 genes
     missing = [g for g in genes if g not in rtech.index]
     if missing:
-        print(f"  WARNING: {len(missing)} genes not in Rtech!")
+        print(f"  WARNING: {len(missing)} genes not in Rtech")
         print(f"  First 20 missing: {missing[:20]}")
         # Keep only genes that exist
         genes = [g for g in genes if g in rtech.index]
@@ -191,7 +189,7 @@ def main():
     edges.to_csv(p2 / "edge_index.tsv", sep="\t", index=False)
 
     print(f"\n{'=' * 60}")
-    print("LIONESS computation complete!")
+    print("LIONESS computation complete")
     print(f"{'=' * 60}")
     print(f"\nOutput shape: {out.shape} (samples × edges)")
     print(f"  Fisher-z range: [{out.min():.4f}, {out.max():.4f}]")

@@ -1,4 +1,3 @@
-# =============================================================================
 # Sanity Marker Panel Script
 # Purpose: Validate marker expression across nephron segments to ensure correct
 #          cell type labeling in the reference SCE before deconvolution.
@@ -12,7 +11,6 @@
 #
 # Prerequisites: Run this AFTER run_deconvolution.R has created `sce2` so that
 #                `sce2` is in your global environment with segment_use assigned.
-# =============================================================================
 
 suppressPackageStartupMessages({
     library(SingleCellExperiment)
@@ -25,13 +23,9 @@ stopifnot(exists("sce2"))
 stopifnot("segment_use" %in% colnames(colData(sce2)))
 stopifnot("counts" %in% assayNames(sce2))
 
-# =============================================================================
 # PART A: Sanity Marker Panel (means + % expressing)
-# =============================================================================
 
-# ----------------------------
 # 0) Marker panel (SYMBOLS)
-# ----------------------------
 panel <- list(
     PT      = c("Slc34a1", "Lrp2", "Aqp1"),
     TAL     = c("Slc12a1", "Umod", "Kcnj1", "Clcnkb"),
@@ -42,9 +36,7 @@ panel <- list(
 )
 all_syms <- unique(unlist(panel))
 
-# ----------------------------
 # 1) Map SYMBOL -> ENSMUSG (only if needed)
-# ----------------------------
 rown_is_ens <- mean(grepl("^ENSMUSG", rownames(sce2))) > 0.5
 
 sym2ens <- function(symbols) {
@@ -75,9 +67,7 @@ for (k in names(panel_ids)) {
     if (length(panel_ids[[k]]) == 0) cat("  !!! NONE present for this group\n")
 }
 
-# ----------------------------
 # 2) Compute logCPM for scoring + mean per segment
-# ----------------------------
 X <- assay(sce2, "counts")
 grp <- factor(colData(sce2)$segment_use)
 
@@ -112,9 +102,7 @@ group_pct_expr <- function(counts, gene_ids) {
     sweep(S, 2, n_per_group, "/")
 }
 
-# ----------------------------
 # 3) Build tables for the full panel
-# ----------------------------
 panel_gene_ids <- unique(unlist(panel_ids))
 if (length(panel_gene_ids) == 0) stop("No marker genes found in sce2 after mapping.")
 
@@ -139,9 +127,7 @@ print(round(means, 2))
 cat("\n=== % cells expressing (counts>0) by segment ===\n")
 print(round(pct * 100, 1))
 
-# ----------------------------
 # 4) Quick "where does each marker peak?"
-# ----------------------------
 peak_seg <- apply(means, 1, function(v) colnames(means)[which.max(v)])
 cat("\n=== Peak segment per marker (by mean logCPM) ===\n")
 print(peak_seg)
@@ -159,7 +145,6 @@ if (length(cdpc_rows) > 0) {
     print(peak_seg[cdpc_rows])
 }
 
-# =============================================================================
 # How to interpret the output (the "skeptical" read):
 #
 # - If Aqp2 / Avpr2 / Scnn1g peak in "Other", you likely have true collecting
@@ -170,17 +155,13 @@ if (length(cdpc_rows) > 0) {
 #   NOT true collecting duct.
 # - If Slc12a1/Umod don't peak in your TAL_LOH, your TAL label may be off
 #   (or TAL is underrepresented).
-# =============================================================================
 
 
-# =============================================================================
 # PART B: Rename/split distal segments (practical way)
-# =============================================================================
 # Option 1: Simple "module-score winner" relabel inside (DCT, CD, Other)
 #
 # This is the fastest approach, and it's surprisingly effective.
 # After running this, use `segment_refined` instead of `segment_use` in MuSiC.
-# =============================================================================
 
 # Set to TRUE to enable the relabeling (run Part A first to inspect markers)
 RUN_RELABELING <- FALSE
@@ -237,7 +218,6 @@ if (RUN_RELABELING) {
     print(table(before = colData(sce2)$segment_use[cells]))
     print(table(after = colData(sce2)$segment_refined[cells]))
 
-    # =============================================================================
     # What this accomplishes:
     #   - If true collecting duct is hiding in "Other", it becomes CD_PC / CD_IC.
     #   - Your current "CD" that's really CNT becomes DCT2CNT.
@@ -247,7 +227,6 @@ if (RUN_RELABELING) {
     # IMPORTANT: Tell MuSiC to use `segment_refined` instead of `segment_use`
     #   Wherever your deconvolution script currently uses `segment_use`,
     #   switch the cluster column to `segment_refined`.
-    # =============================================================================
 
     message("\nDone! Use colData(sce2)$segment_refined for MuSiC deconvolution.")
     message("Remember to update clusters.type to include: DCT1, DCT2CNT, CD_PC, CD_IC")
@@ -256,9 +235,7 @@ if (RUN_RELABELING) {
     message("Set RUN_RELABELING <- TRUE after inspecting Part A output to enable refinement.")
 }
 
-# =============================================================================
 # Summary statistics export (optional)
-# =============================================================================
 
 # Save marker expression tables for later review
 outdir <- "data/processed/deconvolution/marker_sanity"

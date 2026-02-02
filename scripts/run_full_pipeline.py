@@ -46,9 +46,7 @@ def run_full_pipeline(config: dict, data_path: str, output_dir: str):
         6. Rewiring Quantification & Statistics
         7. Leakage-Safe Validation
     """
-    logger.info("="*60)
     logger.info("RRRM-2 Kidney Network Rewiring Analysis Pipeline")
-    logger.info("="*60)
     
     # Create output directories
     output_dir = Path(output_dir)
@@ -113,10 +111,9 @@ def run_full_pipeline(config: dict, data_path: str, output_dir: str):
     logger.info("    [Placeholder] Sample-level classification")
     # TODO: Implement actual phase7 pipeline
     
-    logger.info("\n" + "="*60)
-    logger.info("Pipeline execution complete!")
+    
+    logger.info("Pipeline execution complete")
     logger.info("Results saved to: %s", output_dir)
-    logger.info("="*60)
 
 
 def main():

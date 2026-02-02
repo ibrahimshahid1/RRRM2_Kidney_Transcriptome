@@ -1,85 +1,123 @@
 # Repository File Summary
 
-## Created Template/Scaffold Files
+## Reorganized Module Structure (src/)
 
-### Core Modules (src/)
+### src/preprocessing/
+Phase 0-1: Deconvolution, VST Normalization, Global Residualization
+| File | Description |
+|------|-------------|
+| `__init__.py` | Module exports |
+| `deconvolution.R` | MuSiC cell-type deconvolution with Tabula Muris Senis reference |
+| `residualization.R` | DESeq2 VST + SVA confounder regression |
+| `data_alignment.py` | Metadata-to-counts alignment utilities |
+| `export_counts.py` | Raw count export utilities |
+| `export_phase1.R` | R-to-Python data export |
 
-#### Preprocessing
-- ✅ `src/preprocessing/residualization.py` - Global confounder regression with SVA
-- ✅ `src/preprocessing/deconvolution.py` - Cell-type proportion estimation
-- ⚠️  `src/preprocessing/normalization.py` - Existing, needs update for VST
-- ⚠️  `src/preprocessing/qc.py` - Existing, needs update for variance partitioning
+### src/networks/
+Phase 2-3: Shared Topology + LIONESS + Edge Regression + node2vec + Procrustes
+| File | Description |
+|------|-------------|
+| `__init__.py` | Module exports |
+| `shared_topology.py` | Cell-standardized skeleton (Ledoit-Wolf shrinkage + top-k) |
+| `lioness.py` | LIONESS sample-specific edge weights |
+| `edge_regression.py` | Edge-wise regression + limma EB + predicted networks |
+| `embeddings.py` | PecanPy node2vec embeddings (multi-seed) |
+| `procrustes.py` | Procrustes alignment + rewiring quantification |
 
-#### Networks
-- ✅ `src/networks/shared_topology.py` - Cell-standardized edge selection (KEY INNOVATION)
-- ✅ `src/networks/lioness.py` - LIONESS sample-specific networks
-- ✅ `src/networks/edge_regression.py` - Edge-wise factorial modeling
-- ✅ `src/networks/embeddings.py` - node2vec + Procrustes alignment
-- ⚠️  `src/networks/graph_builder.py` - Exists, may need updates for signed edges
-- ⚠️  `src/networks/metrics.py` - Exists, centrality/module detection
+### src/statistics/
+Phase 5-6: Silent Shifters, Uncertainty Estimation, Full Regression
+| File | Description |
+|------|-------------|
+| `__init__.py` | Module exports |
+| `silent_shifters.py` | Silent shifter identification (high rewiring + low DE) |
+| `interaction_metrics.py` | Interaction persistence analysis across contrasts |
+| `permutation_bootstrap.py` | Permutation tests + bootstrap CIs (n=2000) |
+| `full_regression.py` | Full factorial edge regression (n=80) |
+| `differential_expression.R` | Gene-level DE tables (limma) |
 
-#### Statistics
-- ✅ `src/statistics/rewiring_metrics.py` - Cosine distance & silent shifters
-- ⚠️  `src/statistics/bootstrap.py` - Exists, needs fixed-topology implementation
-- ⚠️  `src/statistics/permutation.py` - Exists, needs leakage-safe updates
+### src/enrichment/
+Phase 7: Biological Grounding
+| File | Description |
+|------|-------------|
+| `__init__.py` | Module exports |
+| `biological_grounding.py` | Gene set enrichment (GO/KEGG/Reactome) + module analysis |
 
-#### Validation (NEW MODULE)
-- ✅ `src/validation/cross_validation.py` - Leakage-safe CV framework
-- ✅ `src/validation/sample_features.py` - Mouse-level feature extraction
-- ✅ `src/validation/__init__.py`
+### src/visualization/
+Publication-ready plots and diagnostics
+| File | Description | Source |
+|------|-------------|--------|
+| `__init__.py` | Module exports | NEW |
+| `publication_plots.py` | All-phase publication plots | `plot_output.py` |
+| `network_diagnostics.py` | Skeleton visualization | `plot_skeleton_diagnostics.py` |
 
-#### Utils
-- ✅ `src/utils.py` - Updated with all starter code functions
+### src/validation/
+Leakage-safe cross-validation (Section 5 of methodology)
+| File | Description |
+|------|-------------|
+| `__init__.py` | Module exports |
+| `cross_validation.py` | 5-fold stratified CV with fold-wise feature engineering |
+| `sample_features.py` | Mouse-level feature extraction (pathway strength, node strength, PCA) |
 
-### Configuration Files (config/)
-- ✅ `config/metadata_design.yaml` - Full n=80 factorial specification
-- ✅ `config/anchor_genes.yaml` - Pre-registered Procrustes anchors
-- ✅ `config/gene_sets.yaml` - DCT/NCC-WNK + spaceflight pathways
-- ✅ `config/hyperparameters.yaml` - Complete pipeline parameters
+### src/utils.py
+Common utility functions (unchanged)
 
-### Scripts
-- ✅ `scripts/run_full_pipeline.py` - Master orchestration (with placeholders)
-- ⚠️  Individual phase scripts (phase0-7) - Not yet created, use master script
+---
 
-### Documentation
-- ✅ `METHODOLOGY.md` - Complete detailed methodology
-- ✅ `README.md` - Updated with new research framework
+## Scripts Remaining in scripts/
 
-## Status Legend
-- ✅ Newly created template file with full scaffold
-- ⚠️ Existing file that may need updates
-- ❌ Not yet created
+### Pipeline Orchestration
+- **`src/run_all_phases.py`** - ⭐ Main pipeline orchestrator (runs phases 0-7)
+- `run_full_pipeline.py` - Legacy placeholder (not currently used)
 
-## Next Steps for User
+### Phase-Specific Scripts
+- `DESeq2.R` - VST normalization source
+- `run_deconvolution.R` - Full deconvolution pipeline
+- `phase2_edge_regression.py` - Edge-wise regression implementation
+- `phase3_node2vec_embedding.py` - PecanPy node2vec implementation
+- `phase3_procrustes_rewiring.py` - Procrustes alignment + rewiring
 
-1. **Test Imports**
-   ```bash
-   cd c:\Users\Ibrah\Documents\GitHub\RRRM2_Kidney_Transcriptome
-   python -c "from src.preprocessing import residualization, deconvolution; print('✓ Imports OK')"
-   ```
+### Utility Scripts
+- `pick_anchors.py`, `make_consensus_anchors.py` - Procrustes anchor selection
+- `plot_output.py`, `plot_skeleton_diagnostics.py` - Visualization utilities
 
-2. **Load Configuration**
-   ```bash
-   python -c "import yaml; print(yaml.safe_load(open('config/metadata_design.yaml')))"
-   ```
+---
 
-3. **Add Actual Data**
-   - Place OSD-771 raw counts in `data/raw/`
-   - Update placeholder data loaders in phase scripts
+## Research Phase → Module Mapping
 
-4. **Implement Production Features** (Priority Order)
-   - Partial correlation / graphical lasso in `shared_topology.py`
-   - Fast LIONESS optimization in `lioness.py`
-   - Full empirical Bayes in `edge_regression.py`
-   -  PecanPy integration in `embeddings.py`
+| Phase | Description | Module | Key Files |
+|-------|-------------|--------|-----------|
+| 0 | Deconvolution | `src/preprocessing/` | `deconvolution.R` |
+| 1 | VST + Residualization | `src/preprocessing/` | `residualization.R`, `data_alignment.py` |
+| 2 | Network Construction | `src/networks/` | `shared_topology.py`, `lioness.py`, `edge_regression.py` |
+| 3 | Embeddings + Alignment | `src/networks/` | `embeddings.py`, `procrustes.py` |
+| 5 | Silent Shifters | `src/statistics/` | `silent_shifters.py`, `interaction_metrics.py` |
+| 6 | Uncertainty + Full Reg | `src/statistics/` | `permutation_bootstrap.py`, `full_regression.py` |
+| 7 | Biological Grounding | `src/enrichment/` | `biological_grounding.py` |
+| - | Validation | `src/validation/` | `cross_validation.py`, `sample_features.py` |
 
-5. **Run Tests**
-   - Create synthetic test data (small n=16, 100 genes)
-   - Validate pipeline end-to-end on toy data
+> **Note:** Phase 4 (edge regression) is now integrated into Phase 2. The pipeline runs phases {0, 1, 2, 3, 5, 6, 7}.
 
-## Key Design Decisions
+---
 
-1. **Fixed Topology E**: Same edges across all conditions, different weights
-2. **Cell-Standardization**: Within Age×Arm×Group cells before pooling
-3. **Fisher z**: For approximate normality in edge regression
-4. **Leakage-Safe CV**: All feature engineering within training folds
+## Usage Examples
+
+```bash
+# Run full pipeline
+python src/run_all_phases.py
+
+# Run specific phases
+python src/run_all_phases.py --phases 2 3 5
+
+# Run without R dependencies
+python src/run_all_phases.py --skip-r
+
+# Run as modules (from repo root)
+python -m src.networks.shared_topology --max_genes 1200 --topk 80
+python -m src.networks.lioness
+python -m src.networks.edge_regression
+
+# Import in Python
+from src.networks import shared_topology, lioness
+from src.statistics import silent_shifters
+from src.validation import cross_validation
+```

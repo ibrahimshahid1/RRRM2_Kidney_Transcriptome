@@ -1,359 +1,203 @@
+# src/networks/lioness.py
 """
-LIONESS: Sample-Specific Network Inference
+Phase 2 Step A1: Compute LIONESS-style sample-specific edge weights on skeleton E
 
-Implements sample-specific edge weight estimation on a fixed edge skeleton E.
-Uses the LIONESS formula to quantify how each sample influences pooled networks.
+Uses the ORIGINAL (non-cell-standardized) Rtech for correlation computation.
+Computes LIONESS in Fisher-z space for regression-friendly output.
 
-Reference:
-    Kuijjer et al. (2019) Estimating Sample-Specific Regulatory Networks. iScience.
+Key points:
+- Uses original Rtech (cell-standardization was only for topology selection)
+- Correlations are clipped aggressively before atanh (CLIP_R=0.9995) to prevent explosion
+- LIONESS formula applied in z-space: z_s = N*z_all - (N-1)*z_loo
+- Final LIONESS z is clipped at ±ZCAP to catch remaining outliers
+- Output is bounded and regression-friendly
 
-Key Functions:
-    - edge_corrs: Compute correlations for edges in E
-    - lioness_sparse: Sample-specific weights via LIONESS formula
-    - fisher_z: Fisher z-transform for edge weights
+Usage:
+    python -m src.networks.lioness
 """
+from __future__ import annotations
 
-import numpy as np
-from typing import List, Tuple
-from dataclasses import dataclass
+import argparse
 from pathlib import Path
+import numpy as np
+import pandas as pd
 
 
-# ============================================================================
-# DENSE LIONESS IMPLEMENTATION (full correlation networks)
-# ============================================================================
-
-@dataclass(frozen=True)
-class LionessIndex:
-    """Index structure for reconstructing matrices from edge vectors."""
-    gene_names: list
-    triu_i: np.ndarray  # (n_edges,) row indices of upper triangle
-    triu_j: np.ndarray  # (n_edges,) column indices of upper triangle
+# Numerical stabilization constants
+CLIP_R = 0.9995   # Clip correlations before atanh to prevent explosion from r≈±1
+ZCAP = 20.0       # Final cap on LIONESS z to catch outlier pathology
 
 
-def _corr_from_summaries(sum_x: np.ndarray, cross: np.ndarray, n: int, eps: float = 1e-12) -> np.ndarray:
+def pearson_from_sums(N, Sx, Sy, Sxx, Syy, Sxy, eps=1e-12):
+    """Compute Pearson correlation from precomputed sums (safe version)."""
+    num = N * Sxy - Sx * Sy
+    # Fix: sqrt can fail if N*Sxx - Sx^2 goes slightly negative due to rounding
+    denx = N * Sxx - Sx * Sx
+    deny = N * Syy - Sy * Sy
+    den = np.sqrt(np.maximum(denx, 0.0) * np.maximum(deny, 0.0))
+    r = np.where(den > eps, num / den, 0.0)
+    return np.clip(r, -1.0, 1.0)
+
+
+def fisher_z_from_r(r: np.ndarray) -> np.ndarray:
+    """Convert Pearson r to Fisher z with robust clipping.
+    
+    Clips |r| to CLIP_R before atanh to prevent explosion when r≈±1.
+    This is critical for LIONESS where LOO can produce extreme correlations.
     """
-    Compute Pearson correlation matrix from sufficient statistics.
+    r = np.clip(r, -CLIP_R, CLIP_R)
+    return np.arctanh(r)
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Compute LIONESS Fisher-z weights on skeleton E")
+    ap.add_argument("--rtech", default="data/processed/phase1_residuals/Rtech.tsv.gz",
+                    help="Path to Rtech.tsv.gz (genes x samples)")
+    ap.add_argument("--meta", default="data/processed/phase1_residuals/meta_phase1.tsv.gz",
+                    help="Path to meta_phase1.tsv.gz")
+    ap.add_argument("--phase2_dir", default="data/processed/networks/phase2",
+                    help="Phase 2 directory with skeleton_edges.tsv")
+    ap.add_argument("--out", default="lioness_z_edges.npy",
+                    help="Output filename for LIONESS weights")
+    args = ap.parse_args()
+
+    p2 = Path(args.phase2_dir)
+
+    print("=" * 60)
+    print("Phase 2 Step A1: LIONESS Sample-Specific Weights on E")
+    print("=" * 60)
+
+    # Load skeleton
+    print(f"\nLoading Phase 2 skeleton from {p2}")
+    genes = (p2 / "phase2_genes.txt").read_text().splitlines()
+    genes = [g for g in genes if g.strip()]
+    edges = pd.read_csv(p2 / "skeleton_edges.tsv", sep="\t")
+    print(f"  Genes: {len(genes)}")
+    print(f"  Edges: {len(edges)}")
+
+    gene_to_idx = {g: i for i, g in enumerate(genes)}
     
-    This allows efficient leave-one-out computation without recomputing
-    the full correlation matrix from scratch.
+    # Validate gene mapping (fail hard on bad edges)
+    ii = edges["gene_i"].map(gene_to_idx)
+    jj = edges["gene_j"].map(gene_to_idx)
+    bad = ii.isna() | jj.isna()
+    if bad.any():
+        bad_edges = edges.loc[bad, ["gene_i", "gene_j"]].head(20)
+        raise ValueError(f"Skeleton edges reference genes not in phase2_genes.txt. Examples:\n{bad_edges}")
+    ii = ii.to_numpy(np.int32)
+    jj = jj.to_numpy(np.int32)
+
+    # Load ORIGINAL Rtech (not cell-standardized!)
+    print(f"\nLoading Rtech: {args.rtech}")
+    rtech = pd.read_csv(args.rtech, sep="\t", compression="gzip", index_col=0)
+    meta = pd.read_csv(args.meta, sep="\t", compression="gzip")
+
+    # Find sample column
+    sample_col = None
+    for col in ["Sample Name (raw_counts_colname)", "Sample Name", "sample"]:
+        if col in meta.columns:
+            sample_col = col
+            break
+    if sample_col is None:
+        sample_col = meta.columns[0]
+    meta = meta.set_index(sample_col, drop=False)
+
+    # Align
+    common = [s for s in rtech.columns if s in meta.index]
+    rtech = rtech[common]
+    meta = meta.loc[common]
+    print(f"  Aligned: {len(common)} samples")
     
-    Parameters
-    ----------
-    sum_x : np.ndarray
-        Column sums of the data matrix, shape (p,)
-    cross : np.ndarray
-        Cross-product matrix X.T @ X, shape (p, p)
-    n : int
-        Number of samples
-    eps : float
-        Small constant to prevent division by zero
-        
-    Returns
-    -------
-    np.ndarray
-        Correlation matrix, shape (p, p)
-    """
-    outer = np.outer(sum_x, sum_x) / float(n)
-    S = cross - outer
-    cov = S / float(n - 1)
+    # Save sample order for downstream regression alignment
+    (p2 / "lioness_samples.txt").write_text("\n".join(common) + "\n")
+    print(f"  → Saved sample order: lioness_samples.txt")
 
-    var = np.clip(np.diag(cov), eps, None)
-    sd = np.sqrt(var)
-    denom = sd[:, None] * sd[None, :]
-    corr = cov / denom
+    # Extract gene matrix - only Phase 2 genes
+    missing = [g for g in genes if g not in rtech.index]
+    if missing:
+        print(f"  WARNING: {len(missing)} genes not in Rtech")
+        print(f"  First 20 missing: {missing[:20]}")
+        # Keep only genes that exist
+        genes = [g for g in genes if g in rtech.index]
+        # Rebuild edge index for remaining genes with validation
+        gene_to_idx = {g: i for i, g in enumerate(genes)}
+        mask = edges["gene_i"].isin(genes) & edges["gene_j"].isin(genes)
+        edges = edges[mask].reset_index(drop=True)
+        ii = edges["gene_i"].map(gene_to_idx)
+        jj = edges["gene_j"].map(gene_to_idx)
+        bad = ii.isna() | jj.isna()
+        if bad.any():
+            raise ValueError("Gene mismatch after filtering - this should not happen")
+        ii = ii.to_numpy(np.int32)
+        jj = jj.to_numpy(np.int32)
+        # Save effective gene list for reproducibility
+        (p2 / "phase2_genes_effective.txt").write_text("\n".join(genes) + "\n")
+        print(f"  Saved effective gene list: phase2_genes_effective.txt")
 
-    corr = np.clip(corr, -1.0, 1.0)
-    np.fill_diagonal(corr, 0.0)
-    return corr
+    X = rtech.loc[genes].values.astype(np.float64)  # (G x N)
+    G, N = X.shape
+    E = len(ii)
+    print(f"  Expression matrix: {G} genes × {N} samples")
+    print(f"  Computing LIONESS for {E} edges...")
 
+    # Precompute gene sums for efficient Pearson
+    Sx = X.sum(axis=1)              # (G,)
+    Sxx = (X**2).sum(axis=1)        # (G,)
 
-def lioness_correlation_edges(
-    X: np.ndarray,
-    gene_names: list,
-    dtype=np.float32,
-    verbose: bool = True,
-) -> tuple:
-    """
-    Compute LIONESS sample-specific networks using Pearson correlation.
+    # Edge cross-sums
+    Xi = X[ii, :]                   # (E x N)
+    Xj = X[jj, :]
+    Sxy = (Xi * Xj).sum(axis=1)     # (E,)
+
+    # Pooled correlations (all samples)
+    print("\n  Computing pooled correlations...")
+    r_all = pearson_from_sums(N, Sx[ii], Sx[jj], Sxx[ii], Sxx[jj], Sxy)
+    z_all = fisher_z_from_r(r_all)  # Fisher z with CLIP_R protection
     
-    Uses full dense correlation matrices. Suitable for ~800-1500 genes.
-    
-    Parameters
-    ----------
-    X : np.ndarray
-        Expression matrix, shape (n_samples, p_genes)
-    gene_names : list
-        Gene names corresponding to columns of X
-    dtype : np.dtype
-        Output dtype for edge weights
-    verbose : bool
-        Print progress
-        
-    Returns
-    -------
-    edges : np.ndarray, shape (n_samples, n_edges)
-    index : LionessIndex
-    """
-    if X.ndim != 2:
-        raise ValueError(f"X must be 2D (n_samples x p_genes). Got {X.shape}")
+    print(f"  Pooled r range: [{r_all.min():.4f}, {r_all.max():.4f}]")
+    print(f"  Pooled z range: [{z_all.min():.4f}, {z_all.max():.4f}]")
+    print(f"  Using CLIP_R={CLIP_R}, ZCAP={ZCAP}")
 
-    n, p = X.shape
-    if n < 4:
-        raise ValueError("Need at least 4 samples for stable correlation / leave-one-out.")
+    # LIONESS z output
+    out = np.empty((N, E), dtype=np.float32)
+    N1 = N - 1
 
-    if len(gene_names) != p:
-        raise ValueError("gene_names length must match number of columns in X.")
-
-    if verbose:
-        n_edges = p * (p - 1) // 2
-        print(f"LIONESS: {n} samples × {p} genes → {n_edges:,} edges per network")
-
-    X = np.asarray(X, dtype=np.float64)
-    sum_x = X.sum(axis=0)
-    cross = X.T @ X
-
-    W_all = _corr_from_summaries(sum_x, cross, n)
-
-    triu_i, triu_j = np.triu_indices(p, k=1)
-    W_all_edges = W_all[triu_i, triu_j]
-
-    n_edges = W_all_edges.shape[0]
-    edges = np.empty((n, n_edges), dtype=dtype)
-
-    for i in range(n):
-        if verbose and i % 10 == 0:
-            print(f"  Processing sample {i+1}/{n}", end="\r")
-        
-        xi = X[i, :]
-        sum_x_m = sum_x - xi
-        cross_m = cross - np.outer(xi, xi)
-        W_m = _corr_from_summaries(sum_x_m, cross_m, n - 1)
-        W_m_edges = W_m[triu_i, triu_j]
-
-        Wi_edges = n * (W_all_edges - W_m_edges) + W_m_edges
-        edges[i, :] = Wi_edges.astype(dtype, copy=False)
-
-    if verbose:
-        print(f"  Completed all {n} samples" + " " * 20)
-
-    index = LionessIndex(gene_names=gene_names, triu_i=triu_i, triu_j=triu_j)
-    return edges, index
-
-
-def edges_to_matrix(edges: np.ndarray, index: LionessIndex) -> np.ndarray:
-    """Reconstruct symmetric adjacency matrix from edge vector."""
-    p = len(index.gene_names)
-    mat = np.zeros((p, p), dtype=edges.dtype)
-    mat[index.triu_i, index.triu_j] = edges
-    mat[index.triu_j, index.triu_i] = edges
-    return mat
-
-
-def save_lioness_bundle(outdir, edges: np.ndarray, index: LionessIndex) -> None:
-    """Save LIONESS results: lioness_edges.npy, triu_i.npy, triu_j.npy, genes.txt"""
-    outdir = Path(outdir)
-    outdir.mkdir(parents=True, exist_ok=True)
-
-    np.save(outdir / "lioness_edges.npy", edges)
-    np.save(outdir / "triu_i.npy", index.triu_i)
-    np.save(outdir / "triu_j.npy", index.triu_j)
-    (outdir / "genes.txt").write_text("\n".join(index.gene_names) + "\n", encoding="utf-8")
-    
-    print(f"Saved LIONESS bundle to {outdir}:")
-    print(f"  - lioness_edges.npy: {edges.shape}")
-    print(f"  - triu_i.npy, triu_j.npy: {len(index.triu_i):,} edges")
-    print(f"  - genes.txt: {len(index.gene_names)} genes")
-
-
-def load_lioness_bundle(indir):
-    """Load LIONESS results from disk."""
-    indir = Path(indir)
-    edges = np.load(indir / "lioness_edges.npy")
-    triu_i = np.load(indir / "triu_i.npy")
-    triu_j = np.load(indir / "triu_j.npy")
-    gene_names = (indir / "genes.txt").read_text(encoding="utf-8").strip().split("\n")
-    index = LionessIndex(gene_names=gene_names, triu_i=triu_i, triu_j=triu_j)
-    return edges, index
-
-
-# ============================================================================
-# SPARSE LIONESS IMPLEMENTATION (original - for fixed edge skeletons)
-# ============================================================================
-
-
-def edge_corrs(
-    R_std: np.ndarray,
-    edges: List[Tuple[int, int]]
-) -> np.ndarray:
-    """
-    Pearson correlation on standardized columns for each edge in E.
-    
-    Parameters
-    ----------
-    R_std : np.ndarray, shape (n_samples, n_genes)
-        Standardized expression (mean=0, sd=1 per gene)
-    edges : list of (int, int)
-        Edge list E
-        
-    Returns
-    -------
-    W : np.ndarray, shape (|E|,)
-        Correlation weight for each edge
-        
-    Notes
-    -----
-    For standardized data, Pearson(i,j) = mean(x_i * x_j)
-    """
-    W = np.empty(len(edges), dtype=np.float32)
-    for idx, (i, j) in enumerate(edges):
-        W[idx] = (R_std[:, i] * R_std[:, j]).mean()
-    return W
-
-
-def lioness_sparse(
-    R_std: np.ndarray,
-    edges: List[Tuple[int, int]],
-    show_progress: bool = True
-) -> np.ndarray:
-    """
-    Naive LIONESS on sparse edges.
-    
-    Parameters
-    ----------
-    R_std : np.ndarray, shape (n_samples, n_genes)
-        Standardized expression
-    edges : list of (int, int)
-        Fixed edge list E
-    show_progress : bool
-        If True, print progress
-        
-    Returns
-    -------
-    W_samp : np.ndarray, shape (n_samples, |E|)
-        Sample-specific correlations for each edge
-        
-    Notes
-    -----
-    LIONESS formula: w_e(s) = N * w_e(all) - (N-1) * w_e(-s)
-    
-    OPTIMIZATION NOTE: For production, vectorize LOO operations or use
-    fast update formulas instead of recomputing from scratch.
-    """
-    N = R_std.shape[0]
-    n_edges = len(edges)
-    
-    # Pooled weights
-    w_all = edge_corrs(R_std, edges)
-    
-    # Per-sample weights
-    W = np.empty((N, n_edges), dtype=np.float32)
-    
+    print(f"\n  Computing leave-one-out LIONESS for {N} samples...")
     for s in range(N):
-        if show_progress and s % 10 == 0:
-            print(f"LIONESS: processing sample {s+1}/{N}")
+        if s % 20 == 0:
+            print(f"    Sample {s+1}/{N}...")
         
-        # Leave-one-out
-        R_loo = np.delete(R_std, s, axis=0)
-        
-        # Re-standardize LOO (IMPORTANT for correct correlations)
-        R_loo -= R_loo.mean(axis=0, keepdims=True)
-        R_loo /= (R_loo.std(axis=0, keepdims=True) + 1e-8)
-        
-        w_minus = edge_corrs(R_loo, edges)
-        
-        # LIONESS formula
-        W[s, :] = N * w_all - (N - 1) * w_minus
-    
-    return W
+        # Leave-one-out sums (memory-efficient: use X[ii,s] instead of Xi[:,s])
+        Sx_i = Sx[ii] - X[ii, s]
+        Sx_j = Sx[jj] - X[jj, s]
+        Sxx_i = Sxx[ii] - X[ii, s]**2
+        Sxx_j = Sxx[jj] - X[jj, s]**2
+        Sxy_loo = Sxy - (X[ii, s] * X[jj, s])
 
+        r_loo = pearson_from_sums(N1, Sx_i, Sx_j, Sxx_i, Sxx_j, Sxy_loo)
+        z_loo = fisher_z_from_r(r_loo)  # Fisher z with CLIP_R protection
 
-def lioness_sparse_fast(
-    R_std: np.ndarray,
-    edges: List[Tuple[int, int]]
-) -> np.ndarray:
-    """
-    Fast LIONESS using update formulas (advanced).
-    
-    Parameters
-    ----------
-    R_std : np.ndarray
-        Standardized expression
-    edges : list of (int, int)
-        Edge list
+        # LIONESS in Fisher space
+        z_s = N * z_all - (N - 1) * z_loo
         
-    Returns
-    -------
-    W_samp : np.ndarray
-        Sample-specific weights
-        
-    Notes
-    -----
-    TODO: Implement fast LOO update formulas that avoid full recomputation.
-    For now, use lioness_sparse (slower but correct).
-    """
-    raise NotImplementedError("Fast LIONESS not yet implemented. Use lioness_sparse.")
+        # Final clip to catch any remaining pathological values
+        z_s = np.clip(z_s, -ZCAP, ZCAP)
+        out[s, :] = z_s.astype(np.float32)
 
+    # Save outputs
+    np.save(p2 / args.out, out)
+    edges.to_csv(p2 / "edge_index.tsv", sep="\t", index=False)
 
-def fisher_z(W: np.ndarray, eps: float = 1e-6) -> np.ndarray:
-    """
-    Fisher transform of correlations: z = atanh(r).
-    
-    Parameters
-    ----------
-    W : np.ndarray
-        Correlation weights
-    eps : float
-        Small constant to clip correlations away from ±1
-        
-    Returns
-    -------
-    Z : np.ndarray
-        Fisher z-transformed weights
-        
-    Notes
-    -----
-    Fisher z approximates normal distribution, improving regression modeling.
-    Clips to avoid inf at |r|=1.
-    """
-    Wc = np.clip(W, -1 + eps, 1 - eps)
-    return np.arctanh(Wc).astype(np.float32)
-
-
-def inverse_fisher_z(Z: np.ndarray) -> np.ndarray:
-    """
-    Inverse Fisher transform: r = tanh(z).
-    
-    Parameters
-    ----------
-    Z : np.ndarray
-        Fisher z-transformed weights
-        
-    Returns
-    -------
-    W : np.ndarray
-        Correlation weights
-    """
-    return np.tanh(Z).astype(np.float32)
+    print(f"\n{'=' * 60}")
+    print("LIONESS computation complete")
+    print(f"{'=' * 60}")
+    print(f"\nOutput shape: {out.shape} (samples × edges)")
+    print(f"  Fisher-z range: [{out.min():.4f}, {out.max():.4f}]")
+    print(f"  Mean |z|: {np.abs(out).mean():.4f}")
+    print(f"\nOutputs in {p2}:")
+    print(f"  - {args.out}")
+    print(f"  - edge_index.tsv")
 
 
 if __name__ == "__main__":
-    # Example usage with toy data
-    np.random.seed(42)
-    R = np.random.randn(20, 10).astype(np.float32)
-    
-    # Standardize
-    R -= R.mean(axis=0, keepdims=True)
-    R /= (R.std(axis=0, keepdims=True) + 1e-8)
-    
-    # Toy edge list
-    edges = [(0, 1), (1, 2), (2, 3), (0, 5)]
-    
-    print(f"Computing LIONESS for {len(edges)} edges on {R.shape[0]} samples...")
-    W_samp = lioness_sparse(R, edges, show_progress=False)
-    Z_samp = fisher_z(W_samp)
-    
-    print(f"Output shape: {W_samp.shape}")
-    print(f"Sample 0 edge weights (raw): {W_samp[0, :]}")
-    print(f"Sample 0 edge weights (Fisher-z): {Z_samp[0, :]}")
-    print("\nLIONESS module loaded successfully")
+    main()

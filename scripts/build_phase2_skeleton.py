@@ -218,7 +218,7 @@ def main():
     edge_df.to_csv(outdir / "skeleton_edges.tsv", sep="\t", index=False)
 
     print(f"\n{'=' * 60}")
-    print(f"Skeleton E built successfully!")
+    print(f"Skeleton E built successfully")
     print(f"{'=' * 60}")
     print(f"  Genes: {len(genes)}")
     print(f"  Edges: {len(edge_df)} (target: ~{len(genes)*args.topk//2} to ~{len(genes)*args.topk})")

@@ -1,0 +1,123 @@
+# =============================================================================
+# RRRM-2 Pipeline .gitignore
+# Ignores generated results while keeping source code, configs, and input data
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Python
+# -----------------------------------------------------------------------------
+venv/
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# -----------------------------------------------------------------------------
+# R
+# -----------------------------------------------------------------------------
+.Rhistory
+.RData
+.Rproj.user/
+
+# -----------------------------------------------------------------------------
+# IDE and Editor
+# -----------------------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# -----------------------------------------------------------------------------
+# Log files generated during pipeline execution
+# -----------------------------------------------------------------------------
+*.log
+debug_*.txt
+deconv_log*.txt
+sce_structure.txt
+unique_cell_types.txt
+
+# -----------------------------------------------------------------------------
+# Generated Results - Main results directory
+# -----------------------------------------------------------------------------
+results/embeddings/
+results/figures/
+results/models/
+results/tables/
+
+# -----------------------------------------------------------------------------
+# Generated Results - Data processing outputs (keep aligned_outputs)
+# -----------------------------------------------------------------------------
+data/processed/batch_corrected/
+data/processed/deconvolution/
+data/processed/gene_level_DE/
+data/processed/networks/
+data/processed/phase1_residuals/
+data/processed/qc_metrics/
+data/processed/vst_normalized/
+data/networks/
+
+# -----------------------------------------------------------------------------
+# Generated Results - Phase outputs in data/results
+# -----------------------------------------------------------------------------
+data/results/figures/
+data/results/phase3_rewiring/
+data/results/phase4_anchor_qc/
+data/results/phase5_derived/
+data/results/phase5_silent_shifters_strict/
+data/results/phase6_regression/
+data/results/phase6_uncertainty/
+data/results/phase7_grounding/
+
+# -----------------------------------------------------------------------------
+# Exports and Plots (timestamped snapshot directories)
+# -----------------------------------------------------------------------------
+exports/
+plots/
+
+# -----------------------------------------------------------------------------
+# Temporary output directories
+# -----------------------------------------------------------------------------
+deconv_music_out/
+tms_kidney_female_counts/
+tms_kidney_ytrfemale_counts/
+
+# -----------------------------------------------------------------------------
+# Jupyter Notebooks checkpoints
+# -----------------------------------------------------------------------------
+.ipynb_checkpoints/
+
+# -----------------------------------------------------------------------------
+# Large data files (>100MB GitHub limit)
+# -----------------------------------------------------------------------------
+*.mtx
+*.h5
+*.h5ad
+*.rds
+*.RData
+*.parquet
+*.feather
+*.pkl
+*.pickle
+*.npy
+
+# External single-cell atlases (large reference datasets)
+data/external/single_cell_atlases/
+
+# =============================================================================
+# KEEP (not ignored):
+# - src/                    # All source code
+# - scripts/                # All pipeline scripts  
+# - config/                 # Configuration files
+# - notebooks/              # Jupyter notebooks (but not checkpoints)
+# - data/raw/               # Raw input data
+# - data/external/          # External reference data
+# - data/processed/aligned_outputs/  # Aligned counts (input data)
+# - *.md, *.yml, *.txt (requirements), setup.py, LICENSE
+# =============================================================================

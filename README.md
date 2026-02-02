@@ -44,8 +44,8 @@ Female C57BL/6NTac mice, whole kidney RNA-seq
 
 ### Phase 0: Preprocessing & Deconvolution
 - VST normalization (DESeq2)
-- Cell-type deconvolution using murine kidney atlases
-- Nephron segment proportion estimation (DCT, PT, CD, Glom)
+- Cell-type deconvolution using **MuSiC** with Tabula Muris Senis kidney atlas reference
+- Nephron segment proportion estimation (DCT, PT, CD, Glom, Immune, Stroma)
 - QC and outlier detection
 
 ### Phase 1: Global Residualization
@@ -53,35 +53,33 @@ Female C57BL/6NTac mice, whole kidney RNA-seq
 - Regression: `Y ~ batch + SVs + CLR(cell_props)`
 - Output: `R_tech` (biology preserved), `R_all` (fully residualized)
 
-### Phase 2: Shared Topology Construction
+### Phase 2: Network Construction (Shared Topology + LIONESS + Edge Regression)
 - **Cell-standardization**: `(R - μ_cell) / σ_cell` per gene within each Age×Arm×Group cell
-- Pool all samples → build fixed edge list **E** (top-k or partial correlation)
-- Prevents edges driven by between-cell mean shifts (Simpson's paradox)
-
-### Phase 3: LIONESS Sample-Specific Networks
-- Compute per-sample edge weights on fixed **E**
-- `w_e(s) = N·w_e(all) - (N-1)·w_e(-s)`
+- Pool all samples → build fixed skeleton **E** using Ledoit-Wolf shrinkage + top-k partial correlations
+- **LIONESS** sample-specific edge weights on fixed **E**: `w_e(s) = N·w_e(all) - (N-1)·w_e(-s)`
 - Fisher z-transform: `z = atanh(r)`
+- **Edge-wise regression**: Model each edge `z_e ~ Age + Arm + Group + interactions + covariates`
+- Empirical Bayes variance moderation (limma-style) → predicted contrast networks
 
-### Phase 4: Edge-Wise Regression
-- Model each edge: `z_e ~ Age + Arm + Group + interactions + covariates`
-- Empirical Bayes variance moderation (limma-style)
-- Generate predicted contrast networks
-
-### Phase 5: node2vec Embeddings & Alignment
-- Multi-seed node2vec (10 seeds, d=128, p=0.25, q=4)
-- Orthogonal Procrustes alignment using pre-registered anchors
+### Phase 3: node2vec Embeddings & Procrustes Alignment
+- Multi-seed **PecanPy** node2vec (10 seeds, d=128, p=0.25, q=4)
+- Orthogonal Procrustes alignment using pre-registered anchor genes
 - Consensus embedding across seeds
 
-### Phase 6: Rewiring Quantification & Statistics
-- Cosine distance rewiring: `Δ = 1 - cos(v₁, v₂)`
-- **Silent shifters**: high Δ (top 10%, FDR<0.1) + low DE (|log₂FC|<0.3)
-- Bootstrap CIs + permutation tests (n=2000 each)
+### Phase 5: Silent Shifters & Interaction Metrics
+- **Silent shifters**: high rewiring (top 10%, FDR<0.1) + low DE (|log₂FC|<0.3, FDR>0.2)
+- Interaction persistence analysis across contrasts
 
-### Phase 7: Leakage-Safe Cross-Validation
-- 5-fold CV with fold-wise feature engineering
-- Sample-level features: pathway strength, node strength, PCA
-- RandomForest classification (Environment Group)
+### Phase 6: Uncertainty Estimation & Full Regression
+- Permutation tests (n=2000, stratified within Age/Arm)
+- Bootstrap CIs (n=2000) for rewiring metrics
+- Full factorial edge regression (n=80)
+- Gene-level differential expression (limma)
+
+### Phase 7: Biological Grounding
+- Gene set enrichment analysis (GO, KEGG, Reactome)
+- Pathway-level rewiring quantification
+- Module analysis via k-means on embeddings
 
 ---
 
@@ -109,21 +107,76 @@ pip install -e .
 
 ---
 
+## 📥 Data Download
+
+Due to file size limitations, input data files are not included in this repository. Download the following before running the pipeline:
+
+### 1. NASA GeneLab OSD-771 (Bulk RNA-seq)
+
+Download from [NASA GeneLab OSD-771](https://genelab.nasa.gov/data/study?acc=OSD-771):
+
+| File | Destination |
+|------|-------------|
+| `GLDS-771_rna_seq_ERCCnorm_counts.csv` | `data/raw/counts/` |
+| `GLDS-771_metadata_OSD-771-samples.csv` | `data/raw/metadata/` |
+| `GLDS-771_annotations.csv` | `data/raw/metadata/` |
+
+### 2. Single-Cell Reference Atlas (for Deconvolution)
+
+The MuSiC deconvolution requires a Tabula Muris Senis kidney reference atlas. Download from [CZI CellxGene](https://cellxgene.cziscience.com/):
+
+```bash
+# Search for: "Tabula Muris Senis" + "kidney" + "female"
+# Download the .h5ad file and place in:
+mkdir -p data/external/single_cell_atlases/
+# → data/external/single_cell_atlases/tms_kidney_female_ALLDATASETS_counts_innerGenes.h5ad
+```
+
+**Required files** (place in `data/external/single_cell_atlases/`):
+- `tms_kidney_female_ALLDATASETS_counts_innerGenes.h5ad` (~200MB)
+- `tms_kidney_female_ALLDATASETS_obs.csv` (cell metadata)
+- `tms_kidney_female_ALLDATASETS_var.csv` (gene metadata)
+
+### 3. Verify Data Structure
+
+After downloading, your data directory should look like:
+```
+data/
+├── raw/
+│   ├── counts/
+│   │   └── GLDS-771_rna_seq_ERCCnorm_counts.csv
+│   └── metadata/
+│       ├── GLDS-771_metadata_OSD-771-samples.csv
+│       └── GLDS-771_annotations.csv
+└── external/
+    └── single_cell_atlases/
+        ├── tms_kidney_female_ALLDATASETS_counts_innerGenes.h5ad
+        ├── tms_kidney_female_ALLDATASETS_obs.csv
+        └── tms_kidney_female_ALLDATASETS_var.csv
+```
+
 ## 🚀 Quick Start
 
 ### Run Full Pipeline
 ```bash
-python scripts/run_full_pipeline.py \
-    --config config/hyperparameters.yaml \
-    --data data/raw \
-    --output results
+# Run all phases
+python src/run_all_phases.py
+
+# Run specific phases
+python src/run_all_phases.py --phases 2 3 5
+
+# Skip R-dependent steps (if R not available)
+python src/run_all_phases.py --skip-r
+
+# Dry run (show commands without executing)
+python src/run_all_phases.py --dry-run
 ```
 
 ### Configuration
 Edit `config/hyperparameters.yaml` to adjust:
-- node2vec parameters (dimensions, p, q)
-- Network topology method (top-k, partial correlation)
-- Statistical thresholds (FDR, percentiles)
+- node2vec parameters (dimensions=128, p=0.25, q=4.0)
+- Network topology method (top-k=50 neighbors, Ledoit-Wolf shrinkage)
+- Statistical thresholds (FDR, percentiles, bootstrap/permutation iterations)
 
 ### Key Gene Sets
 Pre-configured in `config/gene_sets.yaml`:
@@ -138,29 +191,34 @@ Pre-configured in `config/gene_sets.yaml`:
 RRRM2_Kidney_Transcriptome/
 ├── config/
 │   ├── metadata_design.yaml     # Full factorial design specification
-│   ├── anchor_genes.yaml        # Pre-registered alignment anchors
+│   ├── anchor_genes.yaml        # Pre-registered Procrustes alignment anchors
 │   ├── gene_sets.yaml           # DCT/NCC-WNK & pathway genes
 │   └── hyperparameters.yaml     # Pipeline parameters
 ├── src/
+│   ├── run_all_phases.py        # ⭐ Main pipeline orchestrator
 │   ├── preprocessing/
-│   │   ├── deconvolution.py     # Cell-type proportion estimation
-│   │   ├── residualization.py   # Global confounder regression
-│   │   ├── normalization.py     # VST transformation
-│   │   └── qc.py                # Quality control
+│   │   ├── deconvolution.R      # MuSiC cell-type deconvolution
+│   │   ├── residualization.R    # DESeq2 VST + SVA residualization
+│   │   ├── data_alignment.py    # Metadata-to-counts alignment
+│   │   └── export_phase1.R      # R-to-Python export utilities
 │   ├── networks/
-│   │   ├── shared_topology.py   # Cell-standardized edge selection
-│   │   ├── lioness.py           # Sample-specific networks
-│   │   ├── edge_regression.py   # Edge-wise modeling
-│   │   └── embeddings.py        # node2vec + Procrustes
+│   │   ├── shared_topology.py   # Cell-standardized skeleton (Ledoit-Wolf)
+│   │   ├── lioness.py           # Sample-specific edge weights
+│   │   ├── edge_regression.py   # Edge-wise modeling + limma EB
+│   │   ├── embeddings.py        # PecanPy node2vec embeddings
+│   │   └── procrustes.py        # Procrustes alignment + rewiring
 │   ├── statistics/
-│   │   ├── rewiring_metrics.py  # Cosine distance & silent shifters
-│   │   ├── bootstrap.py         # Bootstrap CIs
-│   │   └── permutation.py       # Permutation tests
+│   │   ├── silent_shifters.py   # Silent shifter identification
+│   │   ├── interaction_metrics.py # Interaction persistence
+│   │   ├── permutation_bootstrap.py # Uncertainty estimation
+│   │   └── full_regression.py   # Full factorial regression (n=80)
+│   ├── enrichment/
+│   │   └── biological_grounding.py # GO/KEGG/Reactome enrichment
 │   └── validation/
-│       ├── cross_validation.py  # Leakage-safe CV
+│       ├── cross_validation.py  # Leakage-safe CV framework
 │       └── sample_features.py   # Mouse-level feature extraction
-├── scripts/
-│   └── run_full_pipeline.py     # Master orchestration
+├── scripts/                     # Standalone utility scripts
+├── data/results/                # Pipeline outputs by phase
 ├── METHODOLOGY.md               # Detailed methods
 └── README.md
 ```

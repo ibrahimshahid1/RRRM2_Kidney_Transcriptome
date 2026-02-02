@@ -88,9 +88,7 @@ Examples:
 
     success = True
 
-    # -------------------------------------------------------------------------
     # Step 1: Node rewiring from deltas
-    # -------------------------------------------------------------------------
     if not args.skip_rewiring:
         if not run(
             [py, "scripts/phase3_node_rewiring_from_deltas.py"],
@@ -101,9 +99,7 @@ Examples:
     else:
         print("\n[SKIPPED] Phase 3.1: Node Rewiring from Deltas")
 
-    # -------------------------------------------------------------------------
     # Step 2: Node2vec embeddings
-    # -------------------------------------------------------------------------
     if not args.skip_node2vec:
         if not run(
             [
@@ -122,9 +118,7 @@ Examples:
     else:
         print("\n[SKIPPED] Phase 3.2: Node2Vec Embeddings")
 
-    # -------------------------------------------------------------------------
     # Step 3: Procrustes alignment + rewiring
-    # -------------------------------------------------------------------------
     if not args.skip_procrustes:
         if not run(
             [
@@ -139,9 +133,7 @@ Examples:
     else:
         print("\n[SKIPPED] Phase 3.3: Procrustes Alignment + Rewiring")
 
-    # -------------------------------------------------------------------------
     # Summary
-    # -------------------------------------------------------------------------
     print("\n" + "=" * 70)
     print("PIPELINE COMPLETE" if success else "PIPELINE COMPLETE (with warnings)")
     print("=" * 70)
@@ -156,7 +148,7 @@ Examples:
     print("\nOutputs:")
     for name, path in outputs:
         p = REPO_ROOT / path
-        status = "✓" if p.exists() else "✗"
+        status = "[+]" if p.exists() else "[-]"
         n_files = len(list(p.glob("*"))) if p.exists() else 0
         print(f"  {status} {name}: {path} ({n_files} items)")
 

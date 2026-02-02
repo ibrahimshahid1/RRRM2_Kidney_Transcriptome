@@ -77,9 +77,7 @@ def main():
     print("Phase 2 Step A2-A3: Edge-wise Regression")
     print("=" * 60)
 
-    # -------------------------------------------------------------------------
     # Load LIONESS z (N x E) and sample order
-    # -------------------------------------------------------------------------
     print(f"\nLoading LIONESS z: {phase2 / args.z}")
     Z = np.load(phase2 / args.z)
     N, E = Z.shape
@@ -96,9 +94,7 @@ def main():
         raise ValueError(f"lioness_samples.txt has {len(samples)} samples but Z has {N} rows")
     print(f"  Loaded sample order: {len(samples)} samples")
 
-    # -------------------------------------------------------------------------
     # Load and align metadata
-    # -------------------------------------------------------------------------
     print(f"\nLoading metadata: {args.meta}")
     meta = pd.read_csv(args.meta, sep="\t", compression="gzip")
     sample_col = find_sample_col(meta)
@@ -114,9 +110,7 @@ def main():
     # Normalize labels
     meta = normalize_labels(meta)
 
-    # -------------------------------------------------------------------------
     # Factor encoding
-    # -------------------------------------------------------------------------
     print("\nFactor encoding:")
     for col, allowed in [("Age", ["YNG", "OLD"]), 
                          ("Arm", ["ISS-T", "LAR"]), 
@@ -130,9 +124,7 @@ def main():
         meta[col] = pd.Categorical(meta[col].astype(str), categories=allowed, ordered=False)
         print(f"  {col}: {list(meta[col].unique())}")
 
-    # -------------------------------------------------------------------------
     # Covariates (numeric vs categorical)
-    # -------------------------------------------------------------------------
     covs = [c.strip() for c in args.add_covariates.split(",") if c.strip()]
     covs = [c for c in covs if c in meta.columns]
     print(f"\nCovariates found: {covs}")
@@ -152,9 +144,7 @@ def main():
             print(f"  {c}: categorical ({n_levels} levels)")
     cov_str = " + " + " + ".join(cov_terms) if cov_terms else ""
 
-    # -------------------------------------------------------------------------
     # R setup via rpy2
-    # -------------------------------------------------------------------------
     print("\nInitializing R/limma...")
     try:
         import rpy2.robjects as ro
@@ -173,9 +163,7 @@ def main():
     base = importr("base")
     stats = importr("stats")
 
-    # -------------------------------------------------------------------------
     # Build design matrix with explicit cell factor (drops empty combinations)
-    # -------------------------------------------------------------------------
     print("\nBuilding design matrix...")
     
     # Put meta into R (using converter context)
@@ -209,9 +197,7 @@ def main():
     # Save design column names for reproducibility
     (outdir / "design_colnames.txt").write_text("\n".join(cn) + "\n")
 
-    # -------------------------------------------------------------------------
     # Transfer Z to R (safe column-major fill)
-    # -------------------------------------------------------------------------
     print("\nTransferring LIONESS matrix to R...")
     # Safer approach: fill nrow=N, ncol=E (matches Z shape), then transpose in R
     # This guarantees Y[e, s] == Z[s, e] after transpose
@@ -223,17 +209,13 @@ def main():
     ro.r(f"rownames(Y) <- paste0('e', seq_len({E}))")
     print(f"  Y matrix: {E} edges × {N} samples (with rownames)")
 
-    # -------------------------------------------------------------------------
     # Fit limma
-    # -------------------------------------------------------------------------
     print("\nFitting limma model...")
     ro.r("fit <- lmFit(Y, design)")
     ro.r("fit <- eBayes(fit)")
     print("  lmFit + eBayes complete")
 
-    # -------------------------------------------------------------------------
     # Define contrasts
-    # -------------------------------------------------------------------------
     
     # Helper to build coefficient names matching interaction(Age, Arm, EnvGroup) pattern
     # R's interaction() produces "Level1.Level2.Level3", then make.names() sanitizes
@@ -299,9 +281,7 @@ def main():
     with open(outdir / "contrasts.json", "w") as f:
         json.dump(all_contrasts, f, indent=2)
 
-    # -------------------------------------------------------------------------
     # Run contrast effects (Δz for rewiring)
-    # -------------------------------------------------------------------------
     print("\nRunning contrast effects...")
     
     for name, con in contrasts.items():
@@ -327,9 +307,7 @@ def main():
 
         print(f"  {name}: delta_z saved ({coef.min():.3f} to {coef.max():.3f})")
 
-    # -------------------------------------------------------------------------
     # Extract predicted condition networks directly from fit$coefficients
-    # -------------------------------------------------------------------------
     print("\nExtracting predicted networks from fit$coefficients...")
     
     # Get coefficient matrix (E x ncol)
@@ -346,14 +324,12 @@ def main():
         np.save(outdir / f"{name}_z_hat.npy", z_hat)
         print(f"  {name}: z_hat saved ({z_hat.min():.3f} to {z_hat.max():.3f})")
 
-    # -------------------------------------------------------------------------
     # Copy edge index for downstream graph building
-    # -------------------------------------------------------------------------
     edge_index = pd.read_csv(phase2 / "edge_index.tsv", sep="\t")
     edge_index.to_csv(outdir / "edge_index.tsv", sep="\t", index=False)
 
     print(f"\n{'=' * 60}")
-    print("Edge-wise regression complete!")
+    print("Edge-wise regression complete")
     print(f"{'=' * 60}")
     print(f"\nOutputs in {outdir}:")
     print(f"  - design_colnames.txt")

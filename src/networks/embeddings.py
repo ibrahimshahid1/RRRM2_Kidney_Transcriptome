@@ -1,182 +1,272 @@
+# src/networks/embeddings.py
+"""
+Phase 3.2: PecanPy node2vec embeddings on Pred_*_z_hat.npy (multi-seed, fixed topology)
+
+Builds biased random walks + trains embeddings using PecanPy for speed.
+
+Graph:
+  - fixed topology from Phase 2 skeleton (edge_i, edge_j)
+  - condition-specific edge weights: w = abs(tanh(z_hat)) in [0,1)
+
+Targets:
+  - by default embed only FLT/GC predicted networks via --patterns
+  - multi-seed for robustness; saves embeddings per seed + stability stats
+
+Usage:
+  python -m src.networks.embeddings
+  python -m src.networks.embeddings --num_seeds 2 --num_walks 20 --walk_length 40  # quick test
+"""
+from __future__ import annotations
+
+import os
+import argparse
+from pathlib import Path
 import numpy as np
 import pandas as pd
-import os
-import networkx as nx
-from node2vec import Node2Vec  # pip install node2vec
-from scipy.linalg import orthogonal_procrustes
+import random
+import inspect
 
-# ==========================================
-# CONFIG
-# ==========================================
-BASE_DIR = "data"
-# Input 1: The Group-Mean Networks you generated
-NETWORK_PATH = os.path.join(BASE_DIR, "processed/networks/phase1/group_mean_edges.npz")
-# Input 2: The Anchor Files you just created
-ANCHOR_DIR = os.path.join(BASE_DIR, "processed/networks/phase1")
-# Input 3: The Gene Universe
-GENE_LIST = os.path.join(BASE_DIR, "processed/networks/phase1/phase1_genes.txt")
+# Repository root (2 levels up from src/networks/)
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
-OUT_DIR = os.path.join(BASE_DIR, "results/embeddings")
-os.makedirs(OUT_DIR, exist_ok=True)
 
-# Node2Vec Hyperparameters (PDF Section 4.5)
-DIMENSIONS = 128
-WALK_LENGTH = 80
-NUM_WALKS = 20   # Use 20 for quick test, 200 for final paper
-P = 0.25         # Return parameter (local structure)
-Q = 4.0          # In-out parameter (global structure)
-WORKERS = 4 
-
-# ==========================================
-# HELPER FUNCTIONS
-# ==========================================
-
-def load_data():
-    print("Loading gene list...")
-    with open(GENE_LIST, 'r') as f:
-        genes = [line.strip() for line in f]
-    
-    print("Loading network bundle...")
-    data = np.load(NETWORK_PATH)
-    # The .npz contains the edges. We need to reconstruct the matrix or graph.
-    # Assuming the previous script saved correlation matrices or similar.
-    # Let's inspect the keys.
-    networks = {k: data[k] for k in data.files}
-    return genes, networks
-
-def embed_network(adj_matrix, gene_names):
+def write_edgelist_weighted(
+    path: Path,
+    edge_i: np.ndarray,
+    edge_j: np.ndarray,
+    w_edge: np.ndarray,
+    node_names: list[str],
+    w_min: float = 1e-8,
+) -> None:
     """
-    Runs node2vec on a weighted adjacency matrix.
+    Write weighted edgelist expected by PecanPy:
+      node_u <tab> node_v <tab> weight
+    We use integer node IDs as strings to keep things compact.
     """
-    # 1. Prepare Graph
-    # Take absolute values (we care about connection strength, not sign for embedding)
-    w_matrix = np.abs(adj_matrix)
-    np.fill_diagonal(w_matrix, 0)
-    
-    # Thresholding for speed: Keep only strong edges (e.g., top 10% or > 0.1)
-    # Node2vec is slow on fully connected graphs.
-    threshold = np.percentile(w_matrix, 90) # Top 10% edges
-    w_matrix[w_matrix < threshold] = 0
-    
-    G = nx.from_numpy_array(w_matrix)
-    
-    # 2. Run Node2Vec
-    n2v = Node2Vec(G, dimensions=DIMENSIONS, walk_length=WALK_LENGTH, 
-                   num_walks=NUM_WALKS, p=P, q=Q, workers=WORKERS, quiet=True)
-    model = n2v.fit(window=10, min_count=1, batch_words=4)
-    
-    # 3. Extract Embeddings in correct order
-    # Node2Vec might shuffle node IDs, so we map back to gene_names indices
-    emb_ordered = np.zeros((len(gene_names), DIMENSIONS))
-    for i in range(len(gene_names)):
-        if str(i) in model.wv:
-            emb_ordered[i, :] = model.wv[str(i)]
-    
-    return emb_ordered
+    # PecanPy accepts node ids as strings; we'll use "0..N-1"
+    # Filter extremely tiny weights to reduce I/O and walk noise.
+    m = w_edge > w_min
+    ei = edge_i[m]
+    ej = edge_j[m]
+    ww = w_edge[m]
 
-def align_embeddings(base_emb, target_emb, anchors, gene_names):
+    with path.open("w", encoding="utf-8") as f:
+        for a, b, w in zip(ei.tolist(), ej.tolist(), ww.tolist()):
+            f.write(f"{a}\t{b}\t{w:.8g}\n")
+
+
+def call_embed_version_safe(g, **kwargs):
     """
-    Procrustes Alignment: Rotates 'target' to match 'base' using anchors.
+    Call PecanPy g.embed(...) but only with args supported by the installed version.
+    This prevents crashes like: unexpected keyword argument 'workers' or 'seed'.
     """
-    # Find indices of anchor genes
-    anchor_indices = [i for i, g in enumerate(gene_names) if g in anchors]
-    
-    if len(anchor_indices) < 10:
-        print(f"WARNING: Only {len(anchor_indices)} anchors found. Alignment may be unstable.")
-        return target_emb
-        
-    # Extract anchor subsets
-    A = base_emb[anchor_indices]
-    B = target_emb[anchor_indices]
-    
-    # Compute Rotation Matrix R
-    # Minimize || A - B*R ||
-    R, scale = orthogonal_procrustes(B, A)
-    
-    # Apply Rotation to ALL genes in target
-    target_aligned = np.dot(target_emb, R)
-    return target_aligned
+    sig = inspect.signature(g.embed)
+    allowed = set(sig.parameters.keys())
+    safe = {k: v for k, v in kwargs.items() if k in allowed}
+    return g.embed(**safe)
 
-# ==========================================
-# EXECUTION
-# ==========================================
 
-genes, networks = load_data()
-print(f"Loaded {len(networks)} networks (groups) for {len(genes)} genes.")
+def main():
+    os.chdir(REPO_ROOT)
 
-# Define the Spaceflight Comparisons (Aim 2)
-comparisons = [
-    # Reference (Ground)          Target (Flight)
-    ("YNG|ISS-T|GC",            "YNG|ISS-T|FLT"),
-    ("OLD|ISS-T|GC",            "OLD|ISS-T|FLT"),
-    # Controls
-    ("YNG|LAR|GC",              "YNG|LAR|FLT"),
-]
+    ap = argparse.ArgumentParser(description="Phase 3.2: PecanPy node2vec embeddings (multi-seed, fixed topology)")
+    ap.add_argument("--phase2_dir", default="data/processed/networks/phase2")
+    ap.add_argument("--reg_dir", default="data/processed/networks/phase2/regression")
+    ap.add_argument("--outdir", default="data/processed/networks/phase3/embeddings")
 
-results = []
+    # FLT/GC-only focus
+    ap.add_argument(
+        "--patterns",
+        default="Pred_*_FLT_z_hat.npy,Pred_*_GC_z_hat.npy",
+        help="Comma-separated glob patterns inside reg_dir (e.g., Pred_*_FLT_z_hat.npy,Pred_*_GC_z_hat.npy)",
+    )
 
-for ref_name, target_name in comparisons:
-    print(f"\n--- Processing: {ref_name} vs {target_name} ---")
-    
-    if ref_name not in networks or target_name not in networks:
-        print("Skipping: Network not found in .npz bundle")
-        continue
+    # node2vec hyperparams (your spec)
+    ap.add_argument("--dimensions", type=int, default=128)
+    ap.add_argument("--walk_length", type=int, default=80)
+    ap.add_argument("--num_walks", type=int, default=200)
+    ap.add_argument("--window", type=int, default=10)  # skip-gram window
+    ap.add_argument("--epochs", type=int, default=1)   # keep 1; increase if needed
+    ap.add_argument("--p", type=float, default=0.25)
+    ap.add_argument("--q", type=float, default=4.0)
 
-    # 1. Embed Reference
-    print(f"Embedding Reference ({ref_name})...")
-    emb_ref = embed_network(networks[ref_name], genes)
-    
-    # 2. Embed Target
-    print(f"Embedding Target ({target_name})...")
-    emb_target = embed_network(networks[target_name], genes)
-    
-    # 3. Load Anchors
-    # Filename format: anchors_YNG_ISS-T_GC_vs_YNG_ISS-T_FLT_k150.tsv
-    safe_ref = ref_name.replace("|", "_")
-    safe_tar = target_name.replace("|", "_")
-    anchor_file = f"anchors_{safe_ref}_vs_{safe_tar}_k150.tsv"
-    anchor_path = os.path.join(ANCHOR_DIR, anchor_file)
-    
-    if os.path.exists(anchor_path):
-        print(f"Loading anchors from: {anchor_file}")
-        anchors_df = pd.read_csv(anchor_path, sep='\t')
-        anchor_genes = anchors_df['gene'].tolist()
-    else:
-        print(f"ERROR: Anchor file missing: {anchor_path}")
-        continue
+    ap.add_argument("--num_seeds", type=int, default=10)
+    ap.add_argument("--seed0", type=int, default=0)
 
-    # 4. Align
-    print("Aligning flight network to ground network...")
-    emb_target_aligned = align_embeddings(emb_ref, emb_target, anchor_genes, genes)
-    
-    # 5. Calculate Rewiring (Cosine Distance)
-    # Cosine Sim = dot(u, v) / (|u| |v|)
-    # Normalize vectors first
-    norm_ref = emb_ref / np.linalg.norm(emb_ref, axis=1, keepdims=True)
-    norm_tar = emb_target_aligned / np.linalg.norm(emb_target_aligned, axis=1, keepdims=True)
-    
-    cosine_sim = np.sum(norm_ref * norm_tar, axis=1)
-    rewiring = 1 - cosine_sim
-    
-    # 6. Save top hits
-    df_res = pd.DataFrame({
-        'gene': genes,
-        'rewiring_score': rewiring,
-        'cosine_sim': cosine_sim,
-        'comparison': f"{target_name}_vs_{ref_name}"
-    })
-    
-    # Filter out anchors (they shouldn't be top hits)
-    df_res = df_res[~df_res['gene'].isin(anchor_genes)]
-    
-    # Sort
-    df_res = df_res.sort_values('rewiring_score', ascending=False)
-    
-    out_file = os.path.join(OUT_DIR, f"rewiring_{safe_tar}_vs_{safe_ref}.csv")
-    df_res.to_csv(out_file, index=False)
-    print(f"Saved results to: {out_file}")
-    
-    print("Top 5 Rewired Genes:")
-    print(df_res.head(5)[['gene', 'rewiring_score']])
+    # Practical speed knobs
+    ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
+    ap.add_argument("--weight_min", type=float, default=1e-8, help="Drop edges with weight <= this before writing edgelist")
+    ap.add_argument("--keep_edgelists", action="store_true", help="Keep generated .edgelist files (debug/audit)")
+    args = ap.parse_args()
 
-print("\nDONE. The top genes in the CSVs are your 'Silent Shifters'.")
+    phase2 = Path(args.phase2_dir)
+    reg = Path(args.reg_dir)
+    out = Path(args.outdir)
+    out.mkdir(parents=True, exist_ok=True)
+
+    print("=" * 60)
+    print("Phase 3.2: PecanPy Node2Vec Embeddings (Multi-seed)")
+    print("=" * 60)
+
+    # Load skeleton
+    genes = [g for g in (phase2 / "phase2_genes.txt").read_text().splitlines() if g.strip()]
+    edge_i = np.load(phase2 / "edge_i.npy")
+    edge_j = np.load(phase2 / "edge_j.npy")
+    num_nodes = len(genes)
+    E = edge_i.shape[0]
+
+    print(f"\nNodes: {num_nodes}, Edges: {E}")
+    print(f"Hyperparams: dim={args.dimensions} walks={args.num_walks} len={args.walk_length} p={args.p} q={args.q}")
+    print(f"Seeds: {args.num_seeds} (starting from {args.seed0})")
+    print(f"Patterns: {args.patterns}")
+
+    # Find predicted networks (FLT/GC only by default)
+    patterns = [p.strip() for p in args.patterns.split(",") if p.strip()]
+    pred_files: list[Path] = []
+    for pat in patterns:
+        pred_files.extend(reg.glob(pat))
+    pred_files = sorted(set(pred_files))
+
+    if not pred_files:
+        raise FileNotFoundError(f"No predicted networks matched patterns={patterns} in {reg}")
+
+    print(f"\nFound {len(pred_files)} predicted networks to embed")
+
+    # Import PecanPy
+    try:
+        from pecanpy import pecanpy as pecanpy_mod
+    except Exception as e:
+        raise ImportError("pecanpy is required. Install with: pip install pecanpy") from e
+
+    all_stats_rows = []
+
+    for f in pred_files:
+        cond = f.stem.replace("_z_hat", "")
+        cond_dir = out / cond
+        cond_dir.mkdir(parents=True, exist_ok=True)
+
+        z = np.load(f).astype(np.float64)
+        if z.shape[0] != E:
+            raise ValueError(f"{f.name}: expected {E} edges but got {z.shape[0]}")
+
+        # Convert Fisher-z to correlation-ish magnitude weights
+        w_edge = np.abs(np.tanh(z)).astype(np.float32)
+
+        # Diagnostics
+        w_mean = float(w_edge.mean())
+        w_99 = float(np.percentile(w_edge, 99))
+        n_tiny = int((w_edge <= args.weight_min).sum())
+
+        print(f"\n=== {cond} ===")
+        print(f"  Edge weight stats: mean={w_mean:.4f}, 99th={w_99:.4f}, #dropped(<= {args.weight_min:g})={n_tiny}")
+
+        # Build a weighted edgelist file for PecanPy (fast + simple)
+        edgelist_path = cond_dir / f"{cond}.edgelist"
+        write_edgelist_weighted(
+            edgelist_path,
+            edge_i=edge_i,
+            edge_j=edge_j,
+            w_edge=w_edge,
+            node_names=genes,
+            w_min=float(args.weight_min),
+        )
+
+        # Multi-seed embeddings
+        embs = []
+        seeds = [args.seed0 + k for k in range(args.num_seeds)]
+
+        for sd in seeds:
+            print(f"  Embedding seed {sd}...", end=" ", flush=True)
+
+            # Control RNG outside pecanpy (embed() may not accept seed)
+            random.seed(sd)
+            np.random.seed(sd)
+
+            # PecanPy graph + embedding
+            # Use SparseOTF for speed/memory on large graphs; it builds transition probs on-the-fly.
+            g = pecanpy_mod.SparseOTF(
+                p=float(args.p),
+                q=float(args.q),
+                workers=int(args.workers),
+                verbose=False,
+            )
+            g.read_edg(str(edgelist_path), weighted=True, directed=False)
+
+            # node2vec embedding (PecanPy includes training)
+            # Use a version-safe helper to handle API variations (seed, workers, names)
+            emb = call_embed_version_safe(
+                g,
+                dim=int(args.dimensions),
+                dimensions=int(args.dimensions),   # some versions use "dimensions"
+                num_walks=int(args.num_walks),
+                walk_length=int(args.walk_length),
+                window=int(args.window),
+                window_size=int(args.window),      # some versions use "window_size"
+                epochs=int(args.epochs),
+                epoch=int(args.epochs),            # some versions use "epoch"
+                verbose=False,
+                seed=int(sd),                      # ignored if unsupported
+                workers=1,                         # ignored if unsupported
+            )
+            
+
+            # PecanPy returns dict-like mapping or ndarray depending on version.
+            # Normalize to (N, D) array ordered by node id 0..N-1.
+            if isinstance(emb, dict):
+                mat = np.zeros((num_nodes, int(args.dimensions)), dtype=np.float32)
+                for k, v in emb.items():
+                    mat[int(k), :] = np.asarray(v, dtype=np.float32)
+            else:
+                mat = np.asarray(emb, dtype=np.float32)
+                if mat.shape[0] != num_nodes:
+                    raise RuntimeError(f"PecanPy returned {mat.shape[0]} nodes, expected {num_nodes}")
+
+            np.save(cond_dir / f"seed_{sd}.npy", mat)
+            embs.append(mat)
+            print(f"saved {mat.shape}")
+
+        # Seed stability
+        stack = np.stack(embs, axis=0)  # (S, N, D)
+        mean = stack.mean(axis=0)
+        std = stack.std(axis=0)
+        mean_norm = np.linalg.norm(mean, axis=1)
+        std_norm = np.linalg.norm(std, axis=1)
+
+        stats_df = pd.DataFrame(
+            {"gene": genes, "mean_norm": mean_norm.astype(float), "std_norm": std_norm.astype(float)}
+        )
+        stats_path = cond_dir / "seed_stability.tsv"
+        stats_df.to_csv(stats_path, sep="\t", index=False)
+        print(f"  Saved seed stability: {stats_path}")
+
+        all_stats_rows.append(
+            {
+                "condition": cond,
+                "n_genes": num_nodes,
+                "dim": int(args.dimensions),
+                "num_seeds": int(args.num_seeds),
+                "mean_std_norm": float(stats_df["std_norm"].mean()),
+                "median_std_norm": float(stats_df["std_norm"].median()),
+                "edge_weight_mean": w_mean,
+                "edge_weight_99pct": w_99,
+                "edges_dropped": int(n_tiny),
+            }
+        )
+
+        if not args.keep_edgelists:
+            try:
+                edgelist_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+    summary = pd.DataFrame(all_stats_rows)
+    summary_path = out / "embedding_seed_summary.tsv"
+    summary.to_csv(summary_path, sep="\t", index=False)
+
+    print(f"\n{'=' * 60}")
+    print(f"Done. Summary: {summary_path}")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()

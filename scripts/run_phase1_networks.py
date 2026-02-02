@@ -224,9 +224,7 @@ def main():
     else:
         print("\n  No rewiring tables produced (insufficient samples per group)")
 
-    # -------------------------------------------------------------------------
     # Second Comparison: Age (YNG vs OLD) within each Arm × EnvGroup
-    # -------------------------------------------------------------------------
     print("\n" + "-" * 40)
     print("Computing Age rewiring scores (YNG vs OLD)...")
     print("-" * 40)
@@ -281,7 +279,7 @@ def main():
             print("\n  No age rewiring tables produced (insufficient samples per group)")
 
     print("\n" + "=" * 60)
-    print("Pipeline complete!")
+    print("Pipeline complete")
     print("=" * 60)
     print(f"\nOutputs in: {outdir}")
     print(f"  - phase1_genes.txt: gene universe")

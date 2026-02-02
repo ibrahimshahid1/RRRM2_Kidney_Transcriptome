@@ -85,9 +85,7 @@ Examples:
     scripts_dir = Path(__file__).parent
     success = True
 
-    # -------------------------------------------------------------------------
     # Step 1: Build Skeleton E
-    # -------------------------------------------------------------------------
     cmd = [
         sys.executable, str(scripts_dir / "build_phase2_skeleton.py"),
         "--rtech", args.rtech,
@@ -101,9 +99,7 @@ Examples:
         print("\n[PIPELINE FAILED] Skeleton building failed")
         return 1
 
-    # -------------------------------------------------------------------------
     # Step 2: Compute LIONESS on Skeleton
-    # -------------------------------------------------------------------------
     cmd = [
         sys.executable, str(scripts_dir / "compute_phase2_lioness_on_skeleton.py"),
         "--rtech", args.rtech,
@@ -114,9 +110,7 @@ Examples:
         print("\n[PIPELINE FAILED] LIONESS computation failed")
         return 1
 
-    # -------------------------------------------------------------------------
     # Step 3: Edge-wise Regression
-    # -------------------------------------------------------------------------
     cmd = [
         sys.executable, str(scripts_dir / "phase2_edge_regression.py"),
         "--meta", args.meta,
@@ -129,9 +123,7 @@ Examples:
             print("  Run with --skip_regression or install rpy2")
         success = False
 
-    # -------------------------------------------------------------------------
     # Summary
-    # -------------------------------------------------------------------------
     print("\n" + "=" * 70)
     print("PIPELINE COMPLETE" if success else "PIPELINE COMPLETE (with warnings)")
     print("=" * 70)
@@ -150,16 +142,16 @@ Examples:
     ]
     for f in expected:
         p = outdir / f
-        status = "✓" if p.exists() else "✗"
+        status = "[+]" if p.exists() else "[-]"
         print(f"  {status} {f}")
     
     reg_dir = outdir / "regression"
     if reg_dir.exists():
         print(f"\nRegression outputs in {reg_dir}:")
         for f in sorted(reg_dir.iterdir()):
-            print(f"  ✓ {f.name}")
+            print(f"  [+] {f.name}")
     elif not args.skip_regression:
-        print(f"\n  ✗ regression/ (missing - run edge regression separately)")
+        print(f"\n  [-] regression/ (missing - run edge regression separately)")
 
     return 0 if success else 1
 

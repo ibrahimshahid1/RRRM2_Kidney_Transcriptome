@@ -1,0 +1,8 @@
+gene_set	set_size_in_universe	hits_in_top_decile	odds_ratio	p	q_BH
+DCT_NCC_WNK_axis	0	0		1.0	1.0
+Oxidative_stress	0	0		1.0	1.0
+ECM_remodeling	0	0		1.0	1.0
+Lipid_metabolism	0	0		1.0	1.0
+Calcium_handling	0	0		1.0	1.0
+Inflammation	0	0		1.0	1.0
+Apoptosis	0	0		1.0	1.0
