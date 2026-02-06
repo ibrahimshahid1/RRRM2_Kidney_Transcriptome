@@ -48,7 +48,7 @@ def main():
                     help="Path to meta_phase1.tsv.gz")
     ap.add_argument("--outdir", default="data/processed/networks/phase1",
                     help="Output directory for networks")
-    ap.add_argument("--max_genes", type=int, default=1200,
+    ap.add_argument("--max_genes", type=int, default=2500,
                     help="Maximum genes for network (800-1500 recommended)")
     ap.add_argument("--group_cols", default="Age,Arm,EnvGroup",
                     help="Comma-separated columns for grouping")

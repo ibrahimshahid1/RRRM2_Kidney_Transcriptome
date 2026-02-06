@@ -9,7 +9,7 @@ shrinkage and top-k neighbors per gene.
 The skeleton E is fixed for all downstream sample-specific weighting.
 
 Usage:
-    python -m src.networks.shared_topology --max_genes 1200 --topk 80
+    python -m src.networks.shared_topology --max_genes 2500 --topk 80
     # Or from scripts/:
     python scripts/run_phase2_pipeline.py
 """
@@ -130,7 +130,7 @@ def main():
                     help="Path to meta_phase1.tsv.gz")
     ap.add_argument("--outdir", default="data/processed/networks/phase2",
                     help="Output directory")
-    ap.add_argument("--max_genes", type=int, default=1200,
+    ap.add_argument("--max_genes", type=int, default=2500,
                     help="Maximum genes for skeleton")
     ap.add_argument("--cell_cols", default="Age,Arm,EnvGroup",
                     help="Comma-separated columns defining experimental cells")
@@ -223,7 +223,7 @@ def main():
     edge_df.to_csv(outdir / "skeleton_edges.tsv", sep="\t", index=False)
 
     print(f"\n{'=' * 60}")
-    print(f\"Skeleton E built successfully\")
+    print("Skeleton E built successfully")
     print(f"{'=' * 60}")
     print(f"  Genes: {len(genes)}")
     print(f"  Edges: {len(edge_df)} (target: ~{len(genes)*args.topk//2} to ~{len(genes)*args.topk})")

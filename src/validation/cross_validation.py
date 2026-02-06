@@ -178,7 +178,7 @@ def fold_wise_skeleton_construction(
     train_rtech: pd.DataFrame,
     train_meta: pd.DataFrame,
     cell_cols: List[str],
-    max_genes: int = 1200,
+    max_genes: int = 2500,
     topk: int = 80
 ) -> Tuple[List[str], pd.DataFrame]:
     """

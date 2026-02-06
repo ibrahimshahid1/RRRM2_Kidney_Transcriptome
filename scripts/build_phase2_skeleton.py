@@ -9,7 +9,7 @@ shrinkage and top-k neighbors per gene.
 The skeleton E is fixed for all downstream sample-specific weighting.
 
 Usage:
-    python scripts/build_phase2_skeleton.py --max_genes 1200 --topk 80
+    python scripts/build_phase2_skeleton.py --max_genes 2500 --topk 80
 """
 from __future__ import annotations
 
@@ -125,7 +125,7 @@ def main():
                     help="Path to meta_phase1.tsv.gz")
     ap.add_argument("--outdir", default="data/processed/networks/phase2",
                     help="Output directory")
-    ap.add_argument("--max_genes", type=int, default=1200,
+    ap.add_argument("--max_genes", type=int, default=2500,
                     help="Maximum genes for skeleton")
     ap.add_argument("--cell_cols", default="Age,Arm,EnvGroup",
                     help="Comma-separated columns defining experimental cells")

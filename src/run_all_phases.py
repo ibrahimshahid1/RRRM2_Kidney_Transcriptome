@@ -97,7 +97,7 @@ def phase_1(dry_run: bool = False, skip_r: bool = False) -> bool:
 
 
 def phase_2(dry_run: bool = False, skip_r: bool = False, 
-            max_genes: int = 1200, topk: int = 80) -> bool:
+            max_genes: int = 2500, topk: int = 80) -> bool:
     """Phase 2: Network Construction"""
     log("PHASE 2: Network Skeleton + LIONESS + Edge Regression")
     
@@ -235,8 +235,8 @@ Examples:
                         help="Skip R-dependent steps")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print commands without executing")
-    parser.add_argument("--max-genes", type=int, default=1200,
-                        help="Max genes for skeleton (default: 1200)")
+    parser.add_argument("--max-genes", type=int, default=2500,
+                        help="Max genes for skeleton (default: 2500)")
     parser.add_argument("--topk", type=int, default=80,
                         help="Top-k neighbors per gene (default: 80)")
     parser.add_argument("--num-seeds", type=int, default=10,

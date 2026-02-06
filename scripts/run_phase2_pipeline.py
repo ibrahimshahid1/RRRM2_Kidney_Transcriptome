@@ -9,7 +9,7 @@ Runs all Phase 2 steps in sequence:
 
 Usage:
     python scripts/run_phase2_pipeline.py
-    python scripts/run_phase2_pipeline.py --max_genes 1200 --topk 80 --skip_regression
+    python scripts/run_phase2_pipeline.py --max_genes 2500 --topk 80 --skip_regression
 """
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ Examples:
     ap.add_argument("--rtech", default="data/processed/phase1_residuals/Rtech.tsv.gz")
     ap.add_argument("--meta", default="data/processed/phase1_residuals/meta_phase1.tsv.gz")
     ap.add_argument("--outdir", default="data/processed/networks/phase2")
-    ap.add_argument("--max_genes", type=int, default=1200)
+    ap.add_argument("--max_genes", type=int, default=2500)
     ap.add_argument("--topk", type=int, default=80)
     ap.add_argument("--cell_cols", default="Age,Arm,EnvGroup")
     
