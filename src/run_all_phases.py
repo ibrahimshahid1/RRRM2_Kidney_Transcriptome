@@ -20,11 +20,64 @@ import argparse
 import subprocess
 import sys
 import os
+import json
 from pathlib import Path
 from datetime import datetime
 
 # Repository root
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# Global run configuration (set by init_run)
+RUN_ID = None
+RESULTS_DIR = None
+NETWORKS_DIR = None
+
+
+def init_run(run_id: str, max_genes: int, topk: int, num_seeds: int, 
+             phases: list, skip_r: bool) -> tuple:
+    """Initialize versioned output directories and save run metadata."""
+    global RUN_ID, RESULTS_DIR, NETWORKS_DIR
+    
+    RUN_ID = run_id
+    RESULTS_DIR = REPO_ROOT / "data/results" / run_id
+    NETWORKS_DIR = REPO_ROOT / "data/processed/networks" / run_id
+    
+    # Create directories
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    NETWORKS_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Save run metadata
+    metadata = {
+        "run_id": run_id,
+        "timestamp": datetime.now().isoformat(),
+        "parameters": {
+            "max_genes": max_genes,
+            "topk": topk,
+            "num_seeds": num_seeds,
+        },
+        "phases": phases,
+        "skip_r": skip_r,
+    }
+    
+    # Try to get git commit
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, cwd=REPO_ROOT
+        )
+        if result.returncode == 0:
+            metadata["git_commit"] = result.stdout.strip()
+    except:
+        pass
+    
+    with open(RESULTS_DIR / "run_metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
+    
+    log(f"Run ID: {run_id}")
+    log(f"Results: {RESULTS_DIR}")
+    log(f"Networks: {NETWORKS_DIR}")
+    
+    return RESULTS_DIR, NETWORKS_DIR
 
 
 def log(msg: str, level: str = "INFO"):
@@ -101,21 +154,28 @@ def phase_2(dry_run: bool = False, skip_r: bool = False,
     """Phase 2: Network Construction"""
     log("PHASE 2: Network Skeleton + LIONESS + Edge Regression")
     
+    # Get versioned output directory from environment
+    networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
+    
     # Step 2.1-2.3: Build shared sparse skeleton
     if not run_python("src.networks.shared_topology", 
-                      [f"--max_genes={max_genes}", f"--topk={topk}"], 
+                      [f"--max_genes={max_genes}", f"--topk={topk}", f"--outdir={networks_dir}"], 
                       dry_run=dry_run):
         return False
     
     # Step A1: LIONESS edge weights
-    if not run_python("src.networks.lioness", dry_run=dry_run):
+    if not run_python("src.networks.lioness", 
+                      [f"--skeleton_dir={networks_dir}", f"--outdir={networks_dir}"],
+                      dry_run=dry_run):
         return False
     
     # Step A2-A3: Edge-wise regression (requires R/limma)
     if skip_r:
         log("Skipping R-dependent edge regression", "WARN")
     else:
-        if not run_python("src.networks.edge_regression", dry_run=dry_run):
+        if not run_python("src.networks.edge_regression", 
+                          [f"--networks_dir={networks_dir}"],
+                          dry_run=dry_run):
             return False
     
     return True
@@ -142,8 +202,13 @@ def phase_5(dry_run: bool = False) -> bool:
     """Phase 5: Silent Shifters + Interaction Metrics"""
     log("PHASE 5: Silent Shifters + Interaction Metrics")
     
+    # Get versioned output directory from environment
+    results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
+    
     # Interaction metrics
-    if not run_python("src.statistics.interaction_metrics", dry_run=dry_run):
+    if not run_python("src.statistics.interaction_metrics", 
+                      [f"--outdir={results_dir}"],
+                      dry_run=dry_run):
         return False
     
     # Silent shifters for each contrast
@@ -155,13 +220,13 @@ def phase_5(dry_run: bool = False) -> bool:
     ]
     
     for contrast in contrasts:
-        rewiring_file = REPO_ROOT / f"data/results/phase3_rewiring/{contrast}_rewiring_agg.tsv"
+        rewiring_file = Path(results_dir) / f"phase3_rewiring/{contrast}_rewiring_agg.tsv"
         if not rewiring_file.exists():
             log(f"Skipping {contrast} - rewiring file not found", "WARN")
             continue
         
         if not run_python("src.statistics.silent_shifters",
-                          [f"--rewiring={rewiring_file}"],
+                          [f"--rewiring={rewiring_file}", f"--outdir={results_dir}"],
                           dry_run=dry_run):
             log(f"Warning: silent_shifters failed for {contrast}", "WARN")
     
@@ -172,12 +237,20 @@ def phase_6(dry_run: bool = False, skip_r: bool = False) -> bool:
     """Phase 6: Uncertainty Estimation + Full Regression"""
     log("PHASE 6: Permutation + Bootstrap + Full Regression")
     
+    # Get versioned output directory from environment
+    results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
+    networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
+    
     # Permutation and bootstrap
-    if not run_python("src.statistics.permutation_bootstrap", dry_run=dry_run):
+    if not run_python("src.statistics.permutation_bootstrap", 
+                      [f"--outdir={results_dir}", f"--networks_dir={networks_dir}"],
+                      dry_run=dry_run):
         return False
     
     # Full factorial regression
-    if not run_python("src.statistics.full_regression", dry_run=dry_run):
+    if not run_python("src.statistics.full_regression", 
+                      [f"--outdir={results_dir}", f"--networks_dir={networks_dir}"],
+                      dry_run=dry_run):
         return False
     
     # Gene-level DE (R)
@@ -193,6 +266,9 @@ def phase_7(dry_run: bool = False) -> bool:
     """Phase 7: Biological Grounding"""
     log("PHASE 7: Biological Grounding + Enrichment")
     
+    # Get versioned output directory from environment
+    results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
+    
     contrasts = [
         "ISS_T_YNG_FLT_minus_GC",
         "ISS_T_OLD_FLT_minus_GC",
@@ -201,12 +277,12 @@ def phase_7(dry_run: bool = False) -> bool:
     ]
     
     for contrast in contrasts:
-        rewiring_file = REPO_ROOT / f"data/results/phase3_rewiring/{contrast}_rewiring_agg.tsv"
+        rewiring_file = Path(results_dir) / f"phase3_rewiring/{contrast}_rewiring_agg.tsv"
         if not rewiring_file.exists():
             log(f"Skipping {contrast} - rewiring file not found", "WARN")
             continue
         
-        outdir = REPO_ROOT / f"data/results/phase7_grounding/{contrast}"
+        outdir = Path(results_dir) / f"phase7_grounding/{contrast}"
         if not run_python("src.enrichment.biological_grounding",
                           [f"--rewiring={rewiring_file}", f"--outdir={outdir}"],
                           dry_run=dry_run):
@@ -241,12 +317,37 @@ Examples:
                         help="Top-k neighbors per gene (default: 80)")
     parser.add_argument("--num-seeds", type=int, default=10,
                         help="Number of embedding seeds (default: 10)")
+    parser.add_argument("--run-id", type=str, default=None,
+                        help="Run identifier for versioned outputs (default: auto-generated)")
     
     args = parser.parse_args()
     
     os.chdir(REPO_ROOT)
     
-    # Define phase runners
+    # Determine which phases to run first (needed for init_run)
+    phases_available = [0, 1, 2, 3, 5, 6, 7]
+    if args.phases:
+        to_run = sorted(set(args.phases) & set(phases_available))
+    else:
+        to_run = [p for p in sorted(phases_available) if p >= args.start]
+    
+    # Generate run ID if not provided
+    run_id = args.run_id
+    if run_id is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_id = f"run_{timestamp}_{args.max_genes}g"
+    
+    # Initialize versioned directories (skip for dry-run)
+    if not args.dry_run:
+        init_run(run_id, args.max_genes, args.topk, args.num_seeds, to_run, args.skip_r)
+    else:
+        log(f"[DRY-RUN] Would create run: {run_id}")
+    
+    # Define phase runners - pass versioned paths via environment
+    os.environ["RRRM_RUN_ID"] = run_id
+    os.environ["RRRM_RESULTS_DIR"] = str(REPO_ROOT / "data/results" / run_id)
+    os.environ["RRRM_NETWORKS_DIR"] = str(REPO_ROOT / "data/processed/networks" / run_id)
+    
     phases = {
         0: lambda: phase_0(args.dry_run, args.skip_r),
         1: lambda: phase_1(args.dry_run, args.skip_r),
@@ -257,14 +358,9 @@ Examples:
         7: lambda: phase_7(args.dry_run),
     }
     
-    # Determine which phases to run
-    if args.phases:
-        to_run = sorted(set(args.phases) & set(phases.keys()))
-    else:
-        to_run = [p for p in sorted(phases.keys()) if p >= args.start]
-    
     log(f"RRRM-2 Pipeline Runner", "INFO")
     log(f"Phases to run: {to_run}")
+    log(f"Max genes: {args.max_genes}")
     log(f"Skip R steps: {args.skip_r}")
     log(f"Dry run: {args.dry_run}")
     print()
@@ -283,8 +379,12 @@ Examples:
         sys.exit(1)
     else:
         log("Pipeline completed successfully", "OK")
-        log(f"Results in: {REPO_ROOT / 'data/results/'}")
+        if RESULTS_DIR:
+            log(f"Results in: {RESULTS_DIR}")
+        else:
+            log(f"Results would be in: data/results/{run_id}/")
 
 
 if __name__ == "__main__":
     main()
+
