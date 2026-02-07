@@ -165,7 +165,7 @@ def phase_2(dry_run: bool = False, skip_r: bool = False,
     
     # Step A1: LIONESS edge weights
     if not run_python("src.networks.lioness", 
-                      [f"--skeleton_dir={networks_dir}", f"--outdir={networks_dir}"],
+                      [f"--phase2_dir={networks_dir}"],
                       dry_run=dry_run):
         return False
     
@@ -174,7 +174,7 @@ def phase_2(dry_run: bool = False, skip_r: bool = False,
         log("Skipping R-dependent edge regression", "WARN")
     else:
         if not run_python("src.networks.edge_regression", 
-                          [f"--networks_dir={networks_dir}"],
+                          [f"--phase2_dir={networks_dir}"],
                           dry_run=dry_run):
             return False
     
@@ -185,14 +185,26 @@ def phase_3(dry_run: bool = False, num_seeds: int = 10) -> bool:
     """Phase 3: Embeddings + Procrustes"""
     log("PHASE 3: Node2Vec Embeddings + Procrustes Alignment")
     
+    # Get versioned directories from environment
+    networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
+    results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
+    
     # Step 3.2: Node2Vec embeddings
     if not run_python("src.networks.embeddings", 
-                      [f"--num_seeds={num_seeds}"], 
+                      [f"--phase2_dir={networks_dir}", 
+                       f"--reg_dir={networks_dir}/regression",
+                       f"--outdir={results_dir}/phase3_embeddings",
+                       f"--num_seeds={num_seeds}"], 
                       dry_run=dry_run):
         return False
     
     # Step 3.3: Procrustes alignment
-    if not run_python("src.networks.procrustes", dry_run=dry_run):
+    if not run_python("src.networks.procrustes", 
+                      [f"--phase2_dir={networks_dir}",
+                       f"--emb_dir={results_dir}/phase3_embeddings",
+                       f"--outdir={results_dir}/phase3_rewiring",
+                       f"--num_seeds={num_seeds}"],
+                      dry_run=dry_run):
         return False
     
     return True
@@ -207,7 +219,8 @@ def phase_5(dry_run: bool = False) -> bool:
     
     # Interaction metrics
     if not run_python("src.statistics.interaction_metrics", 
-                      [f"--outdir={results_dir}"],
+                      [f"--in_dir={results_dir}/phase3_rewiring",
+                       f"--out_dir={results_dir}/phase5_derived"],
                       dry_run=dry_run):
         return False
     
@@ -226,7 +239,8 @@ def phase_5(dry_run: bool = False) -> bool:
             continue
         
         if not run_python("src.statistics.silent_shifters",
-                          [f"--rewiring={rewiring_file}", f"--outdir={results_dir}"],
+                          [f"--rewiring={rewiring_file}", 
+                           f"--outdir={results_dir}/phase5_silent_shifters_strict"],
                           dry_run=dry_run):
             log(f"Warning: silent_shifters failed for {contrast}", "WARN")
     
@@ -243,13 +257,15 @@ def phase_6(dry_run: bool = False, skip_r: bool = False) -> bool:
     
     # Permutation and bootstrap
     if not run_python("src.statistics.permutation_bootstrap", 
-                      [f"--outdir={results_dir}", f"--networks_dir={networks_dir}"],
+                      [f"--phase2_dir={networks_dir}", 
+                       f"--outdir={results_dir}/phase6_uncertainty"],
                       dry_run=dry_run):
         return False
     
     # Full factorial regression
     if not run_python("src.statistics.full_regression", 
-                      [f"--outdir={results_dir}", f"--networks_dir={networks_dir}"],
+                      [f"--phase2_dir={networks_dir}", 
+                       f"--outdir={results_dir}/phase6_regression"],
                       dry_run=dry_run):
         return False
     
