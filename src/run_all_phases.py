@@ -174,7 +174,8 @@ def phase_2(dry_run: bool = False, skip_r: bool = False,
         log("Skipping R-dependent edge regression", "WARN")
     else:
         if not run_python("src.networks.edge_regression", 
-                          [f"--phase2_dir={networks_dir}"],
+                          [f"--phase2_dir={networks_dir}",
+                           f"--outdir={networks_dir}/regression"],
                           dry_run=dry_run):
             return False
     
