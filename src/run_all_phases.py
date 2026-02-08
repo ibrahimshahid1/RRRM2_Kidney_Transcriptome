@@ -279,9 +279,9 @@ def phase_6(dry_run: bool = False, skip_r: bool = False) -> bool:
     return True
 
 
-def phase_8(dry_run: bool = False) -> bool:
-    """Phase 8: Generate Publication-Ready Figures"""
-    log("PHASE 8: Figure Generation")
+def phase_9(dry_run: bool = False) -> bool:
+    """Phase 9: Generate Publication-Ready Figures (runs last)"""
+    log("PHASE 9: Figure Generation")
     
     # Get versioned results directory from environment
     results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
@@ -360,7 +360,8 @@ Examples:
     os.chdir(REPO_ROOT)
     
     # Determine which phases to run first (needed for init_run)
-    phases_available = [0, 1, 2, 3, 5, 6, 7, 8]
+    # Note: Phase 9 (figures) runs last, after all data phases
+    phases_available = [0, 1, 2, 3, 5, 6, 7, 9]
     if args.phases:
         to_run = sorted(set(args.phases) & set(phases_available))
     else:
@@ -391,7 +392,7 @@ Examples:
         5: lambda: phase_5(args.dry_run),
         6: lambda: phase_6(args.dry_run, args.skip_r),
         7: lambda: phase_7(args.dry_run),
-        8: lambda: phase_8(args.dry_run),
+        9: lambda: phase_9(args.dry_run),  # Figure generation runs last
     }
     
     log(f"RRRM-2 Pipeline Runner", "INFO")

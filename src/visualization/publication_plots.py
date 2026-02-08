@@ -35,7 +35,7 @@ plt.rcParams.update({
 })
 sns.set_style("whitegrid")
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]  # src/visualization/ -> src/ -> repo root
 
 
 # Utilities
@@ -102,12 +102,14 @@ def plot_phase0_deconvolution(data_dir: Path, out_dir: Path, results_dir: Path =
                 continue
                 
             # Determine sample and cell type columns
-            id_cols = [c for c in df.columns if c.lower() in ('sample', 'sample_id', 'id', 'row.names')]
+            # Handle various naming conventions including pandas default 'Unnamed: 0'
+            id_cols = [c for c in df.columns if c.lower() in ('sample', 'sample_id', 'id', 'row.names', 'unnamed: 0')]
             if not id_cols:
                 id_cols = [df.columns[0]]
             
             value_cols = [c for c in df.columns if c not in id_cols]
             if not value_cols:
+                print(f"  [SKIP] No value columns found in {prop_file.name}")
                 continue
             
             # Melt for plotting
