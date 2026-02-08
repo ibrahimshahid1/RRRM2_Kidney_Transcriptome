@@ -48,9 +48,12 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def load_gene_symbols(data_dir: Path) -> Dict[str, str]:
+def load_gene_symbols(results_dir: Path) -> Dict[str, str]:
     """Load Ensembl to gene symbol mapping."""
-    symbol_file = data_dir / "results" / "phase6_uncertainty" / "ensembl_to_symbol.tsv"
+    # Try versioned path first, then fall back to legacy path
+    symbol_file = results_dir / "phase6_uncertainty" / "ensembl_to_symbol.tsv"
+    if not symbol_file.exists():
+        symbol_file = results_dir.parent / "phase6_uncertainty" / "ensembl_to_symbol.tsv"
     if symbol_file.exists():
         df = pd.read_csv(symbol_file, sep="\t")
         if "ensembl" in df.columns and "symbol" in df.columns:
@@ -73,7 +76,7 @@ def safe_savefig(fig: plt.Figure, path: Path, **kwargs) -> None:
 
 
 # Phase 0: Deconvolution
-def plot_phase0_deconvolution(data_dir: Path, out_dir: Path) -> Tuple[int, int]:
+def plot_phase0_deconvolution(data_dir: Path, out_dir: Path, results_dir: Path = None) -> Tuple[int, int]:
     """Generate deconvolution plots and tables."""
     phase_out = out_dir / "phase0_deconvolution"
     ensure_dir(phase_out)
@@ -152,16 +155,17 @@ def plot_phase0_deconvolution(data_dir: Path, out_dir: Path) -> Tuple[int, int]:
 
 
 # Phase 3: Rewiring
-def plot_phase3_rewiring(data_dir: Path, out_dir: Path, gene_symbols: Dict[str, str]) -> Tuple[int, int]:
+def plot_phase3_rewiring(data_dir: Path, out_dir: Path, gene_symbols: Dict[str, str], results_dir: Path = None) -> Tuple[int, int]:
     """Generate rewiring plots and tables."""
     phase_out = out_dir / "phase3_rewiring"
     ensure_dir(phase_out)
     plots_created = 0
     tables_created = 0
 
-    rewiring_dir = data_dir / "results" / "phase3_rewiring"
+    # Use versioned results_dir if provided, else fall back to data_dir
+    rewiring_dir = (results_dir or data_dir / "results") / "phase3_rewiring"
     if not rewiring_dir.exists():
-        print("  [SKIP] Phase 3 rewiring directory not found")
+        print(f"  [SKIP] Phase 3 rewiring directory not found: {rewiring_dir}")
         return 0, 0
 
     # Find all aggregated rewiring files
@@ -264,16 +268,17 @@ def plot_phase3_rewiring(data_dir: Path, out_dir: Path, gene_symbols: Dict[str, 
 
 
 # Phase 5: Silent Shifters
-def plot_phase5_silent_shifters(data_dir: Path, out_dir: Path, gene_symbols: Dict[str, str]) -> Tuple[int, int]:
+def plot_phase5_silent_shifters(data_dir: Path, out_dir: Path, gene_symbols: Dict[str, str], results_dir: Path = None) -> Tuple[int, int]:
     """Generate silent shifter plots and tables."""
     phase_out = out_dir / "phase5_silent_shifters"
     ensure_dir(phase_out)
     plots_created = 0
     tables_created = 0
 
-    ss_dir = data_dir / "results" / "phase5_silent_shifters_strict"
+    # Use versioned results_dir if provided
+    ss_dir = (results_dir or data_dir / "results") / "phase5_silent_shifters_strict"
     if not ss_dir.exists():
-        print("  [SKIP] Phase 5 silent shifters directory not found")
+        print(f"  [SKIP] Phase 5 silent shifters directory not found: {ss_dir}")
         return 0, 0
 
     ss_files = list(ss_dir.glob("*_silent_shifters.tsv"))
@@ -395,16 +400,17 @@ def plot_phase5_silent_shifters(data_dir: Path, out_dir: Path, gene_symbols: Dic
 
 
 # Phase 6: Uncertainty
-def plot_phase6_uncertainty(data_dir: Path, out_dir: Path, gene_symbols: Dict[str, str]) -> Tuple[int, int]:
+def plot_phase6_uncertainty(data_dir: Path, out_dir: Path, gene_symbols: Dict[str, str], results_dir: Path = None) -> Tuple[int, int]:
     """Generate uncertainty (p-value, CI) plots and tables."""
     phase_out = out_dir / "phase6_uncertainty"
     ensure_dir(phase_out)
     plots_created = 0
     tables_created = 0
 
-    unc_dir = data_dir / "results" / "phase6_uncertainty"
+    # Use versioned results_dir if provided
+    unc_dir = (results_dir or data_dir / "results") / "phase6_uncertainty"
     if not unc_dir.exists():
-        print("  [SKIP] Phase 6 uncertainty directory not found")
+        print(f"  [SKIP] Phase 6 uncertainty directory not found: {unc_dir}")
         return 0, 0
 
     # P-value files
@@ -523,16 +529,17 @@ def plot_phase6_uncertainty(data_dir: Path, out_dir: Path, gene_symbols: Dict[st
 
 
 # Phase 6: Edge Regression (All 80 Samples)
-def plot_phase6_regression(data_dir: Path, out_dir: Path, gene_symbols: Dict[str, str]) -> Tuple[int, int]:
+def plot_phase6_regression(data_dir: Path, out_dir: Path, gene_symbols: Dict[str, str], results_dir: Path = None) -> Tuple[int, int]:
     """Generate plots and tables for regression-based network analysis (all 80 samples)."""
     phase_out = out_dir / "phase6_regression"
     ensure_dir(phase_out)
     plots_created = 0
     tables_created = 0
 
-    reg_dir = data_dir / "results" / "phase6_regression"
+    # Use versioned results_dir if provided
+    reg_dir = (results_dir or data_dir / "results") / "phase6_regression"
     if not reg_dir.exists():
-        print("  [SKIP] Phase 6 regression directory not found")
+        print(f"  [SKIP] Phase 6 regression directory not found: {reg_dir}")
         return 0, 0
 
     # Load flight effect and age×flight interaction results
@@ -763,24 +770,37 @@ def main() -> None:
                     help="Tag added to output folder name.")
     ap.add_argument("--data_dir", default="data",
                     help="Data directory relative to repo root.")
+    ap.add_argument("--results_dir", default=None,
+                    help="Versioned results directory (overrides data_dir/results). Use with pipeline runner.")
+    ap.add_argument("--out_dir", default=None,
+                    help="Direct output directory (overrides out_root/timestamp_tag).")
     args = ap.parse_args()
 
-    timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_dir = (REPO_ROOT / args.out_root / f"{timestamp}_{args.tag}").resolve()
+    # Determine output directory
+    if args.out_dir:
+        out_dir = Path(args.out_dir).resolve()
+    else:
+        timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_dir = (REPO_ROOT / args.out_root / f"{timestamp}_{args.tag}").resolve()
     ensure_dir(out_dir)
     
     data_dir = REPO_ROOT / args.data_dir
+    
+    # Resolve versioned results directory
+    results_dir = Path(args.results_dir).resolve() if args.results_dir else None
 
     print("=" * 72)
     print("RRRM2 Kidney Transcriptome - Plot Generator")
     print("=" * 72)
     print(f"Output folder: {out_dir}")
     print(f"Data directory: {data_dir}")
+    if results_dir:
+        print(f"Results directory: {results_dir}")
     print()
 
     # Load gene symbols
     print("Loading gene symbol mappings...")
-    gene_symbols = load_gene_symbols(data_dir)
+    gene_symbols = load_gene_symbols(results_dir or data_dir / "results")
     print(f"  Loaded {len(gene_symbols)} gene symbol mappings")
     print()
 
@@ -788,31 +808,31 @@ def main() -> None:
 
     # Phase 0: Deconvolution
     print("[Phase 0] Deconvolution plots...")
-    plots, tables = plot_phase0_deconvolution(data_dir, out_dir)
+    plots, tables = plot_phase0_deconvolution(data_dir, out_dir, results_dir)
     phase_stats["phase0_deconvolution"] = (plots, tables)
     print()
 
     # Phase 3: Rewiring
     print("[Phase 3] Rewiring plots...")
-    plots, tables = plot_phase3_rewiring(data_dir, out_dir, gene_symbols)
+    plots, tables = plot_phase3_rewiring(data_dir, out_dir, gene_symbols, results_dir)
     phase_stats["phase3_rewiring"] = (plots, tables)
     print()
 
     # Phase 5: Silent Shifters
     print("[Phase 5] Silent shifter plots...")
-    plots, tables = plot_phase5_silent_shifters(data_dir, out_dir, gene_symbols)
+    plots, tables = plot_phase5_silent_shifters(data_dir, out_dir, gene_symbols, results_dir)
     phase_stats["phase5_silent_shifters"] = (plots, tables)
     print()
 
     # Phase 6: Uncertainty (permutation-based)
     print("[Phase 6] Uncertainty plots (permutation-based)...")
-    plots, tables = plot_phase6_uncertainty(data_dir, out_dir, gene_symbols)
+    plots, tables = plot_phase6_uncertainty(data_dir, out_dir, gene_symbols, results_dir)
     phase_stats["phase6_uncertainty"] = (plots, tables)
     print()
 
     # Phase 6: Regression (all 80 samples)
     print("[Phase 6] Regression plots (all 80 samples)...")
-    plots, tables = plot_phase6_regression(data_dir, out_dir, gene_symbols)
+    plots, tables = plot_phase6_regression(data_dir, out_dir, gene_symbols, results_dir)
     phase_stats["phase6_regression"] = (plots, tables)
     print()
 

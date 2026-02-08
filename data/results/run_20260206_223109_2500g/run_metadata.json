@@ -1,0 +1,20 @@
+{
+  "run_id": "run_20260206_223109_2500g",
+  "timestamp": "2026-02-06T22:31:09.318633",
+  "parameters": {
+    "max_genes": 2500,
+    "topk": 80,
+    "num_seeds": 10
+  },
+  "phases": [
+    0,
+    1,
+    2,
+    3,
+    5,
+    6,
+    7
+  ],
+  "skip_r": false,
+  "git_commit": "08089615e3d4cbfeb75e1309937849e8c15653c7"
+}
