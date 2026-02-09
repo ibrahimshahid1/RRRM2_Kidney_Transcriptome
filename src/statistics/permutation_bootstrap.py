@@ -88,10 +88,10 @@ def main():
                     help="Filename of LIONESS z-scores matrix (N x E)")
     ap.add_argument("--outdir", 
                     default=str(REPO_ROOT / "data/results/phase6_uncertainty"),
-                    help="Output directory")
-    ap.add_argument("--K_perm", type=int, default=200,
+                    help="Outpußt directory")
+    ap.add_argument("--K_perm", type=int, default=2000,
                     help="Number of permutations")
-    ap.add_argument("--B_boot", type=int, default=200,
+    ap.add_argument("--B_boot", type=int, default=2000,
                     help="Number of bootstrap resamples")
     ap.add_argument("--seed", type=int, default=0,
                     help="Random seed")

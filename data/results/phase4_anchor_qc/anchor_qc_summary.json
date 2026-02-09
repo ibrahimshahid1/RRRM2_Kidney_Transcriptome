@@ -1,7 +1,0 @@
-{
-  "n_anchors": 200,
-  "n_with_DE": 0,
-  "n_pass_relaxed_DE": null,
-  "n_with_stability_metrics": 0,
-  "note": "If expr_cell_means was not provided, stability metrics are NA. Provide a gene x cellMeans TSV to fill them."
-}

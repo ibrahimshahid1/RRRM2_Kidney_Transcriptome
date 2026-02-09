@@ -1,0 +1,32 @@
+# Ignore virtual environment
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Ignore large data files (mount these instead)
+data/external/
+data/raw/
+data/processed/
+data/results/
+
+# Ignore git
+.git/
+.gitignore
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore exports and logs
+exports/
+*.log
+*.txt
+!requirements.txt
+
+# Keep config and source
+!config/
+!src/
+!scripts/
