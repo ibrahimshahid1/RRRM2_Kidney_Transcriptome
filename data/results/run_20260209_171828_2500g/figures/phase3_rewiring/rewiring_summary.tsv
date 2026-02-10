@@ -1,0 +1,5 @@
+contrast	rewiring_mean_mean	rewiring_mean_std	rewiring_mean_max	rewiring_std_mean	rewiring_std_max	n_genes
+ISS_T_OLD_FLT_minus_GC	0.2378	0.0852	0.5001	0.0252	0.0687	2500
+ISS_T_YNG_FLT_minus_GC	0.2334	0.0836	0.4516	0.0245	0.0669	2500
+LAR_OLD_FLT_minus_GC	0.2232	0.0812	0.449	0.0244	0.0728	2500
+LAR_YNG_FLT_minus_GC	0.2179	0.0796	0.4412	0.0241	0.0745	2500
