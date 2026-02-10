@@ -35,12 +35,34 @@ def load_meta(path: str) -> pd.DataFrame:
     return pd.read_csv(path, sep="\t", compression="gzip")
 
 
-def pick_genes(rtech: pd.DataFrame, max_genes: int) -> list[str]:
-    """Select top genes by variance, excluding ERCC."""
+def pick_genes(rtech: pd.DataFrame, max_genes: int,
+               force_include: list[str] | None = None) -> list[str]:
+    """Select top genes by variance, excluding ERCC.
+
+    If force_include is provided, those genes are guaranteed in the panel
+    (if present in rtech). HVGs fill remaining slots up to max_genes.
+    """
     keep = ~rtech.index.str.upper().str.startswith("ERCC")
     r = rtech.loc[keep]
     v = r.var(axis=1)
-    return v.sort_values(ascending=False).head(max_genes).index.tolist()
+
+    # Force-include genes that exist in Rtech
+    forced: set[str] = set()
+    if force_include:
+        present = set(rtech.index)
+        forced = {g for g in force_include if g in present}
+        missing = len(force_include) - len(forced)
+        if missing:
+            print(f"  Note: {missing}/{len(force_include)} forced genes not in Rtech")
+
+    # Fill remaining slots with HVGs (excluding already-forced)
+    remaining = max(max_genes - len(forced), 0)
+    hvg = set(v.drop(labels=list(forced), errors="ignore")
+              .sort_values(ascending=False).head(remaining).index)
+
+    genes = list(forced | hvg)
+    print(f"  Gene panel: {len(forced)} forced + {len(hvg)} HVG = {len(genes)} total")
+    return genes
 
 
 def cell_standardize(
@@ -136,6 +158,8 @@ def main():
                     help="Comma-separated columns defining experimental cells")
     ap.add_argument("--topk", type=int, default=80,
                     help="Top-k neighbors per gene (~G*k edges)")
+    ap.add_argument("--force_include", default="",
+                    help="Path to gene list file (one gene per line) to force-include")
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
@@ -171,9 +195,17 @@ def main():
     print(f"  Aligned: {len(common)} samples")
 
     # Gene selection
-    genes = pick_genes(rtech, args.max_genes)
+    force_include = None
+    if args.force_include and Path(args.force_include).exists():
+        force_include = [
+            line.strip() for line in
+            Path(args.force_include).read_text().strip().split("\n")
+            if line.strip()
+        ]
+        print(f"\nLoaded {len(force_include)} force-include genes from {args.force_include}")
+    genes = pick_genes(rtech, args.max_genes, force_include=force_include)
     (outdir / "phase2_genes.txt").write_text("\n".join(genes) + "\n")
-    print(f"\nSelected {len(genes)} top-variance genes")
+    print(f"\nSelected {len(genes)} genes for skeleton")
     print(f"  → Saved to {outdir / 'phase2_genes.txt'}")
 
     rtech_gxs = rtech.loc[genes]
