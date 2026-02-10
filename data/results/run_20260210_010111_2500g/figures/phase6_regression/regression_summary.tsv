@@ -1,0 +1,3 @@
+effect	n_genes	n_significant_q05	n_significant_q01	n_significant_q001	median_p_stouffer	min_p_stouffer
+flight_effect	2500	228	162	107	0.9278629319717469	0.0
+age_flight_interaction	2500	53	39	18	0.9910138800357946	0.0
