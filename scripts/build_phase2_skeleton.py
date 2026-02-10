@@ -30,12 +30,37 @@ def load_meta(path: str) -> pd.DataFrame:
     return pd.read_csv(path, sep="\t", compression="gzip")
 
 
-def pick_genes(rtech: pd.DataFrame, max_genes: int) -> list[str]:
-    """Select top genes by variance, excluding ERCC."""
+def pick_genes(rtech: pd.DataFrame, max_genes: int,
+               force_include: list[str] | None = None) -> list[str]:
+    """Select top genes by variance, with optional force-included genes.
+
+    Force-included genes get priority slots; HVGs fill remaining slots
+    so the total never exceeds max_genes.
+    """
     keep = ~rtech.index.str.upper().str.startswith("ERCC")
     r = rtech.loc[keep]
-    v = r.var(axis=1)
-    return v.sort_values(ascending=False).head(max_genes).index.tolist()
+
+    # Determine forced genes that actually exist in the expression data
+    forced = set()
+    if force_include:
+        forced = set(force_include) & set(r.index)
+        n_requested = len(force_include)
+        n_found = len(forced)
+        print(f"  Force-include: {n_found}/{n_requested} genes found in Rtech")
+        if n_found > max_genes:
+            raise ValueError(
+                f"Force-include genes ({n_found}) exceed max_genes ({max_genes}). "
+                f"Increase --max_genes or reduce the marker panel."
+            )
+
+    # Fill remaining slots with top-variance genes (excluding already-forced)
+    remaining_budget = max_genes - len(forced)
+    v = r.drop(index=list(forced), errors="ignore").var(axis=1)
+    hvg = set(v.sort_values(ascending=False).head(remaining_budget).index.tolist())
+
+    genes = list(forced | hvg)
+    print(f"  Gene panel: {len(forced)} forced + {len(hvg)} HVG = {len(genes)} total")
+    return genes
 
 
 def cell_standardize(
@@ -127,6 +152,8 @@ def main():
                     help="Output directory")
     ap.add_argument("--max_genes", type=int, default=2500,
                     help="Maximum genes for skeleton")
+    ap.add_argument("--force_include", default="",
+                    help="Path to gene list file (one gene per line) to force-include")
     ap.add_argument("--cell_cols", default="Age,Arm,EnvGroup",
                     help="Comma-separated columns defining experimental cells")
     ap.add_argument("--topk", type=int, default=80,
@@ -166,9 +193,17 @@ def main():
     print(f"  Aligned: {len(common)} samples")
 
     # Gene selection
-    genes = pick_genes(rtech, args.max_genes)
+    force_include = None
+    if args.force_include and Path(args.force_include).exists():
+        force_include = [
+            line.strip() for line in
+            Path(args.force_include).read_text().strip().split("\n")
+            if line.strip()
+        ]
+        print(f"\nLoaded {len(force_include)} force-include genes from {args.force_include}")
+    genes = pick_genes(rtech, args.max_genes, force_include=force_include)
     (outdir / "phase2_genes.txt").write_text("\n".join(genes) + "\n")
-    print(f"\nSelected {len(genes)} top-variance genes")
+    print(f"\nSelected {len(genes)} genes for skeleton")
     print(f"  → Saved to {outdir / 'phase2_genes.txt'}")
 
     rtech_gxs = rtech.loc[genes]

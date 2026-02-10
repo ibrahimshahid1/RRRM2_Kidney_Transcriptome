@@ -144,185 +144,240 @@ def phase_1(dry_run: bool = False, skip_r: bool = False) -> bool:
     success = run_rscript("src/preprocessing/residualization.R", dry_run=dry_run)
     if not success:
         return False
-    
+
     # Export to Python format
     return run_rscript("src/preprocessing/export_phase1.R", dry_run=dry_run)
 
 
-def phase_2(dry_run: bool = False, skip_r: bool = False, 
+def phase_1_5(dry_run: bool = False) -> bool:
+    """Phase 1.5: Dataset-Derived DCT Marker Discovery"""
+    log("PHASE 1.5: DCT Marker Discovery")
+
+    # Use VST (NOT Rtech) to avoid the landmine where Rtech already has CLR regressed out
+    vst_path = REPO_ROOT / "data/processed/vst_normalized" / "GLDS-674_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv"
+    clr_path = REPO_ROOT / "data/processed/deconvolution" / "music_segment_direct_proportions_CLR.csv"
+    meta_path = REPO_ROOT / "data/processed/phase1_residuals" / "meta_phase1.tsv.gz"
+    outdir = REPO_ROOT / "data/processed/dct_markers"
+
+    if not vst_path.exists():
+        log(f"VST file not found: {vst_path}", "WARN")
+        return False
+    if not clr_path.exists():
+        log(f"CLR file not found: {clr_path}", "WARN")
+        return False
+
+    return run_python("scripts.discover_dct_markers", [
+        f"--vst={vst_path}",
+        f"--meta={meta_path}",
+        f"--clr={clr_path}",
+        f"--outdir={outdir}",
+    ], dry_run=dry_run)
+
+
+def phase_2(dry_run: bool = False, skip_r: bool = False,
             max_genes: int = 2500, topk: int = 80) -> bool:
     """Phase 2: Network Construction"""
     log("PHASE 2: Network Skeleton + LIONESS + Edge Regression")
-    
+
     # Get versioned output directory from environment
     networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
-    
+
     # Step 2.1-2.3: Build shared sparse skeleton
-    if not run_python("src.networks.shared_topology", 
-                      [f"--max_genes={max_genes}", f"--topk={topk}", f"--outdir={networks_dir}"], 
+    # Check if DCT marker panel exists for force-inclusion
+    dct_panel_path = REPO_ROOT / "data/processed/dct_markers" / "dct_marker_panel.txt"
+    force_args = []
+    if dct_panel_path.exists():
+        force_args = [f"--force_include={dct_panel_path}"]
+        log(f"Including DCT marker panel: {dct_panel_path}")
+    else:
+        log("No DCT marker panel found; using variance-only gene selection", "WARN")
+
+    if not run_python("src.networks.shared_topology",
+                      [f"--max_genes={max_genes}", f"--topk={topk}",
+                       f"--outdir={networks_dir}"] + force_args,
                       dry_run=dry_run):
         return False
-    
+
     # Step A1: LIONESS edge weights
-    if not run_python("src.networks.lioness", 
+    if not run_python("src.networks.lioness",
                       [f"--phase2_dir={networks_dir}"],
                       dry_run=dry_run):
         return False
-    
+
     # Step A2-A3: Edge-wise regression (requires R/limma)
     if skip_r:
         log("Skipping R-dependent edge regression", "WARN")
     else:
-        if not run_python("src.networks.edge_regression", 
+        if not run_python("src.networks.edge_regression",
                           [f"--phase2_dir={networks_dir}",
                            f"--outdir={networks_dir}/regression"],
                           dry_run=dry_run):
             return False
-    
+
     return True
 
 
 def phase_3(dry_run: bool = False, num_seeds: int = 10) -> bool:
     """Phase 3: Embeddings + Procrustes"""
     log("PHASE 3: Node2Vec Embeddings + Procrustes Alignment")
-    
+
     # Get versioned directories from environment
     networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
     results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
-    
+
     # Step 3.2: Node2Vec embeddings
-    if not run_python("src.networks.embeddings", 
-                      [f"--phase2_dir={networks_dir}", 
+    if not run_python("src.networks.embeddings",
+                      [f"--phase2_dir={networks_dir}",
                        f"--reg_dir={networks_dir}/regression",
                        f"--outdir={results_dir}/phase3_embeddings",
-                       f"--num_seeds={num_seeds}"], 
+                       f"--num_seeds={num_seeds}"],
                       dry_run=dry_run):
         return False
-    
+
     # Step 3.3: Procrustes alignment
-    if not run_python("src.networks.procrustes", 
+    if not run_python("src.networks.procrustes",
                       [f"--phase2_dir={networks_dir}",
                        f"--emb_dir={results_dir}/phase3_embeddings",
                        f"--outdir={results_dir}/phase3_rewiring",
                        f"--num_seeds={num_seeds}"],
                       dry_run=dry_run):
         return False
-    
+
     return True
 
 
 def phase_5(dry_run: bool = False) -> bool:
     """Phase 5: Silent Shifters + Interaction Metrics"""
     log("PHASE 5: Silent Shifters + Interaction Metrics")
-    
+
     # Get versioned output directory from environment
     results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
-    
+
     # Interaction metrics
-    if not run_python("src.statistics.interaction_metrics", 
+    if not run_python("src.statistics.interaction_metrics",
                       [f"--in_dir={results_dir}/phase3_rewiring",
                        f"--out_dir={results_dir}/phase5_derived"],
                       dry_run=dry_run):
         return False
-    
+
     # Silent shifters for each contrast
     contrasts = [
         "ISS_T_YNG_FLT_minus_GC",
-        "ISS_T_OLD_FLT_minus_GC", 
+        "ISS_T_OLD_FLT_minus_GC",
         "LAR_YNG_FLT_minus_GC",
         "LAR_OLD_FLT_minus_GC",
     ]
-    
+
     for contrast in contrasts:
         rewiring_file = Path(results_dir) / f"phase3_rewiring/{contrast}_rewiring_agg.tsv"
         if not rewiring_file.exists():
             log(f"Skipping {contrast} - rewiring file not found", "WARN")
             continue
-        
+
         if not run_python("src.statistics.silent_shifters",
-                          [f"--rewiring={rewiring_file}", 
+                          [f"--rewiring={rewiring_file}",
                            f"--outdir={results_dir}/phase5_silent_shifters_strict"],
                           dry_run=dry_run):
             log(f"Warning: silent_shifters failed for {contrast}", "WARN")
-    
+
     return True
 
 
 def phase_6(dry_run: bool = False, skip_r: bool = False) -> bool:
     """Phase 6: Uncertainty Estimation + Full Regression"""
     log("PHASE 6: Permutation + Bootstrap + Full Regression")
-    
+
     # Get versioned output directory from environment
     results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
     networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
-    
+
     # Permutation and bootstrap
-    if not run_python("src.statistics.permutation_bootstrap", 
-                      [f"--phase2_dir={networks_dir}", 
+    if not run_python("src.statistics.permutation_bootstrap",
+                      [f"--phase2_dir={networks_dir}",
                        f"--outdir={results_dir}/phase6_uncertainty"],
                       dry_run=dry_run):
         return False
-    
+
     # Full factorial regression
-    if not run_python("src.statistics.full_regression", 
-                      [f"--phase2_dir={networks_dir}", 
+    if not run_python("src.statistics.full_regression",
+                      [f"--phase2_dir={networks_dir}",
                        f"--outdir={results_dir}/phase6_regression"],
                       dry_run=dry_run):
         return False
-    
+
     # Gene-level DE (R)
     if skip_r:
         log("Skipping R-dependent DE", "WARN")
     else:
         run_rscript("src/statistics/differential_expression.R", dry_run=dry_run)
-    
+
     return True
 
 
 def phase_9(dry_run: bool = False) -> bool:
     """Phase 9: Generate Publication-Ready Figures (runs last)"""
     log("PHASE 9: Figure Generation")
-    
+
     # Get versioned results directory from environment
     results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
     figures_dir = Path(results_dir) / "figures"
-    
+
     # Generate figures using publication_plots module
-    if not run_python("src.visualization.publication_plots", 
+    if not run_python("src.visualization.publication_plots",
                       [f"--results_dir={results_dir}",
                        f"--out_dir={figures_dir}"],
                       dry_run=dry_run):
         return False
-    
+
     return True
 
 
 def phase_7(dry_run: bool = False) -> bool:
     """Phase 7: Biological Grounding"""
     log("PHASE 7: Biological Grounding + Enrichment")
-    
+
     # Get versioned output directory from environment
     results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
-    
+
     contrasts = [
         "ISS_T_YNG_FLT_minus_GC",
         "ISS_T_OLD_FLT_minus_GC",
-        "LAR_YNG_FLT_minus_GC", 
+        "LAR_YNG_FLT_minus_GC",
         "LAR_OLD_FLT_minus_GC",
     ]
-    
+
+    # Ensure ID map exists
+    map_path = REPO_ROOT / "data/processed/resources" / "id_map.tsv"
+    if not map_path.exists():
+        log("Building Ensembl→Symbol ID map (first run)...")
+        networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
+        gene_list = Path(networks_dir) / "phase2_genes.txt"
+        if gene_list.exists():
+            run_python("scripts.build_id_map", [
+                f"--genes={gene_list}",
+                f"--outdir={map_path.parent}",
+            ], dry_run=dry_run)
+        else:
+            log(f"Gene list not found at {gene_list}, cannot build ID map", "WARN")
+
+    map_args = []
+    if map_path.exists():
+        map_args = [f"--map={map_path}"]
+    else:
+        log("ID map not available; gene set enrichment may show 0 overlap", "WARN")
+
     for contrast in contrasts:
         rewiring_file = Path(results_dir) / f"phase3_rewiring/{contrast}_rewiring_agg.tsv"
         if not rewiring_file.exists():
             log(f"Skipping {contrast} - rewiring file not found", "WARN")
             continue
-        
+
         outdir = Path(results_dir) / f"phase7_grounding/{contrast}"
         if not run_python("src.enrichment.biological_grounding",
-                          [f"--rewiring={rewiring_file}", f"--outdir={outdir}"],
+                          [f"--rewiring={rewiring_file}", f"--outdir={outdir}"] + map_args,
                           dry_run=dry_run):
             log(f"Warning: enrichment failed for {contrast}", "WARN")
-    
+
     return True
 
 
@@ -361,7 +416,7 @@ Examples:
     
     # Determine which phases to run first (needed for init_run)
     # Note: Phase 9 (figures) runs last, after all data phases
-    phases_available = [0, 1, 2, 3, 5, 6, 7, 9]
+    phases_available = [0, 1, 1.5, 2, 3, 5, 6, 7, 9]
     if args.phases:
         to_run = sorted(set(args.phases) & set(phases_available))
     else:
@@ -387,6 +442,7 @@ Examples:
     phases = {
         0: lambda: phase_0(args.dry_run, args.skip_r),
         1: lambda: phase_1(args.dry_run, args.skip_r),
+        1.5: lambda: phase_1_5(args.dry_run),
         2: lambda: phase_2(args.dry_run, args.skip_r, args.max_genes, args.topk),
         3: lambda: phase_3(args.dry_run, args.num_seeds),
         5: lambda: phase_5(args.dry_run),

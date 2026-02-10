@@ -64,7 +64,8 @@ def main():
     ap.add_argument("--top_quantile", type=float, default=0.9,
                     help="Quantile threshold for 'high rewiring' (default: top decile = 0.9)")
     ap.add_argument("--map", default="", 
-                    help="Optional TSV with columns: gene, symbol")
+                    help="TSV with columns: ensembl_gene_id, mgi_symbol (REQUIRED when "
+                         "universe uses Ensembl IDs and gene sets use symbols)")
     ap.add_argument("--embed", default="", 
                     help="Optional embedding .npy for clustering (genes x dim)")
     ap.add_argument("--k", type=int, default=12,
@@ -88,91 +89,150 @@ def main():
     genes = rw["gene"].astype(str).tolist()
     print(f"Loaded {len(genes)} genes from {args.rewiring}")
 
-    # Optional gene symbol mapping
-    sym = None
+    # Detect ID type
+    frac_ens = sum(1 for g in genes if g.startswith("ENSMUSG")) / max(len(genes), 1)
+    is_ensembl = frac_ens > 0.5
+    print(f"ID type: {'Ensembl' if is_ensembl else 'Symbol'} ({frac_ens:.0%} ENSMUSG)")
+
+    # Load mapping file
+    sym_to_ens: dict[str, set[str]] = {}  # symbol (lowercase) → set of Ensembl IDs
+    ens_to_sym: dict[str, str] = {}        # Ensembl ID → symbol
+
     if args.map and Path(args.map).exists():
-        m = pd.read_csv(args.map, sep=None, engine="python")
-        m = m.rename(columns={"Gene": "gene", "SYMBOL": "symbol", "Symbol": "symbol"})
-        if "gene" in m.columns and "symbol" in m.columns:
-            sym = dict(zip(m["gene"].astype(str), m["symbol"].astype(str)))
-            print(f"Loaded gene->symbol mapping for {len(sym)} genes")
+        m = pd.read_csv(args.map, sep="\t", comment="#")
+        # Normalise column names
+        col_map = {}
+        for c in m.columns:
+            cl = c.lower().strip()
+            if "ensembl" in cl:
+                col_map[c] = "ensembl_gene_id"
+            elif "symbol" in cl or "mgi" in cl:
+                col_map[c] = "mgi_symbol"
+        m = m.rename(columns=col_map)
+
+        if "ensembl_gene_id" in m.columns and "mgi_symbol" in m.columns:
+            for _, row in m.iterrows():
+                eid = str(row["ensembl_gene_id"]).strip()
+                sym = str(row["mgi_symbol"]).strip()
+                if eid and sym and sym != "nan" and sym != "":
+                    ens_to_sym[eid] = sym
+                    # Reverse map: symbol → set of Ensembl IDs (handles 1:many)
+                    sym_to_ens.setdefault(sym.lower(), set()).add(eid)
+            print(f"Loaded mapping: {len(ens_to_sym)} Ensembl → Symbol")
+            print(f"  Unique symbols: {len(sym_to_ens)}")
+        else:
+            print(f"WARNING: Map file columns not recognized: {list(m.columns)}")
+    elif is_ensembl:
+        print("WARNING: Universe uses Ensembl IDs but no --map provided. "
+              "Gene set overlap will likely be 0.")
 
     # Define high-rewiring genes
     thr = rw["rewiring_mean"].quantile(args.top_quantile)
     high = set(rw.loc[rw["rewiring_mean"] >= thr, "gene"].astype(str))
     print(f"High rewiring threshold (q={args.top_quantile}): {thr:.4f} ({len(high)} genes)")
 
-    # Pre-registered gene sets (SYMBOLS)
-    # These are example kidney-relevant pathways - adjust as needed
+    # Pre-registered gene sets — using MOUSE symbol style
+    # (case-insensitive matching handles WNK1 vs Wnk1 vs wnk1)
     prereg = {
         "DCT_NCC_WNK_axis": [
-            "WNK1", "WNK4", "STK39", "SLC12A3", "KCNJ10", "KCNJ16", 
-            "SCNN1A", "SCNN1B", "SCNN1G"
+            "Wnk1", "Wnk4", "Stk39", "Slc12a3", "Kcnj10", "Kcnj16", 
+            "Scnn1a", "Scnn1b", "Scnn1g"
         ],
         "Oxidative_stress": [
-            "NFE2L2", "SOD1", "SOD2", "CAT", "GPX1", "PRDX1", "PRDX2", "HMOX1"
+            "Nfe2l2", "Sod1", "Sod2", "Cat", "Gpx1", "Prdx1", "Prdx2", "Hmox1"
         ],
         "ECM_remodeling": [
-            "COL1A1", "COL1A2", "COL3A1", "FN1", "MMP2", "MMP9", "TIMP1", "SPARC"
+            "Col1a1", "Col1a2", "Col3a1", "Fn1", "Mmp2", "Mmp9", "Timp1", "Sparc"
         ],
         "Lipid_metabolism": [
-            "PPARA", "PPARG", "SREBF1", "SREBF2", "ACACA", "FASN", "CPT1A"
+            "Ppara", "Pparg", "Srebf1", "Srebf2", "Acaca", "Fasn", "Cpt1a"
         ],
         "Calcium_handling": [
-            "ATP2B1", "ATP2B4", "ITPR1", "ITPR2", "RYR1", "RYR2", "CAMK2A", "CAMK2D"
+            "Atp2b1", "Atp2b4", "Itpr1", "Itpr2", "Ryr1", "Ryr2", "Camk2a", "Camk2d"
         ],
         "Inflammation": [
-            "IL6", "TNF", "IL1B", "CCL2", "NFKB1", "NFKB2", "RELA"
+            "Il6", "Tnf", "Il1b", "Ccl2", "Nfkb1", "Nfkb2", "Rela"
         ],
         "Apoptosis": [
-            "BCL2", "BAX", "CASP3", "CASP9", "TP53", "CYCS"
+            "Bcl2", "Bax", "Casp3", "Casp9", "Trp53", "Cycs"
         ],
     }
 
     gene_universe = set(genes)
     results = []
 
-    # If we have symbol mapping, convert symbols to Ensembl IDs
-    if sym is not None:
-        # Build reverse map: symbol -> list of gene IDs
-        rev = {}
-        for g, s in sym.items():
-            rev.setdefault(s.upper(), []).append(g)
+    # Resolve gene sets to universe IDs
+    for setname, symbols in prereg.items():
+        set_genes = set()
+        unresolved = []
 
-        for setname, symbols in prereg.items():
-            set_genes = set()
-            for s in symbols:
-                set_genes |= set(rev.get(s.upper(), []))
-            set_genes &= gene_universe
+        for s in symbols:
+            s_lower = s.lower()
+            if sym_to_ens and is_ensembl:
+                # Look up symbol → Ensembl IDs, intersect with universe
+                ens_ids = sym_to_ens.get(s_lower, set())
+                matched = ens_ids & gene_universe
+                if matched:
+                    set_genes |= matched
+                else:
+                    unresolved.append(s)
+            else:
+                # Direct symbol matching (case-insensitive)
+                for g in gene_universe:
+                    if g.lower() == s_lower:
+                        set_genes.add(g)
+                        break
+                else:
+                    unresolved.append(s)
 
-            A = len(high & set_genes)         # high & in set
-            B = len(high - set_genes)         # high & not in set
-            C = len((gene_universe - high) & set_genes)
-            D = len((gene_universe - high) - set_genes)
-            OR, p = fisher_exact(A, B, C, D)
-            results.append([setname, len(set_genes), A, OR, p])
-    else:
-        # Assume genes are already symbols
-        for setname, symbols in prereg.items():
-            set_genes = set(s.upper() for s in symbols) & set(g.upper() for g in gene_universe)
-            # Map back to original case
-            set_genes_orig = {g for g in gene_universe if g.upper() in set_genes}
-            high_upper = {g.upper() for g in high}
+        if unresolved:
+            print(f"  {setname}: {len(unresolved)} symbols not in universe "
+                  f"({', '.join(unresolved[:5])}{'...' if len(unresolved) > 5 else ''})")
 
-            A = len({g for g in set_genes_orig if g.upper() in high_upper})
-            B = len(high) - A
-            C = len(set_genes_orig) - A
-            D = len(gene_universe) - len(set_genes_orig) - B
-            OR, p = fisher_exact(A, B, C, D)
-            results.append([setname, len(set_genes_orig), A, OR, p])
+        A = len(high & set_genes)         # high & in set
+        B = len(high - set_genes)         # high & not in set
+        C = len((gene_universe - high) & set_genes)
+        D = len((gene_universe - high) - set_genes)
+        OR, p = fisher_exact(A, B, C, D)
 
-    res = pd.DataFrame(results, columns=["gene_set", "set_size_in_universe", "hits_in_top_decile", "odds_ratio", "p"])
+        # Include matched symbol names for readability
+        matched_syms = []
+        for g in (high & set_genes):
+            matched_syms.append(ens_to_sym.get(g, g))
+
+        results.append([setname, len(set_genes), A, OR, p,
+                        "; ".join(sorted(matched_syms)) if matched_syms else ""])
+
+    res = pd.DataFrame(results, columns=[
+        "gene_set", "set_size_in_universe", "hits_in_top_decile",
+        "odds_ratio", "p", "hit_symbols"
+    ])
     res["q_BH"] = bh_fdr(res["p"].fillna(1.0).values)
     res = res.sort_values("p").reset_index(drop=True)
     
+    # Hard-fail if ALL gene sets have 0 overlap (ID mismatch)
+    total_overlap = res["set_size_in_universe"].sum()
+    if total_overlap == 0:
+        msg = ("ERROR: All gene sets have 0 overlap with the gene universe. "
+               "This almost certainly means an ID type mismatch.\n")
+        if is_ensembl and not sym_to_ens:
+            msg += ("Universe uses Ensembl IDs but no --map file was loaded. "
+                    "Run: python scripts/build_id_map.py --genes <gene_list> "
+                    "--outdir data/processed/resources")
+        print(msg)
+        raise RuntimeError(msg)
+
     enrich_path = outdir / "gene_set_enrichment.tsv"
     res.to_csv(enrich_path, sep="\t", index=False)
     print(f"Wrote {enrich_path}")
+    print(f"\nResults:")
+    for _, row in res.iterrows():
+        marker = "*" if row["q_BH"] < 0.05 else " "
+        print(f"  {marker} {row['gene_set']:25s}  "
+              f"overlap={row['set_size_in_universe']:2d}  "
+              f"hits={row['hits_in_top_decile']}  "
+              f"OR={row['odds_ratio']:.2f}  "
+              f"q={row['q_BH']:.3f}")
 
     # Optional: embedding module clustering
     if args.embed and Path(args.embed).exists():
