@@ -141,7 +141,14 @@ def phase_1(dry_run: bool = False, skip_r: bool = False) -> bool:
         log("Skipping R-dependent residualization", "WARN")
         return True
     
-    success = run_rscript("src/preprocessing/residualization.R", dry_run=dry_run)
+    # Check for DCT marker panel to force-include
+    dct_panel_path = REPO_ROOT / "data/processed/dct_markers" / "dct_marker_panel.txt"
+    force_args = []
+    if dct_panel_path.exists():
+        force_args = [str(dct_panel_path)]
+        log(f"Passing DCT marker panel to residualization: {dct_panel_path}")
+    
+    success = run_rscript("src/preprocessing/residualization.R", args=force_args, dry_run=dry_run)
     if not success:
         return False
 
@@ -261,6 +268,15 @@ def phase_5(dry_run: bool = False) -> bool:
                       dry_run=dry_run):
         return False
 
+    # Check for regression results to use as support
+    reg_file = Path(results_dir) / "phase6_regression/gene_arm_flight_interaction.tsv"
+    reg_args = []
+    if reg_file.exists():
+        reg_args = [f"--regression_results={reg_file}"]
+        log(f"Using regression results for support: {reg_file}")
+    else:
+        log("Regression results not found; Silent Shifters will lack statistical support", "WARN")
+
     # Silent shifters for each contrast
     contrasts = [
         "ISS_T_YNG_FLT_minus_GC",
@@ -277,7 +293,7 @@ def phase_5(dry_run: bool = False) -> bool:
 
         if not run_python("src.statistics.silent_shifters",
                           [f"--rewiring={rewiring_file}",
-                           f"--outdir={results_dir}/phase5_silent_shifters_strict"],
+                           f"--outdir={results_dir}/phase5_silent_shifters_strict"] + reg_args,
                           dry_run=dry_run):
             log(f"Warning: silent_shifters failed for {contrast}", "WARN")
 

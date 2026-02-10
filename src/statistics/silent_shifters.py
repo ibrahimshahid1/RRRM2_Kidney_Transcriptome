@@ -54,6 +54,8 @@ def main():
                     help="Optional gene-level DE TSV with gene, log2FC/logFC, FDR/adj.P.Val")
     ap.add_argument("--perm", default="", 
                     help="Optional phase6 perm table with gene, q_BH")
+    ap.add_argument("--regression_results", default="", 
+                    help="Optional phase6 regression table with gene, q_BH (replaces perm)")
     ap.add_argument("--outdir", 
                     default=str(REPO_ROOT / "data/results/phase5_silent_shifters_strict"),
                     help="Output directory")
@@ -105,22 +107,31 @@ def main():
         rw["low_DE"] = True  # All genes pass DE filter when not available
         print("[INFO] No gene_de provided, using rewiring-only filter")
 
-    # Load permutation support if provided
-    if args.perm and Path(args.perm).exists():
-        perm = pd.read_csv(args.perm, sep="\t")
-        if "q_BH" in perm.columns:
-            perm = perm[["gene", "q_BH"]].drop_duplicates("gene")
-            rw = rw.merge(perm, on="gene", how="left")
+    # Load support (Regression or Permutation)
+    # Priority: Regression Results > Permutation Results
+    support_source = None
+    if args.regression_results and Path(args.regression_results).exists():
+        support = pd.read_csv(args.regression_results, sep="\t")
+        support_source = "Regression"
+    elif args.perm and Path(args.perm).exists():
+        support = pd.read_csv(args.perm, sep="\t")
+        support_source = "Permutation"
+    
+    if support_source:
+        if "q_BH" in support.columns:
+            support = support[["gene", "q_BH"]].drop_duplicates("gene")
+            rw = rw.merge(support, on="gene", how="left")
             rw["supported"] = rw["q_BH"].fillna(1.0) < args.support_q
-            print(f"Loaded permutation q-values for {perm['gene'].nunique()} genes")
+            print(f"Loaded {support_source} q-values for {support['gene'].nunique()} genes")
             print(f"  Supported genes (q<{args.support_q}): {rw['supported'].sum()}")
         else:
+            print(f"[WARN] {support_source} file missing 'q_BH' column")
             rw["q_BH"] = np.nan
             rw["supported"] = np.nan
     else:
         rw["q_BH"] = np.nan
         rw["supported"] = np.nan
-        print("[INFO] No perm file provided, 'supported' column will be NA")
+        print("[INFO] No support file (perm or regression) provided, 'supported' column will be NA")
 
     # Filter to silent shifters
     silent = rw[rw["high_rewiring"] & rw["low_DE"]].copy()

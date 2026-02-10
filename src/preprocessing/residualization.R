@@ -145,6 +145,13 @@ meta2$Age <- factor(meta2$Age)
 meta2$Arm <- factor(meta2$Arm)
 meta2$EnvGroup <- factor(meta2$EnvGroup)
 
+# Handle optional force-keep argument (passed as trailing arg due to Rscript behavior)
+args <- commandArgs(trailingOnly = TRUE)
+force_keep_file <- NULL
+if (length(args) > 0) {
+    force_keep_file <- args[1]
+}
+
 # 4) VST expression matrix Y (genes x samples)
 cat("Creating DESeqDataSet and applying VST normalization...\n")
 dds <- DESeqDataSetFromMatrix(
@@ -156,6 +163,21 @@ dds <- DESeqDataSetFromMatrix(
 # Counts-consistent filter (CPM >= 1 in at least 20% of samples)
 cpm_mat <- edgeR::cpm(counts(dds))
 keep <- rowMeans(cpm_mat >= 1) >= 0.20
+
+# Force-keep genes if provided
+if (!is.null(force_keep_file) && file.exists(force_keep_file)) {
+    cat("Loading force-keep genes from:", force_keep_file, "\n")
+    forced_genes <- readLines(force_keep_file)
+    forced_genes <- trimws(forced_genes[forced_genes != ""])
+    if (length(forced_genes) > 0) {
+        # Match against dds rownames (stripped versions)
+        is_forced <- rownames(dds) %in% forced_genes
+        forced_count <- sum(is_forced)
+        cat("Forcing inclusion of", forced_count, "genes from external list.\n")
+        keep[is_forced] <- TRUE
+    }
+}
+
 cat("Keeping", sum(keep), "of", length(keep), "genes after CPM filtering\n")
 dds <- dds[keep, ]
 
