@@ -108,7 +108,17 @@ def main():
                 col_map[c] = "ensembl_gene_id"
             elif "symbol" in cl or "mgi" in cl:
                 col_map[c] = "mgi_symbol"
+            elif "in_universe" in cl:
+                col_map[c] = "in_universe"
         m = m.rename(columns=col_map)
+
+        # Filter to universe rows only (extras are for reporting, not enrichment)
+        if "in_universe" in m.columns:
+            n_before = len(m)
+            m = m[m["in_universe"].astype(str).str.lower().isin(["true", "1"])]
+            n_filtered = n_before - len(m)
+            if n_filtered > 0:
+                print(f"  Filtered out {n_filtered} non-universe rows")
 
         if "ensembl_gene_id" in m.columns and "mgi_symbol" in m.columns:
             for _, row in m.iterrows():
@@ -118,10 +128,16 @@ def main():
                     ens_to_sym[eid] = sym
                     # Reverse map: symbol → set of Ensembl IDs (handles 1:many)
                     sym_to_ens.setdefault(sym.lower(), set()).add(eid)
-            print(f"Loaded mapping: {len(ens_to_sym)} Ensembl → Symbol")
+            print(f"Loaded mapping: {len(ens_to_sym)} Ensembl → Symbol (universe only)")
             print(f"  Unique symbols: {len(sym_to_ens)}")
         else:
             print(f"WARNING: Map file columns not recognized: {list(m.columns)}")
+
+        # Optionally load extras for annotation/reporting
+        extras_path = Path(args.map).parent / "id_map_extras.tsv"
+        if extras_path.exists():
+            me = pd.read_csv(extras_path, sep="\t", comment="#")
+            print(f"  Loaded {len(me)} extra symbol mappings for annotation")
     elif is_ensembl:
         print("WARNING: Universe uses Ensembl IDs but no --map provided. "
               "Gene set overlap will likely be 0.")

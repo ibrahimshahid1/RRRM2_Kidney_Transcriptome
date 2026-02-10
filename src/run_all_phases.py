@@ -166,11 +166,12 @@ def phase_1_5(dry_run: bool = False) -> bool:
         log(f"CLR file not found: {clr_path}", "WARN")
         return False
 
-    return run_python("scripts.discover_dct_markers", [
+    return run_python("src.markers.discover_dct", [
         f"--vst={vst_path}",
         f"--meta={meta_path}",
         f"--clr={clr_path}",
         f"--outdir={outdir}",
+        "--tech_cols=LibraryBatch,ReadDepth,rRNA",
     ], dry_run=dry_run)
 
 
@@ -353,7 +354,7 @@ def phase_7(dry_run: bool = False) -> bool:
         networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
         gene_list = Path(networks_dir) / "phase2_genes.txt"
         if gene_list.exists():
-            run_python("scripts.build_id_map", [
+            run_python("src.data.build_id_map", [
                 f"--genes={gene_list}",
                 f"--outdir={map_path.parent}",
             ], dry_run=dry_run)
@@ -393,8 +394,8 @@ Examples:
   python scripts/run_all_phases.py --start 3        # Start from phase 3
         """
     )
-    parser.add_argument("--phases", nargs="+", type=int, default=None,
-                        help="Specific phases to run (default: all)")
+    parser.add_argument("--phases", nargs="+", type=float, default=None,
+                        help="Specific phases to run (default: all). Supports 1.5 for DCT discovery.")
     parser.add_argument("--start", type=int, default=0,
                         help="Start from this phase (default: 0)")
     parser.add_argument("--skip-r", action="store_true",
