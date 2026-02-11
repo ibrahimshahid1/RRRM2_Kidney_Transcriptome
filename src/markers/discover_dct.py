@@ -70,14 +70,27 @@ def build_design_matrix(meta: pd.DataFrame, clr: pd.DataFrame,
 
     # CLR(DCT) — the coefficient of interest
     dct_col_idx = 1
-    parts.append(clr[["DCT"]].values)
+    dct_vals = clr[["DCT"]].values.astype(float)
+    # Z-score CLR(DCT)
+    dct_mean = np.nanmean(dct_vals)
+    dct_std = np.nanstd(dct_vals)
+    if dct_std > 1e-8:
+        dct_vals = (dct_vals - dct_mean) / dct_std
+    parts.append(dct_vals)
     col_names.append("CLR_DCT")
 
     # CLR(other segments), dropping one for compositionality
     other_cols = [c for c in clr.columns if c != "DCT" and c != drop_segment]
-    parts.append(clr[other_cols].values)
+    other_vals = clr[other_cols].values.astype(float)
+    # Z-score other CLR columns
+    other_mean = np.nanmean(other_vals, axis=0)
+    other_std = np.nanstd(other_vals, axis=0)
+    # Avoid division by zero
+    other_std[other_std < 1e-8] = 1.0
+    other_vals = (other_vals - other_mean) / other_std
+    parts.append(other_vals)
     col_names.extend([f"CLR_{c}" for c in other_cols])
-
+    
     # Technical covariates (numeric: z-score; factor: one-hot drop-first)
     tech_added = []
     if tech_cols:
@@ -274,7 +287,7 @@ def main():
                                 / "meta_phase1.tsv.gz"),
                     help="Path to metadata TSV (sample-level)")
     ap.add_argument("--clr",
-                    default=str(REPO_ROOT / "data/processed/deconvolution"
+                    default=str(REPO_ROOT / "data/processed/deconvolution/test16"
                                 / "music_segment_direct_proportions_CLR.csv"),
                     help="Path to CLR proportions CSV")
     ap.add_argument("--cell_cols", default="Age,Arm,EnvGroup",
@@ -299,6 +312,8 @@ def main():
     ap.add_argument("--outdir",
                     default=str(REPO_ROOT / "data/processed/dct_markers"),
                     help="Output directory")
+    ap.add_argument("--diff_threshold", type=float, default=0.05,
+                    help="Anti-confounding threshold: corr(expr, DCT) - max(corr(expr, TAL), corr(expr, CD)) > delta")
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
@@ -377,11 +392,52 @@ def main():
 
     # Marginal correlation with CLR(DCT) — makes Simpson's paradox legible
     from scipy.stats import pearsonr as _pearsonr
+    
+    # We need the original CLR values for correlation, not the z-scored ones from design matrix
+    # But since pearsonr is invariant to linear scaling, it doesn't matter much.
+    # However, let's use the raw input 'clr' dataframe to be transparent.
     dct_vec = clr["DCT"].values
+    
+    # Compute marginal correlations for DCT, TAL, and CD
+    print(f"\n   Computing marginal correlations for DCT, TAL, CD...")
     marginal_r = np.array([_pearsonr(Y[:, g], dct_vec)[0] for g in range(Y.shape[1])])
     marginal_p = np.array([_pearsonr(Y[:, g], dct_vec)[1] for g in range(Y.shape[1])])
     results["pearson_r_vst_dct"] = marginal_r
     results["pearson_p_vst_dct"] = marginal_p
+    
+    # Strict Sign Consistency: β_DCT > 0 AND Corr(expr, DCT) > 0
+    results["sign_consistent"] = (results["beta_dct"] > 0) & (results["pearson_r_vst_dct"] > 0)
+    
+    # Anti-confounding: Corr(DCT) >> Corr(TAL) and Corr(CD)
+    # Identify TAL and CD columns. Adjust based on likely column names
+    possible_tal = ["TAL", "TAL_LOH", "LOH"]
+    possible_cd = ["CD", "CD_PC", "CD_IC", "CNT"] # CD might be split or combined
+    
+    tal_col = next((c for c in clr.columns if c in possible_tal), None)
+    cd_col = next((c for c in clr.columns if c in possible_cd), None)
+    
+    if tal_col:
+        print(f"   Using '{tal_col}' for TAL anti-confounding check")
+        tal_vec = clr[tal_col].values
+        r_tal = np.array([_pearsonr(Y[:, g], tal_vec)[0] for g in range(Y.shape[1])])
+        results["pearson_r_vst_tal"] = r_tal
+    else:
+        print("   WARNING: Could not find TAL column. Skipping TAL anti-confounding.")
+        results["pearson_r_vst_tal"] = -1.0 # dummy
+        
+    if cd_col:
+        print(f"   Using '{cd_col}' for CD anti-confounding check")
+        cd_vec = clr[cd_col].values
+        r_cd = np.array([_pearsonr(Y[:, g], cd_vec)[0] for g in range(Y.shape[1])])
+        results["pearson_r_vst_cd"] = r_cd
+    else:
+        print("   WARNING: Could not find CD column. Skipping CD anti-confounding.")
+        results["pearson_r_vst_cd"] = -1.0
+        
+    # Delta check
+    max_confound = np.maximum(results["pearson_r_vst_tal"], results["pearson_r_vst_cd"])
+    results["anti_confounded"] = (results["pearson_r_vst_dct"] - max_confound) > args.diff_threshold
+    
     results["sign_flip"] = (results["beta_dct"] > 0) & (results["pearson_r_vst_dct"] < 0)
 
     sig_pos = (results["beta_dct"] > 0) & (results["q_BH"] < args.q_threshold)
@@ -412,16 +468,34 @@ def main():
 
     # ── 10. Final panel ─────────────────────────────────────────────────
     # Core criteria: β_DCT > 0, q < threshold, bootstrap stable
-    # Specificity is informational unless --require_specific
-    panel_mask = sig_pos & stable
+    # NEW: Sign consistency AND Anti-confounding
+    
+    # 1. Significant positive beta
+    c1 = (results["beta_dct"] > 0) & (results["q_BH"] < args.q_threshold)
+    # 2. Bootstrap stability
+    c2 = results["bootstrap_freq"] >= args.boot_freq
+    # 3. Sign consistency (Marginal R > 0)
+    c3 = results["sign_consistent"]
+    # 4. Anti-confounding (Marginal R_DCT > R_TAL + delta)
+    c4 = results["anti_confounded"]
+    
+    panel_mask = c1 & c2 & c3 & c4
+    
+    print(f"\n10) Filtering stats:")
+    print(f"    Significant (q<{args.q_threshold}): {c1.sum()}")
+    print(f"    Stable (freq>={args.boot_freq}): {c2.sum()}")
+    print(f"    Sign Consistent (r>0): {c3.sum()}")
+    print(f"    Anti-Confounded (δ>{args.diff_threshold}): {c4.sum()}")
+    
     if args.require_specific:
         panel_mask = panel_mask & is_specific
         spec_label = ", DCT-dominant"
     else:
         spec_label = ""
+        
     panel_genes = results.loc[panel_mask, "gene"].tolist()
-    print(f"\n10) Final DCT marker panel: {len(panel_genes)} genes")
-    print(f"    (β_DCT>0, q<{args.q_threshold}, boot≥{args.boot_freq:.0%}{spec_label})")
+    print(f"\n    FINAL DCT marker panel: {len(panel_genes)} genes")
+    print(f"    (β>0, q<{args.q_threshold}, boot≥{args.boot_freq}, sign-consistent, anti-conf{spec_label})")
 
     # Sort by beta_dct descending
     results = results.sort_values("beta_dct", ascending=False)
@@ -429,7 +503,9 @@ def main():
     # ── 11. Save outputs ────────────────────────────────────────────────
     cols_order = ["gene", "beta_dct", "t_stat", "p_value", "q_BH",
                   "partial_r2", "dct_top3", "bootstrap_freq",
-                  "pearson_r_vst_dct", "pearson_p_vst_dct", "sign_flip"]
+                  "pearson_r_vst_dct", "sign_consistent", "anti_confounded",
+                  "pearson_r_vst_tal", "pearson_r_vst_cd",
+                  "pearson_p_vst_dct", "sign_flip"]
     scores_path = outdir / "dct_marker_scores.tsv"
     results[cols_order].to_csv(scores_path, sep="\t", index=False)
     print(f"\n   Wrote full scores: {scores_path}")

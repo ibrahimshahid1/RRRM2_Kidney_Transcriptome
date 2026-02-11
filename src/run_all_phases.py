@@ -162,7 +162,7 @@ def phase_1_5(dry_run: bool = False) -> bool:
 
     # Use VST (NOT Rtech) to avoid the landmine where Rtech already has CLR regressed out
     vst_path = REPO_ROOT / "data/processed/vst_normalized" / "GLDS-674_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv"
-    clr_path = REPO_ROOT / "data/processed/deconvolution" / "music_segment_direct_proportions_CLR.csv"
+    clr_path = REPO_ROOT / "data/processed/deconvolution/test16/music_segment_direct_proportions_CLR.csv"
     meta_path = REPO_ROOT / "data/processed/phase1_residuals" / "meta_phase1.tsv.gz"
     outdir = REPO_ROOT / "data/processed/dct_markers"
 
@@ -475,9 +475,12 @@ Examples:
     log(f"Dry run: {args.dry_run}")
     print()
     
-    # Run phases
+    # Run phases in dependency-aware order (Phase 6 BEFORE Phase 5 for regression support)
+    execution_order = [0, 1, 1.5, 2, 3, 6, 5, 7, 9]
+    phases_to_execute = [p for p in execution_order if p in to_run]
+    
     failed = []
-    for phase_num in to_run:
+    for phase_num in phases_to_execute:
         if not phases[phase_num]():
             failed.append(phase_num)
             log(f"Phase {phase_num} failed", "ERROR")
