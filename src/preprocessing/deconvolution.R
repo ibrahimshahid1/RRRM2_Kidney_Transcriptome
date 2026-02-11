@@ -282,7 +282,69 @@ colData(sce)$segment_use <- factor(seg)
 sce <- sce[, !is.na(colData(sce)$segment_use)]
 colData(sce)$segment_use <- droplevels(colData(sce)$segment_use)
 
-message("\n--- Segment Distribution ---")
+message("\n--- Segment Distribution (before DCT split) ---")
+print(table(colData(sce)$segment_use, useNA = "ifany"))
+
+# ── DCT Sub-clustering: Split DCT into DCT_early (Slc12a3+) and DCT_late (Pvalb+) ──
+# The TMS reference lumps early and late DCT into one cluster. Pvalb+ (late DCT/CNT)
+# dominates the deconvolution signal, causing the DCT fraction to miss the Slc12a3+/NCC
+# population entirely. We fix this by sub-clustering.
+message("\n--- DCT Sub-clustering ---")
+dct_mask <- colData(sce)$segment_use == "DCT"
+n_dct <- sum(dct_mask)
+message("  DCT cells before splitting: ", n_dct)
+
+if (n_dct > 0) {
+  # Resolve Slc12a3 and Pvalb to Ensembl IDs (the matrix uses Ensembl rownames)
+  slc12a3_ids <- resolve_markers_to_matrix("Slc12a3", rownames(sce))
+  pvalb_ids <- resolve_markers_to_matrix("Pvalb", rownames(sce))
+
+  # Compute log1p(CPM) for each marker in DCT cells
+  dct_sce <- sce[, dct_mask]
+  lib_sizes <- colSums(counts(dct_sce))
+  lib_sizes[lib_sizes == 0] <- 1 # avoid division by zero
+
+  # Slc12a3 expression
+  if (length(slc12a3_ids) > 0) {
+    slc12a3_expr <- log1p(colSums(counts(dct_sce)[slc12a3_ids, , drop = FALSE]) / lib_sizes * 1e6)
+  } else {
+    message("  WARNING: Slc12a3 not found in reference. Falling back to all DCT_late.")
+    slc12a3_expr <- rep(0, n_dct)
+  }
+
+  # Pvalb expression
+  if (length(pvalb_ids) > 0) {
+    pvalb_expr <- log1p(colSums(counts(dct_sce)[pvalb_ids, , drop = FALSE]) / lib_sizes * 1e6)
+  } else {
+    message("  WARNING: Pvalb not found in reference. Falling back to all DCT_early.")
+    pvalb_expr <- rep(0, n_dct)
+  }
+
+  # Classify: Slc12a3 > Pvalb → DCT_early, else → DCT_late
+  is_early <- slc12a3_expr > pvalb_expr
+  seg_labels <- as.character(colData(sce)$segment_use)
+  dct_indices <- which(dct_mask)
+  seg_labels[dct_indices[is_early]] <- "DCT_early"
+  seg_labels[dct_indices[!is_early]] <- "DCT_late"
+  colData(sce)$segment_use <- factor(seg_labels)
+
+  message("  DCT_early (Slc12a3+): ", sum(is_early))
+  message("  DCT_late  (Pvalb+):   ", sum(!is_early))
+
+  # Diagnostic: show expression distributions
+  message(
+    "  Slc12a3 logCPM — median early: ", round(median(slc12a3_expr[is_early]), 2),
+    ", median late: ", round(median(slc12a3_expr[!is_early]), 2)
+  )
+  message(
+    "  Pvalb   logCPM — median early: ", round(median(pvalb_expr[is_early]), 2),
+    ", median late: ", round(median(pvalb_expr[!is_early]), 2)
+  )
+} else {
+  message("  No DCT cells found — skipping sub-clustering.")
+}
+
+message("\n--- Segment Distribution (after DCT split) ---")
 print(table(colData(sce)$segment_use, useNA = "ifany"))
 
 # 2) REDEFINED Coarse groups (Plan B: Split Proximal vs Distal)
@@ -302,7 +364,7 @@ colData(sce)$clusterType <- factor(colData(sce)$clusterType)
 clusters.type <- list(
   Glomerular = c("Podocyte", "Endothelial", "Mesangial"),
   Proximal   = c("PT"), # PT stands alone
-  Distal     = c("TAL_LOH", "DCT", "CD", "Other"), # Distal forms a coalition
+  Distal     = c("TAL_LOH", "DCT_early", "DCT_late", "CD", "Other"), # DCT split into early/late
   Immune     = c("Immune"),
   Stroma     = c("Fibroblast")
 )
@@ -463,7 +525,7 @@ if (EXP_REMOVE_OTHER) {
   clusters.type <- list(
     Glomerular = c("Podocyte", "Endothelial", "Mesangial"),
     Proximal   = c("PT"), # PT stands alone
-    Distal     = c("TAL_LOH", "DCT", "CD"), # Distal coalition (Other removed)
+    Distal     = c("TAL_LOH", "DCT_early", "DCT_late", "CD"), # DCT split, Other removed
     Immune     = c("Immune"),
     Stroma     = c("Fibroblast")
   )
@@ -477,7 +539,7 @@ if (EXP_REMOVE_OTHER) {
 message("\n--- Building within-group marker sets (logCPM-based) ---")
 # OPTIMIZED MARKER SELECTION (For Split Groups)
 message("\n--- Building Optimized Marker List (Canonical Focus + Group Split) ---")
-tub_types <- intersect(c("PT", "TAL_LOH", "DCT", "CD"), unique(colData(sce2)$segment_use))
+tub_types <- intersect(c("PT", "TAL_LOH", "DCT_early", "DCT_late", "CD"), unique(colData(sce2)$segment_use))
 
 # 1. PT Markers (For the "Proximal" Group)
 mk_pt <- pick_type_markers(sce2, "PT", tub_types, top_n = 50)
@@ -490,12 +552,19 @@ canon_tal_res <- resolve_markers_to_matrix(canon_tal, rownames(sce2))
 mk_tal_final <- unique(c(canon_tal_res, mk_tal_data))
 message("Resolved ", length(canon_tal_res), " canonical TAL markers.")
 
-# DCT: Strict Canonical
-mk_dct_data <- pick_type_markers(sce2, "DCT", tub_types, top_n = 15)
-canon_dct <- c("Slc12a3", "Pvalb", "Calb1", "Trpv5", "Kl", "Wnk4")
-canon_dct_res <- resolve_markers_to_matrix(canon_dct, rownames(sce2))
-mk_dct_final <- unique(c(canon_dct_res, mk_dct_data))
-message("Resolved ", length(canon_dct_res), " canonical DCT markers.")
+# DCT_early (Slc12a3+/NCC): Early DCT / thiazide-sensitive segment
+mk_dct_early_data <- if ("DCT_early" %in% tub_types) pick_type_markers(sce2, "DCT_early", tub_types, top_n = 15) else character(0)
+canon_dct_early <- c("Slc12a3", "Wnk4", "Trpv5", "Kl")
+canon_dct_early_res <- resolve_markers_to_matrix(canon_dct_early, rownames(sce2))
+mk_dct_early_final <- unique(c(canon_dct_early_res, mk_dct_early_data))
+message("Resolved ", length(canon_dct_early_res), " canonical DCT_early markers.")
+
+# DCT_late (Pvalb+): Late DCT / CNT transition
+mk_dct_late_data <- if ("DCT_late" %in% tub_types) pick_type_markers(sce2, "DCT_late", tub_types, top_n = 15) else character(0)
+canon_dct_late <- c("Pvalb", "Calb1")
+canon_dct_late_res <- resolve_markers_to_matrix(canon_dct_late, rownames(sce2))
+mk_dct_late_final <- unique(c(canon_dct_late_res, mk_dct_late_data))
+message("Resolved ", length(canon_dct_late_res), " canonical DCT_late markers.")
 
 # CD: Strict Canonical
 mk_cd_data <- pick_type_markers(sce2, "CD", tub_types, top_n = 15)
@@ -509,7 +578,7 @@ message("Resolved ", length(canon_cd_res), " canonical CD markers.")
 group.markers <- list(
   Glomerular = pick_within_group_markers(sce2, clusters.type$Glomerular, top_n = 50),
   Proximal   = mk_pt, # PT markers for Proximal group
-  Distal     = unique(c(mk_tal_final, mk_dct_final, mk_cd_final)), # Combined Distal markers
+  Distal     = unique(c(mk_tal_final, mk_dct_early_final, mk_dct_late_final, mk_cd_final)), # Combined Distal markers
   Immune     = NULL,
   Stroma     = NULL
 )
@@ -531,19 +600,21 @@ if (EXP_USE_CANONICAL_MARKERS) {
     message("Proximal canonical markers: ", paste(resolved_proximal, collapse = ", "))
   }
 
-  # Canonical markers for DISTAL (TAL, DCT, CD)
+  # Canonical markers for DISTAL (TAL, DCT_early, DCT_late, CD)
   canonical_distal <- c(
     # TAL markers
     "Umod", "Slc12a1",
-    # DCT markers
-    "Slc12a3", "Pvalb", "Calb1",
+    # DCT_early markers (NCC pathway)
+    "Slc12a3", "Wnk4",
+    # DCT_late markers
+    "Pvalb", "Calb1",
     # CD markers
     "Aqp2", "Krt8", "Krt18", "Atp6v1b1"
   )
   resolved_distal <- resolve_markers_to_matrix(canonical_distal, rownames(sce2))
   message("Resolved ", length(resolved_distal), " of ", length(canonical_distal), " canonical Distal markers")
   if (length(resolved_distal) > 0) {
-    group.markers$Distal <- unique(c(resolved_distal, mk_tal_final, mk_dct_final, mk_cd_final))
+    group.markers$Distal <- unique(c(resolved_distal, mk_tal_final, mk_dct_early_final, mk_dct_late_final, mk_cd_final))
     message("Distal canonical markers: ", paste(resolved_distal, collapse = ", "))
   }
 }
@@ -672,7 +743,8 @@ make_pseudobulk_exact <- function(
   target_depth = NULL, # Fixed depth (e.g., 20e6), overrides depth_scale
   use_multinomial_depth = TRUE, # Use multinomial downsampling instead of Poisson
   # Two-level design: independent ranges for tubule segments
-  dct_range = c(0.00, 0.25),
+  dct_early_range = c(0.00, 0.15),
+  dct_late_range = c(0.00, 0.15),
   pt_range = c(0.40, 0.75),
   tal_range = c(0.05, 0.25),
   cd_range = c(0.00, 0.15),
@@ -697,7 +769,7 @@ make_pseudobulk_exact <- function(
 
   # Define coarse groups based on segment names
   glom_segs <- intersect(c("Podocyte", "Endothelial", "Mesangial"), seg_levels)
-  tubule_segs <- intersect(c("PT", "TAL_LOH", "DCT", "CD", "Other"), seg_levels)
+  tubule_segs <- intersect(c("PT", "TAL_LOH", "DCT_early", "DCT_late", "CD", "Other"), seg_levels)
   immune_segs <- intersect(c("Immune"), seg_levels)
   stroma_segs <- intersect(c("Fibroblast"), seg_levels)
 
@@ -745,7 +817,8 @@ make_pseudobulk_exact <- function(
 
     # Step 2: Within-tubule, sample each segment independently with custom ranges
     tubule_within <- c(
-      DCT = runif(1, dct_range[1], dct_range[2]),
+      DCT_early = runif(1, dct_early_range[1], dct_early_range[2]),
+      DCT_late = runif(1, dct_late_range[1], dct_late_range[2]),
       PT = runif(1, pt_range[1], pt_range[2]),
       TAL_LOH = runif(1, tal_range[1], tal_range[2]),
       CD = runif(1, cd_range[1], cd_range[2]),
@@ -855,7 +928,12 @@ make_pseudobulk_exact <- function(
   }
 
   message("Pseudobulk exact: generated ", n_mixtures, " mixtures from ", length(unique(donor_used)), " unique donors")
-  message("  DCT range in P_target: [", round(min(P_target[, "DCT"]), 4), ", ", round(max(P_target[, "DCT"]), 4), "]")
+  if ("DCT_early" %in% colnames(P_target)) {
+    message("  DCT_early range in P_target: [", round(min(P_target[, "DCT_early"]), 4), ", ", round(max(P_target[, "DCT_early"]), 4), "]")
+    message("  DCT_late  range in P_target: [", round(min(P_target[, "DCT_late"]), 4), ", ", round(max(P_target[, "DCT_late"]), 4), "]")
+  } else if ("DCT" %in% colnames(P_target)) {
+    message("  DCT range in P_target: [", round(min(P_target[, "DCT"]), 4), ", ", round(max(P_target[, "DCT"]), 4), "]")
+  }
   message("  PT range in P_target: [", round(min(P_target[, "PT"]), 4), ", ", round(max(P_target[, "PT"]), 4), "]")
 
   list(
@@ -1208,7 +1286,8 @@ if (EXP_USE_EXACT_PSEUDOBULK) {
     use_multinomial_depth = TRUE,
     depth_scale = 1.0, # irrelevant when target_depth is set
     # Independent tubule segment ranges
-    dct_range = c(0.00, 0.25),
+    dct_early_range = c(0.00, 0.15),
+    dct_late_range = c(0.00, 0.15),
     pt_range = c(0.40, 0.75),
     tal_range = c(0.05, 0.25),
     cd_range = c(0.00, 0.15),
@@ -1518,21 +1597,33 @@ write.csv(validation_results, file.path(outdir, "validation_segment_correlations
 )
 message("\nWrote validation results to: ", file.path(outdir, "validation_segment_correlations.csv"))
 
-# DCT-specific marker check
-message("\n--- DCT Marker Validation ---")
-dct_markers <- c("Slc12a3", "Pvalb", "Calb1", "Trpv5")
-dct_genes <- resolve_markers_to_matrix(dct_markers, rownames(bulk_cpm))
-message("DCT markers found in bulk: ", paste(dct_genes, collapse = ", "))
+# DCT-specific marker check (now split into early/late)
+message("\n--- DCT Marker Validation (Early vs Late) ---")
 
-if (length(dct_genes) > 0) {
-  dct_score <- colMeans(log1p(bulk_cpm[dct_genes, , drop = FALSE]))
-  dct_cor <- cor.test(prop_seg[, "DCT"], dct_score, method = "spearman")
+# DCT_early (Slc12a3+/NCC)
+early_markers <- c("Slc12a3", "Wnk4", "Trpv5")
+early_genes <- resolve_markers_to_matrix(early_markers, rownames(bulk_cpm))
+message("DCT_early markers found in bulk: ", paste(early_genes, collapse = ", "))
+if (length(early_genes) > 0 && "DCT_early" %in% colnames(prop_seg)) {
+  early_score <- colMeans(log1p(bulk_cpm[early_genes, , drop = FALSE]))
+  early_cor <- cor.test(prop_seg[, "DCT_early"], early_score, method = "spearman")
   message(sprintf(
-    "DCT proportion vs DCT marker score: rho=%.3f, p=%.4g",
-    dct_cor$estimate, dct_cor$p.value
+    "DCT_early proportion vs Slc12a3+/NCC markers: rho=%.3f, p=%.4g",
+    early_cor$estimate, early_cor$p.value
   ))
-} else {
-  message("WARNING: No DCT markers found in bulk data for validation.")
+}
+
+# DCT_late (Pvalb+)
+late_markers <- c("Pvalb", "Calb1")
+late_genes <- resolve_markers_to_matrix(late_markers, rownames(bulk_cpm))
+message("DCT_late markers found in bulk: ", paste(late_genes, collapse = ", "))
+if (length(late_genes) > 0 && "DCT_late" %in% colnames(prop_seg)) {
+  late_score <- colMeans(log1p(bulk_cpm[late_genes, , drop = FALSE]))
+  late_cor <- cor.test(prop_seg[, "DCT_late"], late_score, method = "spearman")
+  message(sprintf(
+    "DCT_late proportion vs Pvalb+ markers: rho=%.3f, p=%.4g",
+    late_cor$estimate, late_cor$p.value
+  ))
 }
 
 # IMMUNE MARKER VALIDATION (Critical for Phase 1 Covariates)
