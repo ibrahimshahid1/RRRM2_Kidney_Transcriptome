@@ -110,10 +110,26 @@ cat("Successfully aligned", nrow(meta2), "samples.\n")
 rownames(meta2) <- meta2[["Sample Name (raw_counts_colname)"]]
 
 # 2) Load CLR deconv covariates (your saved output)
-clr_file <- "data/processed/deconvolution/test16/music_segment_direct_proportions_CLR.csv"
-if (!file.exists(clr_file)) {
-    # Fall back to base deconvolution dir
-    clr_file <- "data/processed/deconvolution/music_segment_direct_proportions_CLR.csv"
+# Parse command-line arguments for CLR path and force-keep file
+args <- commandArgs(trailingOnly = TRUE)
+clr_file <- NULL
+force_keep_file <- NULL
+for (.a in args) {
+    if (grepl("^--clr=", .a)) {
+        clr_file <- sub("^--clr=", "", .a)
+    } else if (grepl("^--force_keep=", .a)) {
+        force_keep_file <- sub("^--force_keep=", "", .a)
+    } else if (is.null(force_keep_file) && !grepl("^--", .a)) {
+        # Legacy: plain trailing arg is the force-keep file
+        force_keep_file <- .a
+    }
+}
+if (is.null(clr_file)) {
+    # Default: try latest, then fall back
+    clr_file <- "data/processed/deconvolution/latest/music_segment_direct_proportions_CLR.csv"
+    if (!file.exists(clr_file)) {
+        clr_file <- "data/processed/deconvolution/music_segment_direct_proportions_CLR.csv"
+    }
 }
 cat("Loading CLR proportions from:", clr_file, "\n")
 clr <- read.csv(clr_file, row.names = 1, check.names = FALSE)
@@ -145,14 +161,6 @@ meta2$Age <- factor(meta2$Age)
 meta2$Arm <- factor(meta2$Arm)
 meta2$EnvGroup <- factor(meta2$EnvGroup)
 
-# Handle optional force-keep argument (passed as trailing arg due to Rscript behavior)
-args <- commandArgs(trailingOnly = TRUE)
-force_keep_file <- NULL
-if (length(args) > 0) {
-    force_keep_file <- args[1]
-}
-
-# 4) VST expression matrix Y (genes x samples)
 cat("Creating DESeqDataSet and applying VST normalization...\n")
 dds <- DESeqDataSetFromMatrix(
     countData = round(as.matrix(bulk_counts)),

@@ -287,7 +287,7 @@ def main():
                                 / "meta_phase1.tsv.gz"),
                     help="Path to metadata TSV (sample-level)")
     ap.add_argument("--clr",
-                    default=str(REPO_ROOT / "data/processed/deconvolution/test16"
+                    default=str(REPO_ROOT / "data/processed/deconvolution/latest"
                                 / "music_segment_direct_proportions_CLR.csv"),
                     help="Path to CLR proportions CSV")
     ap.add_argument("--cell_cols", default="Age,Arm,EnvGroup",
@@ -312,8 +312,9 @@ def main():
     ap.add_argument("--outdir",
                     default=str(REPO_ROOT / "data/processed/dct_markers"),
                     help="Output directory")
-    ap.add_argument("--diff_threshold", type=float, default=0.05,
-                    help="Anti-confounding threshold: corr(expr, DCT) - max(corr(expr, TAL), corr(expr, CD)) > delta")
+    ap.add_argument("--diff_threshold", type=float, default=0.0,
+                    help="Anti-confounding threshold: min corr(expr, DCT_resid) after "
+                         "regressing out TAL/CD from DCT (default: 0.0 = positive correlation only)")
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
@@ -394,12 +395,10 @@ def main():
     from scipy.stats import pearsonr as _pearsonr
     
     # We need the original CLR values for correlation, not the z-scored ones from design matrix
-    # But since pearsonr is invariant to linear scaling, it doesn't matter much.
-    # However, let's use the raw input 'clr' dataframe to be transparent.
     dct_vec = clr["DCT"].values
     
-    # Compute marginal correlations for DCT, TAL, and CD
-    print(f"\n   Computing marginal correlations for DCT, TAL, CD...")
+    # Compute marginal correlations for DCT
+    print(f"\n   Computing marginal correlations for DCT...")
     marginal_r = np.array([_pearsonr(Y[:, g], dct_vec)[0] for g in range(Y.shape[1])])
     marginal_p = np.array([_pearsonr(Y[:, g], dct_vec)[1] for g in range(Y.shape[1])])
     results["pearson_r_vst_dct"] = marginal_r
@@ -408,35 +407,76 @@ def main():
     # Strict Sign Consistency: β_DCT > 0 AND Corr(expr, DCT) > 0
     results["sign_consistent"] = (results["beta_dct"] > 0) & (results["pearson_r_vst_dct"] > 0)
     
-    # Anti-confounding: Corr(DCT) >> Corr(TAL) and Corr(CD)
-    # Identify TAL and CD columns. Adjust based on likely column names
+    # ── Anti-confounding via RESIDUALIZED DCT predictor ─────────────────
+    # Problem: CLR(DCT), CLR(TAL_LOH), CLR(CD) are highly collinear in kidney,
+    # so the old δ = corr(DCT) - max(corr(TAL), corr(CD)) > 0.05 gate
+    # was always ~0 → filtering everything.
+    #
+    # Fix: Regress out TAL/CD from DCT to get DCT_resid (the *unique* DCT signal),
+    # then correlate expression with DCT_resid. Positive correlation means the
+    # gene tracks DCT variation beyond what's shared with other distal segments.
+    
     possible_tal = ["TAL", "TAL_LOH", "LOH"]
-    possible_cd = ["CD", "CD_PC", "CD_IC", "CNT"] # CD might be split or combined
+    possible_cd = ["CD", "CD_PC", "CD_IC", "CNT"]
     
     tal_col = next((c for c in clr.columns if c in possible_tal), None)
     cd_col = next((c for c in clr.columns if c in possible_cd), None)
     
+    # Build confound matrix for residualization
+    confound_cols = []
+    confound_names = []
     if tal_col:
-        print(f"   Using '{tal_col}' for TAL anti-confounding check")
-        tal_vec = clr[tal_col].values
-        r_tal = np.array([_pearsonr(Y[:, g], tal_vec)[0] for g in range(Y.shape[1])])
-        results["pearson_r_vst_tal"] = r_tal
-    else:
-        print("   WARNING: Could not find TAL column. Skipping TAL anti-confounding.")
-        results["pearson_r_vst_tal"] = -1.0 # dummy
-        
+        confound_cols.append(clr[tal_col].values)
+        confound_names.append(tal_col)
     if cd_col:
-        print(f"   Using '{cd_col}' for CD anti-confounding check")
-        cd_vec = clr[cd_col].values
-        r_cd = np.array([_pearsonr(Y[:, g], cd_vec)[0] for g in range(Y.shape[1])])
-        results["pearson_r_vst_cd"] = r_cd
-    else:
-        print("   WARNING: Could not find CD column. Skipping CD anti-confounding.")
-        results["pearson_r_vst_cd"] = -1.0
+        confound_cols.append(clr[cd_col].values)
+        confound_names.append(cd_col)
+    
+    if confound_cols:
+        # Residualize: DCT_resid = DCT - projection onto TAL/CD
+        C = np.column_stack([np.ones(len(dct_vec))] + confound_cols)  # intercept + confounders
+        C_pinv = np.linalg.pinv(C)
+        dct_resid = dct_vec - C @ (C_pinv @ dct_vec)
         
-    # Delta check
-    max_confound = np.maximum(results["pearson_r_vst_tal"], results["pearson_r_vst_cd"])
-    results["anti_confounded"] = (results["pearson_r_vst_dct"] - max_confound) > args.diff_threshold
+        # Diagnostic: show collinearity
+        print(f"\n   Anti-confounding: residualized DCT predictor")
+        print(f"   Confounders removed: {confound_names}")
+        from scipy.stats import spearmanr as _spearmanr
+        for cn in confound_names:
+            rho, _ = _spearmanr(dct_vec, clr[cn].values)
+            print(f"   Spearman(DCT, {cn}) = {rho:.3f}")
+        dct_resid_sd = np.std(dct_resid)
+        print(f"   DCT_resid std: {dct_resid_sd:.4f} (original DCT std: {np.std(dct_vec):.4f})")
+        print(f"   Variance retained: {(dct_resid_sd / max(np.std(dct_vec), 1e-12))**2:.1%}")
+        
+        # Correlate expression with DCT_resid
+        r_dct_resid = np.array([_pearsonr(Y[:, g], dct_resid)[0] for g in range(Y.shape[1])])
+        results["pearson_r_dct_resid"] = r_dct_resid
+        
+        # Anti-confounded = gene tracks unique DCT signal (positive correlation with DCT_resid)
+        results["anti_confounded"] = r_dct_resid > args.diff_threshold
+        
+        # Diagnostic: top 20 DCT_resid correlations
+        top_idx = np.argsort(np.abs(r_dct_resid))[-20:][::-1]
+        print(f"\n   Top 20 |corr(expr, DCT_resid)| values:")
+        for idx in top_idx:
+            print(f"     {gene_names[idx]:25s}  r_resid={r_dct_resid[idx]:+.4f}  r_raw={marginal_r[idx]:+.4f}")
+    else:
+        print("   WARNING: No TAL/CD columns found. Skipping anti-confounding (all pass).")
+        results["pearson_r_dct_resid"] = marginal_r
+        results["anti_confounded"] = True
+    
+    # Also store marginal TAL/CD correlations for reference
+    if tal_col:
+        tal_vec = clr[tal_col].values
+        results["pearson_r_vst_tal"] = np.array([_pearsonr(Y[:, g], tal_vec)[0] for g in range(Y.shape[1])])
+    else:
+        results["pearson_r_vst_tal"] = -1.0
+    if cd_col:
+        cd_vec_ = clr[cd_col].values
+        results["pearson_r_vst_cd"] = np.array([_pearsonr(Y[:, g], cd_vec_)[0] for g in range(Y.shape[1])])
+    else:
+        results["pearson_r_vst_cd"] = -1.0
     
     results["sign_flip"] = (results["beta_dct"] > 0) & (results["pearson_r_vst_dct"] < 0)
 
@@ -503,9 +543,12 @@ def main():
     # ── 11. Save outputs ────────────────────────────────────────────────
     cols_order = ["gene", "beta_dct", "t_stat", "p_value", "q_BH",
                   "partial_r2", "dct_top3", "bootstrap_freq",
-                  "pearson_r_vst_dct", "sign_consistent", "anti_confounded",
+                  "pearson_r_vst_dct", "pearson_r_dct_resid",
+                  "sign_consistent", "anti_confounded",
                   "pearson_r_vst_tal", "pearson_r_vst_cd",
                   "pearson_p_vst_dct", "sign_flip"]
+    # Only include columns that exist
+    cols_order = [c for c in cols_order if c in results.columns]
     scores_path = outdir / "dct_marker_scores.tsv"
     results[cols_order].to_csv(scores_path, sep="\t", index=False)
     print(f"\n   Wrote full scores: {scores_path}")

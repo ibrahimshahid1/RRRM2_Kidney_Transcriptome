@@ -20,7 +20,15 @@ bulk_meta_csv <- "data/processed/aligned_outputs/metadata_aligned.tsv"
 sc_h5ad_path <- "data/external/single_cell_atlases/kidney_female_b8c618e5-4b3d-4566-8a3f-7e40047f5c54.h5ad"
 
 
-outdir <- "data/processed/deconvolution/test16"
+# Parse --outdir from command line (e.g. Rscript run_deconvolution.R --outdir=data/processed/deconvolution/run_xxx)
+.args <- commandArgs(trailingOnly = TRUE)
+outdir <- "data/processed/deconvolution/latest"
+for (.a in .args) {
+  if (grepl("^--outdir=", .a)) {
+    outdir <- sub("^--outdir=", "", .a)
+  }
+}
+message("Output directory: ", outdir)
 dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
 
 # Helpers

@@ -110,10 +110,19 @@ cat("Successfully aligned", nrow(meta2), "samples.\n")
 rownames(meta2) <- meta2[["Sample Name (raw_counts_colname)"]]
 
 # 2) Load CLR deconv covariates (your saved output)
-clr_file <- "data/processed/deconvolution/test16/music_segment_direct_proportions_CLR.csv"
-if (!file.exists(clr_file)) {
-    # Fall back to base deconvolution dir
-    clr_file <- "data/processed/deconvolution/music_segment_direct_proportions_CLR.csv"
+# Parse command-line arguments for CLR path
+.clr_args <- commandArgs(trailingOnly = TRUE)
+clr_file <- NULL
+for (.a in .clr_args) {
+    if (grepl("^--clr=", .a)) {
+        clr_file <- sub("^--clr=", "", .a)
+    }
+}
+if (is.null(clr_file)) {
+    clr_file <- "data/processed/deconvolution/latest/music_segment_direct_proportions_CLR.csv"
+    if (!file.exists(clr_file)) {
+        clr_file <- "data/processed/deconvolution/music_segment_direct_proportions_CLR.csv"
+    }
 }
 cat("Loading CLR proportions from:", clr_file, "\n")
 clr <- read.csv(clr_file, row.names = 1, check.names = FALSE)

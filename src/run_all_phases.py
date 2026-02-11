@@ -130,7 +130,10 @@ def phase_0(dry_run: bool = False, skip_r: bool = False) -> bool:
         log("Skipping R-dependent deconvolution", "WARN")
         return True
     
-    return run_rscript("src/preprocessing/deconvolution.R", dry_run=dry_run)
+    deconv_dir = os.environ.get("RRRM_DECONV_DIR",
+                                str(REPO_ROOT / "data/processed/deconvolution/latest"))
+    return run_rscript("src/preprocessing/deconvolution.R",
+                       args=[f"--outdir={deconv_dir}"], dry_run=dry_run)
 
 
 def phase_1(dry_run: bool = False, skip_r: bool = False) -> bool:
@@ -141,14 +144,19 @@ def phase_1(dry_run: bool = False, skip_r: bool = False) -> bool:
         log("Skipping R-dependent residualization", "WARN")
         return True
     
+    # Pass CLR path from the versioned deconvolution directory
+    deconv_dir = os.environ.get("RRRM_DECONV_DIR",
+                                str(REPO_ROOT / "data/processed/deconvolution/latest"))
+    clr_path = Path(deconv_dir) / "music_segment_direct_proportions_CLR.csv"
+    resid_args = [f"--clr={clr_path}"]
+
     # Check for DCT marker panel to force-include
     dct_panel_path = REPO_ROOT / "data/processed/dct_markers" / "dct_marker_panel.txt"
-    force_args = []
     if dct_panel_path.exists():
-        force_args = [str(dct_panel_path)]
+        resid_args.append(f"--force_keep={dct_panel_path}")
         log(f"Passing DCT marker panel to residualization: {dct_panel_path}")
     
-    success = run_rscript("src/preprocessing/residualization.R", args=force_args, dry_run=dry_run)
+    success = run_rscript("src/preprocessing/residualization.R", args=resid_args, dry_run=dry_run)
     if not success:
         return False
 
@@ -162,7 +170,9 @@ def phase_1_5(dry_run: bool = False) -> bool:
 
     # Use VST (NOT Rtech) to avoid the landmine where Rtech already has CLR regressed out
     vst_path = REPO_ROOT / "data/processed/vst_normalized" / "GLDS-674_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv"
-    clr_path = REPO_ROOT / "data/processed/deconvolution/test16/music_segment_direct_proportions_CLR.csv"
+    deconv_dir = os.environ.get("RRRM_DECONV_DIR",
+                                str(REPO_ROOT / "data/processed/deconvolution/latest"))
+    clr_path = Path(deconv_dir) / "music_segment_direct_proportions_CLR.csv"
     meta_path = REPO_ROOT / "data/processed/phase1_residuals" / "meta_phase1.tsv.gz"
     outdir = REPO_ROOT / "data/processed/dct_markers"
 
@@ -455,6 +465,7 @@ Examples:
     os.environ["RRRM_RUN_ID"] = run_id
     os.environ["RRRM_RESULTS_DIR"] = str(REPO_ROOT / "data/results" / run_id)
     os.environ["RRRM_NETWORKS_DIR"] = str(REPO_ROOT / "data/processed/networks" / run_id)
+    os.environ["RRRM_DECONV_DIR"] = str(REPO_ROOT / "data/processed/deconvolution" / run_id)
     
     phases = {
         0: lambda: phase_0(args.dry_run, args.skip_r),
