@@ -1,0 +1,5 @@
+contrast	total_candidates	high_rewiring	low_DE	supported
+ISS_T_YNG_FLT_minus_GC	250	250	250	97
+ISS_T_OLD_FLT_minus_GC	250	250	250	108
+LAR_OLD_FLT_minus_GC	250	250	250	108
+LAR_YNG_FLT_minus_GC	250	250	250	97
