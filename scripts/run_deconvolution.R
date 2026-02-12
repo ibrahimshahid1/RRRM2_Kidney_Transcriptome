@@ -1534,22 +1534,36 @@ for (i in seq_len(nrow(validation_results))) {
   if (!(seg %in% colnames(bulk_scores))) next
   if (all(is.na(bulk_scores[[seg]]))) next
 
-  ct <- cor.test(prop_seg[, seg], bulk_scores[[seg]], method = "spearman")
+  # Guard: skip if proportion has zero variance
+  if (sd(prop_seg[, seg], na.rm = TRUE) < 1e-12) {
+    message("  Skipping ", seg, " validation: zero variance in proportions")
+    validation_results$interpretation[i] <- "Zero-var"
+    next
+  }
+
+  ct <- tryCatch(
+    cor.test(prop_seg[, seg], bulk_scores[[seg]], method = "spearman"),
+    error = function(e) NULL,
+    warning = function(w) suppressWarnings(cor.test(prop_seg[, seg], bulk_scores[[seg]], method = "spearman"))
+  )
+  if (is.null(ct)) next
+
   validation_results$spearman_rho[i] <- round(ct$estimate, 3)
   validation_results$pvalue[i] <- signif(ct$p.value, 3)
 
-  # Interpretation
   rho <- ct$estimate
-  validation_results$interpretation[i] <- if (rho > 0.5) {
-    "Strong"
+  if (is.na(rho)) {
+    validation_results$interpretation[i] <- "NA"
+  } else if (rho > 0.5) {
+    validation_results$interpretation[i] <- "Strong"
   } else if (rho > 0.3) {
-    "Moderate"
+    validation_results$interpretation[i] <- "Moderate"
   } else if (rho > 0.1) {
-    "Weak"
+    validation_results$interpretation[i] <- "Weak"
   } else if (rho > -0.1) {
-    "None"
+    validation_results$interpretation[i] <- "None"
   } else {
-    "Negative!"
+    validation_results$interpretation[i] <- "Negative!"
   }
 }
 
