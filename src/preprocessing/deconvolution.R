@@ -1485,6 +1485,8 @@ if (!has_source) {
   message("Falling back to donor_id prefix to infer source (Chen_ prefix = Chen, else TMS).")
   did <- as.character(colData(sce2)$donor_id)
   colData(sce2)$source <- ifelse(grepl("^Chen_", did), "Chen", "TMS")
+  message("Inferred sources: TMS=", sum(colData(sce2)$source == "TMS"),
+          ", Chen=", sum(colData(sce2)$source == "Chen"))
 }
 
 src <- as.character(colData(sce2)$source)
@@ -1541,17 +1543,20 @@ message("\n--- Scale & Combine ---")
 # distal_total = 1 - sum(all TMS types) per sample
 distal_total <- 1 - rowSums(prop_stage1)
 distal_total <- pmax(distal_total, 0)  # clamp to non-negative
+if (any(distal_total == 0)) {
+  message("WARNING: ", sum(distal_total == 0), " samples had Stage 1 proportions summing to >=1 (clamped distal_total to 0)")
+}
 message("Distal total: mean=", round(mean(distal_total), 4),
         ", range=[", round(min(distal_total), 4), ", ", round(max(distal_total), 4), "]")
 
 # Scale Stage 2 relative proportions by distal_total
-prop_distal <- prop_stage2 * distal_total  # broadcasts per-sample
+prop_distal <- sweep(prop_stage2, 1, distal_total, "*")
 
 # Combine into final prop_seg
 prop_seg <- cbind(prop_stage1, prop_distal)
 # Normalize rows to sum to 1 (should be close already)
 rs <- rowSums(prop_seg)
-prop_seg <- prop_seg / rs
+prop_seg <- sweep(prop_seg, 1, rs, "/")
 
 message("Final combined proportions:")
 print(round(colMeans(prop_seg), 4))
@@ -1793,8 +1798,12 @@ scatter_check <- function(seg_name, marker_symbol, prop_seg, bulk_cpm) {
   ens <- resolve_markers_to_matrix(marker_symbol, rownames(bulk_cpm))
   if (length(ens) == 0 || !(seg_name %in% colnames(prop_seg))) return(NULL)
   cpm_val <- log1p(bulk_cpm[ens[1], ])
-  rho <- cor(prop_seg[, seg_name], cpm_val, method = "spearman")
-  message(sprintf("  %s vs %s: rho=%.3f", seg_name, marker_symbol, rho))
+  rho <- cor(prop_seg[, seg_name], cpm_val, method = "spearman", use = "complete.obs")
+  if (is.na(rho)) {
+    message(sprintf("  %s vs %s: rho=NA (insufficient variation)", seg_name, marker_symbol))
+  } else {
+    message(sprintf("  %s vs %s: rho=%.3f", seg_name, marker_symbol, rho))
+  }
 }
 
 message("\n--- Per-Gene Scatter Diagnostics ---")
@@ -1823,6 +1832,9 @@ immune_near_zero <- mean(immune_prop < 0.01)
 message(sprintf("Samples with Immune < 1%%: %.1f%%", immune_near_zero * 100))
 
 # 2. Compute immune marker scores from bulk
+# Expanded immune markers: pan-immune (Ptprc/Lyz2/Tyrobp/Ctss/Fcer1g),
+# macrophage (Cd68/Adgre1/Csf1r), T-cell (Cd3d/Cd3e), B-cell (Ms4a1),
+# monocyte (Lst1/Itgam), MHC-II (H2-Aa)
 immune_markers <- c("Ptprc", "Lyz2", "Tyrobp", "Ctss", "Fcer1g", "Cd68", "Cd3d",
                     "Cd3e", "Ms4a1", "Lst1", "Itgam", "Adgre1", "Csf1r", "H2-Aa")
 immune_genes <- resolve_markers_to_matrix(immune_markers, rownames(bulk_cpm))
