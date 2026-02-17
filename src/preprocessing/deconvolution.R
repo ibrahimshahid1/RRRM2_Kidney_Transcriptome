@@ -567,28 +567,32 @@ message("Resolved ", length(canon_tal_res), " canonical TAL markers.")
 
 # DCT1 (Slc12a3+/Pvalb+): Thiazide-sensitive NCC segment
 mk_dct1_data <- if ("DCT1" %in% tub_types) pick_type_markers(sce2, "DCT1", tub_types, top_n = 15) else character(0)
-canon_dct1 <- c("Slc12a3", "Pvalb", "Wnk4", "Trpv5", "Kl")
+canon_dct1 <- c("Slc12a3", "Pvalb", "Wnk4", "Trpv5", "Kl", "Wnk1", "Clcnkb",
+                 "Egf", "Fxyd2", "Calb1", "Slc8a1", "Trpm6", "Pth1r", "Cldn8")
 canon_dct1_res <- resolve_markers_to_matrix(canon_dct1, rownames(sce2))
 mk_dct1_final <- unique(c(canon_dct1_res, mk_dct1_data))
 message("Resolved ", length(canon_dct1_res), " canonical DCT1 markers.")
 
 # DCT2 (Slc12a3+/Calb1+/Pvalb−): Calcium transport segment
 mk_dct2_data <- if ("DCT2" %in% tub_types) pick_type_markers(sce2, "DCT2", tub_types, top_n = 15) else character(0)
-canon_dct2 <- c("Calb1", "Trpm6")
+canon_dct2 <- c("Calb1", "Trpm6", "Slc8a1", "S100g", "Trpv5", "Slc12a3",
+                 "Fxyd2", "Aqp2", "Scnn1b", "Scnn1g")
 canon_dct2_res <- resolve_markers_to_matrix(canon_dct2, rownames(sce2))
 mk_dct2_final <- unique(c(canon_dct2_res, mk_dct2_data))
 message("Resolved ", length(canon_dct2_res), " canonical DCT2 markers.")
 
 # CNT (connecting tubule): Calb1++, Scnn1g+
 mk_cnt_data <- if ("CNT" %in% tub_types) pick_type_markers(sce2, "CNT", tub_types, top_n = 15) else character(0)
-canon_cnt <- c("Calb1", "Scnn1g")
+canon_cnt <- c("Calb1", "Scnn1g", "Scnn1b", "Aqp2", "Slc8a1", "Trpv5",
+                "S100g", "Fxyd4", "Hsd11b2", "Avpr2")
 canon_cnt_res <- resolve_markers_to_matrix(canon_cnt, rownames(sce2))
 mk_cnt_final <- unique(c(canon_cnt_res, mk_cnt_data))
 message("Resolved ", length(canon_cnt_res), " canonical CNT markers.")
 
-# CD: Strict Canonical
+# CD: Strict Canonical (expanded to ensure ≥10 survive mapping)
 mk_cd_data <- pick_type_markers(sce2, "CD", tub_types, top_n = 15)
-canon_cd <- c("Aqp2", "Aqp3", "Fxyd4", "Hsd11b2", "Scnn1g", "Krt8", "Krt18")
+canon_cd <- c("Aqp2", "Aqp3", "Fxyd4", "Hsd11b2", "Scnn1g", "Krt8", "Krt18",
+               "Atp6v1b1", "Atp6v0d2", "Slc4a1", "Aqp6", "Slc26a4", "Foxi1", "Hmx2")
 canon_cd_res <- resolve_markers_to_matrix(canon_cd, rownames(sce2))
 mk_cd_final <- unique(c(canon_cd_res, mk_cd_data))
 message("Resolved ", length(canon_cd_res), " canonical CD markers.")
@@ -1461,26 +1465,106 @@ p_rec <- ggplot(df_plot, aes(x = true, y = est)) +
 ggsave(file.path(outdir, "pseudobulk_recovery_scatter_P_rna.png"), p_rec, width = 11, height = 7)
 message("Saved pseudo-bulk recovery plot: pseudobulk_recovery_scatter_P_rna.png")
 
-res_cluster <- MuSiC::music_prop.cluster(
-  bulk.mtx      = bulk_mat2, # genes x samples
-  sc.sce        = sce2,
-  group.markers = group.markers,
-  groups        = "clusterType",
-  clusters      = "segment_use",
-  samples       = "donor_id", # must exist in colData(sce2)
-  clusters.type = clusters.type,
-  normalize     = TRUE, # IMPORTANT (see MuSiC docs)
-  centered      = FALSE,
-  verbose       = TRUE
+# ══════════════════════════════════════════════════════════════════════════════
+# TWO-STAGE DECONVOLUTION
+# Stage 1: TMS-only MuSiC for coarse types (PT, Podo, Endo, Mes, Immune, Fibro, CD)
+# Stage 2: Chen-only MuSiC for distal subtypes (TAL_LOH, DCT1, DCT2, CNT)
+# Then scale Stage 2 relative proportions by distal_total from Stage 1.
+# This avoids the block-diagonal donor problem where cross-donor variance
+# between TMS segments and Chen segments cannot be modeled.
+# ══════════════════════════════════════════════════════════════════════════════
+
+message("\n", paste(rep("=", 60), collapse = ""))
+message("TWO-STAGE DECONVOLUTION")
+message(paste(rep("=", 60), collapse = ""))
+
+# ── Build source-specific SCEs ──
+has_source <- "source" %in% colnames(colData(sce2))
+if (!has_source) {
+  message("WARNING: 'source' column not found in SCE colData.")
+  message("Falling back to donor_id prefix to infer source (Chen_ prefix = Chen, else TMS).")
+  did <- as.character(colData(sce2)$donor_id)
+  colData(sce2)$source <- ifelse(grepl("^Chen_", did), "Chen", "TMS")
+  message("Inferred sources: TMS=", sum(colData(sce2)$source == "TMS"),
+          ", Chen=", sum(colData(sce2)$source == "Chen"))
+}
+
+src <- as.character(colData(sce2)$source)
+tms_mask <- src == "TMS"
+chen_mask <- src == "Chen"
+message("TMS cells: ", sum(tms_mask), "  Chen cells: ", sum(chen_mask))
+
+# ── TMS-only SCE: PT, Podocyte, Endothelial, Mesangial, Immune, Fibroblast, CD ──
+sce_tms <- sce2[, tms_mask]
+colData(sce_tms)$segment_use <- as.character(colData(sce_tms)$segment_use)
+colData(sce_tms)$donor_id    <- as.character(colData(sce_tms)$donor_id)
+tms_types <- unique(colData(sce_tms)$segment_use)
+message("TMS cell types: ", paste(sort(tms_types), collapse = ", "))
+
+# ── Chen-only SCE: TAL_LOH, DCT1, DCT2, CNT ──
+sce_chen <- sce2[, chen_mask]
+colData(sce_chen)$segment_use <- as.character(colData(sce_chen)$segment_use)
+colData(sce_chen)$donor_id    <- as.character(colData(sce_chen)$donor_id)
+chen_types <- unique(colData(sce_chen)$segment_use)
+message("Chen cell types: ", paste(sort(chen_types), collapse = ", "))
+
+# ── Stage 1: TMS-only flat MuSiC ──
+message("\n--- Stage 1: TMS-only flat MuSiC ---")
+res_stage1 <- MuSiC::music_prop(
+  bulk.mtx  = bulk_mat2,
+  sc.sce    = sce_tms,
+  clusters  = "segment_use",
+  samples   = "donor_id",
+  normalize = TRUE,
+  verbose   = TRUE
 )
+prop_stage1 <- res_stage1$Est.prop.weighted
+message("Stage 1 cell types: ", paste(colnames(prop_stage1), collapse = ", "))
+message("Stage 1 mean proportions:")
+print(round(colMeans(prop_stage1), 4))
 
-# Extract cell-type proportions
-prop_seg <- res_cluster$Est.prop.weighted.cluster
+# ── Stage 2: Chen-only flat MuSiC ──
+message("\n--- Stage 2: Chen-only flat MuSiC ---")
+res_stage2 <- MuSiC::music_prop(
+  bulk.mtx  = bulk_mat2,
+  sc.sce    = sce_chen,
+  clusters  = "segment_use",
+  samples   = "donor_id",
+  normalize = TRUE,
+  verbose   = TRUE
+)
+prop_stage2 <- res_stage2$Est.prop.weighted
+message("Stage 2 cell types: ", paste(colnames(prop_stage2), collapse = ", "))
+message("Stage 2 relative proportions (within distal):")
+print(round(colMeans(prop_stage2), 4))
+
+# ── Scale & Combine ──
+message("\n--- Scale & Combine ---")
+# distal_total = 1 - sum(all TMS types) per sample
+distal_total <- 1 - rowSums(prop_stage1)
+distal_total <- pmax(distal_total, 0)  # clamp to non-negative
+if (any(distal_total == 0)) {
+  message("WARNING: ", sum(distal_total == 0), " samples had Stage 1 proportions summing to >=1 (clamped distal_total to 0)")
+}
+message("Distal total: mean=", round(mean(distal_total), 4),
+        ", range=[", round(min(distal_total), 4), ", ", round(max(distal_total), 4), "]")
+
+# Scale Stage 2 relative proportions by distal_total
+prop_distal <- sweep(prop_stage2, 1, distal_total, "*")
+
+# Combine into final prop_seg
+prop_seg <- cbind(prop_stage1, prop_distal)
+# Normalize rows to sum to 1 (should be close already)
+rs <- rowSums(prop_seg)
+prop_seg <- sweep(prop_seg, 1, rs, "/")
+
+message("Final combined proportions:")
+print(round(colMeans(prop_seg), 4))
+
 write.csv(prop_seg, file.path(outdir, "music_cluster_proportions.csv"), quote = FALSE)
-message("Wrote tree-guided cluster proportions to: ", file.path(outdir, "music_cluster_proportions.csv"))
+message("Wrote two-stage cluster proportions to: ", file.path(outdir, "music_cluster_proportions.csv"))
 
-# Compute coarse group proportions by summing segments (MuSiC doesn't return this directly)
-# Safely sum segments that exist in prop_seg
+# Compute coarse group proportions by summing segments
 safe_sum_cols <- function(mat, cols) {
   existing <- intersect(cols, colnames(mat))
   if (length(existing) == 0) {
@@ -1605,6 +1689,14 @@ for (i in seq_len(nrow(validation_results))) {
     next
   }
 
+  # Guard: skip rho if too few markers survived mapping (unreliable estimate)
+  n_markers_found <- validation_results$n_markers[i]
+  if (!is.na(n_markers_found) && n_markers_found < 10) {
+    message(sprintf("  %s: only %d markers found — INSUFFICIENT (skipping rho)", seg, n_markers_found))
+    validation_results$interpretation[i] <- "Insufficient"
+    next
+  }
+
   ct <- tryCatch(
     cor.test(prop_seg[, seg], bulk_scores[[seg]], method = "spearman"),
     error = function(e) NULL,
@@ -1640,47 +1732,89 @@ write.csv(validation_results, file.path(outdir, "validation_segment_correlations
 )
 message("\nWrote validation results to: ", file.path(outdir, "validation_segment_correlations.csv"))
 
-# DCT-specific marker check (DCT1/DCT2/CNT subtypes)
-message("\n--- DCT Subtype Marker Validation ---")
+# DCT-specific marker check (DCT1/DCT2/CNT/CD subtypes)
+# Expanded canonical marker lists (15–25 per segment) to ensure ≥10 survive
+# symbol→Ensembl mapping, making rho estimates reliable.
+message("\n--- DCT Subtype Marker Validation (Expanded) ---")
 
 # DCT1 (Slc12a3+/Pvalb+/NCC)
-dct1_markers <- c("Slc12a3", "Pvalb", "Wnk4", "Trpv5")
+dct1_markers <- c("Slc12a3", "Pvalb", "Wnk4", "Trpv5", "Kl", "Wnk1", "Clcnkb",
+                   "Egf", "Fxyd2", "Calb1", "Slc8a1", "Trpm6", "Pth1r", "Cldn8")
 dct1_genes <- resolve_markers_to_matrix(dct1_markers, rownames(bulk_cpm))
-message("DCT1 markers found in bulk: ", paste(dct1_genes, collapse = ", "))
+message("DCT1 markers found in bulk: ", length(dct1_genes), " of ", length(dct1_markers))
 if (length(dct1_genes) > 0 && "DCT1" %in% colnames(prop_seg)) {
   dct1_score <- colMeans(log1p(bulk_cpm[dct1_genes, , drop = FALSE]))
   dct1_cor <- cor.test(prop_seg[, "DCT1"], dct1_score, method = "spearman")
   message(sprintf(
-    "DCT1 proportion vs Slc12a3+/Pvalb+ markers: rho=%.3f, p=%.4g",
-    dct1_cor$estimate, dct1_cor$p.value
+    "DCT1 proportion vs canonical markers: rho=%.3f, p=%.4g (%d markers)",
+    dct1_cor$estimate, dct1_cor$p.value, length(dct1_genes)
   ))
 }
 
-# DCT2 (Calb1+/Trpm6+)
-dct2_markers <- c("Calb1", "Trpm6")
+# DCT2 (Calb1+/Trpm6+/Slc8a1+)
+dct2_markers <- c("Calb1", "Trpm6", "Slc8a1", "S100g", "Trpv5", "Slc12a3",
+                   "Fxyd2", "Aqp2", "Scnn1b", "Scnn1g")
 dct2_genes <- resolve_markers_to_matrix(dct2_markers, rownames(bulk_cpm))
-message("DCT2 markers found in bulk: ", paste(dct2_genes, collapse = ", "))
+message("DCT2 markers found in bulk: ", length(dct2_genes), " of ", length(dct2_markers))
 if (length(dct2_genes) > 0 && "DCT2" %in% colnames(prop_seg)) {
   dct2_score <- colMeans(log1p(bulk_cpm[dct2_genes, , drop = FALSE]))
   dct2_cor <- cor.test(prop_seg[, "DCT2"], dct2_score, method = "spearman")
   message(sprintf(
-    "DCT2 proportion vs Calb1+/Trpm6+ markers: rho=%.3f, p=%.4g",
-    dct2_cor$estimate, dct2_cor$p.value
+    "DCT2 proportion vs canonical markers: rho=%.3f, p=%.4g (%d markers)",
+    dct2_cor$estimate, dct2_cor$p.value, length(dct2_genes)
   ))
 }
 
-# CNT (Scnn1g+)
-cnt_markers <- c("Scnn1g", "Calb1")
+# CNT (connecting tubule)
+cnt_markers <- c("Calb1", "Scnn1g", "Scnn1b", "Aqp2", "Slc8a1", "Trpv5",
+                  "S100g", "Fxyd4", "Hsd11b2", "Avpr2")
 cnt_genes <- resolve_markers_to_matrix(cnt_markers, rownames(bulk_cpm))
-message("CNT markers found in bulk: ", paste(cnt_genes, collapse = ", "))
+message("CNT markers found in bulk: ", length(cnt_genes), " of ", length(cnt_markers))
 if (length(cnt_genes) > 0 && "CNT" %in% colnames(prop_seg)) {
   cnt_score <- colMeans(log1p(bulk_cpm[cnt_genes, , drop = FALSE]))
   cnt_cor <- cor.test(prop_seg[, "CNT"], cnt_score, method = "spearman")
   message(sprintf(
-    "CNT proportion vs Scnn1g+/Calb1+ markers: rho=%.3f, p=%.4g",
-    cnt_cor$estimate, cnt_cor$p.value
+    "CNT proportion vs canonical markers: rho=%.3f, p=%.4g (%d markers)",
+    cnt_cor$estimate, cnt_cor$p.value, length(cnt_genes)
   ))
 }
+
+# CD (collecting duct — principal + intercalated)
+cd_markers <- c("Aqp2", "Aqp3", "Fxyd4", "Hsd11b2", "Scnn1g", "Krt8", "Krt18",
+                 "Atp6v1b1", "Atp6v0d2", "Slc4a1", "Aqp6", "Slc26a4", "Foxi1", "Hmx2")
+cd_genes <- resolve_markers_to_matrix(cd_markers, rownames(bulk_cpm))
+message("CD markers found in bulk: ", length(cd_genes), " of ", length(cd_markers))
+if (length(cd_genes) > 0 && "CD" %in% colnames(prop_seg)) {
+  cd_score <- colMeans(log1p(bulk_cpm[cd_genes, , drop = FALSE]))
+  cd_cor <- cor.test(prop_seg[, "CD"], cd_score, method = "spearman")
+  message(sprintf(
+    "CD proportion vs canonical markers: rho=%.3f, p=%.4g (%d markers)",
+    cd_cor$estimate, cd_cor$p.value, length(cd_genes)
+  ))
+}
+
+# Per-gene scatter diagnostics for key distal segments
+scatter_check <- function(seg_name, marker_symbol, prop_seg, bulk_cpm) {
+  ens <- resolve_markers_to_matrix(marker_symbol, rownames(bulk_cpm))
+  if (length(ens) == 0 || !(seg_name %in% colnames(prop_seg))) return(NULL)
+  cpm_val <- log1p(bulk_cpm[ens[1], ])
+  rho <- cor(prop_seg[, seg_name], cpm_val, method = "spearman", use = "complete.obs")
+  if (is.na(rho)) {
+    message(sprintf("  %s vs %s: rho=NA (insufficient variation)", seg_name, marker_symbol))
+  } else {
+    message(sprintf("  %s vs %s: rho=%.3f", seg_name, marker_symbol, rho))
+  }
+}
+
+message("\n--- Per-Gene Scatter Diagnostics ---")
+scatter_check("CD",   "Aqp2",    prop_seg, bulk_cpm)
+scatter_check("CD",   "Fxyd4",   prop_seg, bulk_cpm)
+scatter_check("DCT1", "Slc12a3", prop_seg, bulk_cpm)
+scatter_check("DCT1", "Pvalb",   prop_seg, bulk_cpm)
+scatter_check("DCT2", "Calb1",   prop_seg, bulk_cpm)
+scatter_check("DCT2", "Trpm6",   prop_seg, bulk_cpm)
+scatter_check("CNT",  "Scnn1g",  prop_seg, bulk_cpm)
+scatter_check("CNT",  "Calb1",   prop_seg, bulk_cpm)
 
 # IMMUNE MARKER VALIDATION (Critical for Phase 1 Covariates)
 message("\n", paste(rep("=", 60), collapse = ""))
@@ -1698,7 +1832,11 @@ immune_near_zero <- mean(immune_prop < 0.01)
 message(sprintf("Samples with Immune < 1%%: %.1f%%", immune_near_zero * 100))
 
 # 2. Compute immune marker scores from bulk
-immune_markers <- c("Ptprc", "Lyz2", "Tyrobp", "Ctss", "Fcer1g", "Cd68", "Cd3d", "Cd3e", "Ms4a1", "Lst1")
+# Expanded immune markers: pan-immune (Ptprc/Lyz2/Tyrobp/Ctss/Fcer1g),
+# macrophage (Cd68/Adgre1/Csf1r), T-cell (Cd3d/Cd3e), B-cell (Ms4a1),
+# monocyte (Lst1/Itgam), MHC-II (H2-Aa)
+immune_markers <- c("Ptprc", "Lyz2", "Tyrobp", "Ctss", "Fcer1g", "Cd68", "Cd3d",
+                    "Cd3e", "Ms4a1", "Lst1", "Itgam", "Adgre1", "Csf1r", "H2-Aa")
 immune_genes <- resolve_markers_to_matrix(immune_markers, rownames(bulk_cpm))
 message("Immune markers found in bulk: ", paste(immune_genes, collapse = ", "))
 
