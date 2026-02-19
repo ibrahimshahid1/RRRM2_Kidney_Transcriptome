@@ -70,6 +70,10 @@ def main():
                     help="Optional embedding .npy for clustering (genes x dim)")
     ap.add_argument("--k", type=int, default=12,
                     help="Number of clusters for k-means (if --embed provided)")
+    ap.add_argument("--gene_de", default="",
+                    help="Path to gene-level DE TSV (e.g. from Phase 6 regression). "
+                         "If provided, expands the gene universe beyond network genes "
+                         "to include all expressed genes for enrichment testing.")
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
@@ -88,6 +92,25 @@ def main():
     
     genes = rw["gene"].astype(str).tolist()
     print(f"Loaded {len(genes)} genes from {args.rewiring}")
+
+    # Optionally expand universe with gene-level DE results (all expressed genes)
+    extra_universe_genes = set()
+    if args.gene_de and Path(args.gene_de).exists():
+        de_df = pd.read_csv(args.gene_de, sep="\t")
+        # Find gene column
+        gene_col = None
+        for c in ["gene", "gene_id", "ensembl_gene_id", "Gene"]:
+            if c in de_df.columns:
+                gene_col = c
+                break
+        if gene_col is None and de_df.index.dtype == object:
+            extra_universe_genes = set(de_df.index.astype(str))
+        elif gene_col:
+            extra_universe_genes = set(de_df[gene_col].astype(str))
+        if extra_universe_genes:
+            n_new = len(extra_universe_genes - set(genes))
+            print(f"Expanded universe with {n_new} additional genes from DE results "
+                  f"(total universe: {len(set(genes) | extra_universe_genes)})")
 
     # Detect ID type
     frac_ens = sum(1 for g in genes if g.startswith("ENSMUSG")) / max(len(genes), 1)
@@ -174,7 +197,7 @@ def main():
         ],
     }
 
-    gene_universe = set(genes)
+    gene_universe = set(genes) | extra_universe_genes
     results = []
 
     # Resolve gene sets to universe IDs

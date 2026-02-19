@@ -242,7 +242,7 @@ features_out <- data.frame(
     stringsAsFactors = FALSE
 )
 write.table(features_out, file.path(OUT_DIR, "features.tsv"),
-    sep = "\t", quote = FALSE, col.names = TRUE
+    sep = "\t", quote = FALSE, col.names = NA
 )
 
 message("\n✓ Hybrid reference built successfully!")

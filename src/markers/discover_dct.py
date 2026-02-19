@@ -272,6 +272,55 @@ def bootstrap_stability(X: np.ndarray, Y: np.ndarray, meta: pd.DataFrame,
     return pass_counts / n_boot
 
 
+def bootstrap_marginal_stability(Y: np.ndarray, dct_vec: np.ndarray,
+                                 meta: pd.DataFrame, cell_cols: list[str],
+                                 n_boot: int, alpha: float,
+                                 rng: np.random.Generator) -> np.ndarray:
+    """
+    Fallback bootstrap using marginal Pearson correlation instead of OLS.
+    Used when the full OLS model is over-parameterised (≈0 genes pass q<α).
+
+    For each bootstrap resample, compute Pearson r(gene, DCT) and test
+    whether r > 0 with BH-corrected p < α.
+
+    Returns: (G,) array of fraction of bootstraps where gene passes.
+    """
+    from scipy.stats import pearsonr as _pearsonr
+
+    G = Y.shape[1]
+    pass_counts = np.zeros(G, dtype=int)
+
+    cell_labels = meta[cell_cols].astype(str).agg("|".join, axis=1).values
+    unique_cells = np.unique(cell_labels)
+    cell_indices = {c: np.where(cell_labels == c)[0] for c in unique_cells}
+
+    for b in range(n_boot):
+        boot_idx = []
+        for cell, idx in cell_indices.items():
+            boot_idx.append(rng.choice(idx, size=len(idx), replace=True))
+        boot_idx = np.concatenate(boot_idx)
+
+        dct_b = dct_vec[boot_idx]
+        Y_b = Y[boot_idx]
+
+        # Vectorised Pearson correlation
+        n = len(boot_idx)
+        dct_c = dct_b - dct_b.mean()
+        Y_c = Y_b - Y_b.mean(axis=0)
+        dct_ss = np.dot(dct_c, dct_c)
+        Y_ss = np.sum(Y_c ** 2, axis=0)
+        r_b = (dct_c @ Y_c) / np.sqrt(np.maximum(dct_ss * Y_ss, 1e-30))
+
+        # t-test for correlation
+        t_b = r_b * np.sqrt((n - 2) / np.maximum(1 - r_b ** 2, 1e-30))
+        p_b = 2.0 * sp_stats.t.sf(np.abs(t_b), n - 2)
+        q_b = bh_fdr(p_b)
+
+        pass_counts += ((r_b > 0) & (q_b < alpha)).astype(int)
+
+    return pass_counts / n_boot
+
+
 # ── main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -312,9 +361,10 @@ def main():
     ap.add_argument("--outdir",
                     default=str(REPO_ROOT / "data/processed/dct_markers"),
                     help="Output directory")
-    ap.add_argument("--diff_threshold", type=float, default=0.0,
-                    help="Anti-confounding threshold: min corr(expr, DCT_resid) after "
-                         "regressing out TAL/CD from DCT (default: 0.0 = positive correlation only)")
+    ap.add_argument("--diff_threshold", type=float, default=0.10,
+                    help="Anti-confounding threshold: min delta between corr(expr,DCT) and "
+                         "max corr(expr,confounder). Higher = more DCT-specific. "
+                         "(default: 0.10)")
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
@@ -348,8 +398,39 @@ def main():
     print(f"\n3) Loading CLR proportions: {args.clr}")
     clr = pd.read_csv(args.clr, index_col=0)
     print(f"   Segments: {list(clr.columns)}")
+
+    # If no single 'DCT' column, synthesize from DCT subtypes.
+    # The hybrid reference splits DCT into DCT1, DCT2, CNT — we need a
+    # combined DCT signal for marker discovery.
     if "DCT" not in clr.columns:
-        raise ValueError(f"CLR file must contain 'DCT' column. Found: {list(clr.columns)}")
+        # Look for DCT subtypes to combine
+        dct_parts = [c for c in clr.columns if c.startswith("DCT")]
+        # CNT is part of the distal convoluted tubule continuum
+        if "CNT" in clr.columns:
+            dct_parts.append("CNT")
+        if dct_parts:
+            # CLR values are log-ratio transformed, so we need to:
+            # 1) back-transform to proportions, 2) sum, 3) re-CLR
+            # But since CLR = log(p/geom_mean), summing CLR is wrong.
+            # Instead, exponentiate, sum, then log.
+            import warnings
+            dct_exp = np.exp(clr[dct_parts].values)  # undo log
+            dct_combined_exp = dct_exp.sum(axis=1)    # sum proportional parts
+            # Re-log to get a combined CLR-like score
+            clr["DCT"] = np.log(np.maximum(dct_combined_exp, 1e-12))
+            print(f"   Synthesized 'DCT' column from {dct_parts}")
+            print(f"   DCT CLR range: [{clr['DCT'].min():.3f}, {clr['DCT'].max():.3f}]")
+            # Check if there's actual variance
+            dct_std = clr["DCT"].std()
+            if dct_std < 1e-6:
+                print(f"   WARNING: Synthesized DCT has near-zero variance (std={dct_std:.2e}).")
+                print(f"   This likely means deconvolution assigned ~0 to all DCT subtypes.")
+                print(f"   Marker discovery will proceed but may find no markers.")
+        else:
+            raise ValueError(
+                f"CLR file must contain 'DCT' column or DCT subtypes (DCT1/DCT2/CNT). "
+                f"Found: {list(clr.columns)}"
+            )
 
     # ── 4. Align samples ────────────────────────────────────────────────
     print("\n4) Aligning samples across VST, metadata, CLR...")
@@ -407,72 +488,85 @@ def main():
     # Strict Sign Consistency: β_DCT > 0 AND Corr(expr, DCT) > 0
     results["sign_consistent"] = (results["beta_dct"] > 0) & (results["pearson_r_vst_dct"] > 0)
     
-    # ── Anti-confounding via RESIDUALIZED DCT predictor ─────────────────
-    # Problem: CLR(DCT), CLR(TAL_LOH), CLR(CD) are highly collinear in kidney,
-    # so the old δ = corr(DCT) - max(corr(TAL), corr(CD)) > 0.05 gate
-    # was always ~0 → filtering everything.
+    # ── Anti-confounding via DELTA approach ─────────────────────────────
+    # Problem: CLR(DCT), CLR(TAL_LOH), CLR(CD) are highly correlated because
+    # the two-stage Scale & Combine multiplies all distal subtypes by the same
+    # distal_total. Full residualization destroys >99% of DCT variance.
     #
-    # Fix: Regress out TAL/CD from DCT to get DCT_resid (the *unique* DCT signal),
-    # then correlate expression with DCT_resid. Positive correlation means the
-    # gene tracks DCT variation beyond what's shared with other distal segments.
+    # Fix: Instead of residualizing DCT against TAL/CD (which kills variance),
+    # use a per-gene delta filter: gene passes if its correlation with DCT
+    # exceeds its max correlation with confounders. This catches genes that
+    # track DCT specifically rather than just "distal signal in general".
     
     possible_tal = ["TAL", "TAL_LOH", "LOH"]
-    possible_cd = ["CD", "CD_PC", "CD_IC", "CNT"]
+    possible_cd = ["CD", "CD_PC", "CD_IC"]
     
     tal_col = next((c for c in clr.columns if c in possible_tal), None)
     cd_col = next((c for c in clr.columns if c in possible_cd), None)
     
-    # Build confound matrix for residualization
-    confound_cols = []
+    # Compute per-gene correlations with confounders
     confound_names = []
+    confound_r = {}
     if tal_col:
-        confound_cols.append(clr[tal_col].values)
         confound_names.append(tal_col)
+        tal_vec = clr[tal_col].values
+        confound_r[tal_col] = np.array([_pearsonr(Y[:, g], tal_vec)[0] for g in range(Y.shape[1])])
     if cd_col:
-        confound_cols.append(clr[cd_col].values)
         confound_names.append(cd_col)
+        cd_vec_ = clr[cd_col].values
+        confound_r[cd_col] = np.array([_pearsonr(Y[:, g], cd_vec_)[0] for g in range(Y.shape[1])])
     
-    if confound_cols:
-        # Residualize: DCT_resid = DCT - projection onto TAL/CD
-        C = np.column_stack([np.ones(len(dct_vec))] + confound_cols)  # intercept + confounders
-        C_pinv = np.linalg.pinv(C)
-        dct_resid = dct_vec - C @ (C_pinv @ dct_vec)
-        
-        # Diagnostic: show collinearity
-        print(f"\n   Anti-confounding: residualized DCT predictor")
-        print(f"   Confounders removed: {confound_names}")
+    if confound_names:
+        print(f"\n   Anti-confounding: delta approach (DCT corr vs max confounder corr)")
+        print(f"   Confounders: {confound_names}")
         from scipy.stats import spearmanr as _spearmanr
         for cn in confound_names:
             rho, _ = _spearmanr(dct_vec, clr[cn].values)
             print(f"   Spearman(DCT, {cn}) = {rho:.3f}")
-        dct_resid_sd = np.std(dct_resid)
-        print(f"   DCT_resid std: {dct_resid_sd:.4f} (original DCT std: {np.std(dct_vec):.4f})")
-        print(f"   Variance retained: {(dct_resid_sd / max(np.std(dct_vec), 1e-12))**2:.1%}")
         
-        # Correlate expression with DCT_resid
-        r_dct_resid = np.array([_pearsonr(Y[:, g], dct_resid)[0] for g in range(Y.shape[1])])
-        results["pearson_r_dct_resid"] = r_dct_resid
+        # Max |confounder correlation| per gene
+        confound_stack = np.column_stack([confound_r[c] for c in confound_names])
+        max_confound_r = np.max(np.abs(confound_stack), axis=1)  # (G,)
         
-        # Anti-confounded = gene tracks unique DCT signal (positive correlation with DCT_resid)
-        results["anti_confounded"] = r_dct_resid > args.diff_threshold
+        # Anti-confounded = gene tracks DCT MORE than it tracks any confounder
+        # Use signed correlation: gene must correlate positively with DCT
+        # AND that positive correlation must exceed the max confounder correlation
+        delta = marginal_r - max_confound_r
+        results["delta_confound"] = delta
+        results["anti_confounded"] = delta > args.diff_threshold
         
-        # Diagnostic: top 20 DCT_resid correlations
-        top_idx = np.argsort(np.abs(r_dct_resid))[-20:][::-1]
-        print(f"\n   Top 20 |corr(expr, DCT_resid)| values:")
+        # Also store a "DCT_resid" correlation for reference (using partial correlation)
+        # Partial r(Y, DCT | confounders) via formula:
+        # r_partial = (r_xy - r_xz * r_yz) / sqrt((1 - r_xz²)(1 - r_yz²))
+        # For multiple confounders, use the strongest one
+        results["pearson_r_dct_resid"] = delta  # use delta as proxy for DCT-specific signal
+        
+        # Diagnostic: top 20 by delta
+        top_idx = np.argsort(delta)[-20:][::-1]
+        print(f"\n   Top 20 genes by delta(corr_DCT - max_corr_confounder):")
         for idx in top_idx:
-            print(f"     {gene_names[idx]:25s}  r_resid={r_dct_resid[idx]:+.4f}  r_raw={marginal_r[idx]:+.4f}")
+            conf_str = ", ".join([f"r_{cn}={confound_r[cn][idx]:+.4f}" for cn in confound_names])
+            print(f"     {gene_names[idx]:25s}  r_DCT={marginal_r[idx]:+.4f}  {conf_str}  δ={delta[idx]:+.4f}")
+        
+        n_pass = results["anti_confounded"].sum()
+        print(f"\n   Genes passing delta > {args.diff_threshold}: {n_pass} / {len(gene_names)}")
     else:
         print("   WARNING: No TAL/CD columns found. Skipping anti-confounding (all pass).")
         results["pearson_r_dct_resid"] = marginal_r
+        results["delta_confound"] = 1.0
         results["anti_confounded"] = True
     
-    # Also store marginal TAL/CD correlations for reference
-    if tal_col:
+    # Also store marginal TAL/CD correlations for reference (reuse computed values)
+    if tal_col and tal_col in confound_r:
+        results["pearson_r_vst_tal"] = confound_r[tal_col]
+    elif tal_col:
         tal_vec = clr[tal_col].values
         results["pearson_r_vst_tal"] = np.array([_pearsonr(Y[:, g], tal_vec)[0] for g in range(Y.shape[1])])
     else:
         results["pearson_r_vst_tal"] = -1.0
-    if cd_col:
+    if cd_col and cd_col in confound_r:
+        results["pearson_r_vst_cd"] = confound_r[cd_col]
+    elif cd_col:
         cd_vec_ = clr[cd_col].values
         results["pearson_r_vst_cd"] = np.array([_pearsonr(Y[:, g], cd_vec_)[0] for g in range(Y.shape[1])])
     else:
@@ -498,10 +592,30 @@ def main():
 
     # ── 9. Bootstrap stability ──────────────────────────────────────────
     print(f"\n9) Bootstrap stability ({args.boot_n} stratified resamples)...")
-    boot_freq = bootstrap_stability(
-        X, Y, meta, cell_cols, dct_col,
-        n_boot=args.boot_n, alpha=args.q_threshold, rng=rng
-    )
+
+    # Determine whether OLS has enough power to be useful
+    n_ols_sig = sig_pos.sum()
+
+    if n_ols_sig > 0:
+        # OLS is powered — use the strict OLS-based bootstrap
+        print(f"   OLS found {n_ols_sig} significant genes → using OLS bootstrap")
+        boot_freq = bootstrap_stability(
+            X, Y, meta, cell_cols, dct_col,
+            n_boot=args.boot_n, alpha=args.q_threshold, rng=rng
+        )
+        fallback_mode = False
+    else:
+        # OLS is under-powered (29 predictors / 80 samples) — fall back to
+        # marginal-correlation bootstrap which has 1 predictor and full power.
+        print(f"   OLS found 0 significant genes (model has {X.shape[1]} predictors "
+              f"for {X.shape[0]} samples)")
+        print(f"   → Falling back to marginal-correlation bootstrap")
+        boot_freq = bootstrap_marginal_stability(
+            Y, dct_vec, meta, cell_cols,
+            n_boot=args.boot_n, alpha=args.q_threshold, rng=rng
+        )
+        fallback_mode = True
+
     results["bootstrap_freq"] = boot_freq
     stable = boot_freq >= args.boot_freq
     print(f"   Stable at ≥{args.boot_freq:.0%}: {stable.sum()} genes")
@@ -510,22 +624,47 @@ def main():
     # Core criteria: β_DCT > 0, q < threshold, bootstrap stable
     # NEW: Sign consistency AND Anti-confounding
     
-    # 1. Significant positive beta
-    c1 = (results["beta_dct"] > 0) & (results["q_BH"] < args.q_threshold)
-    # 2. Bootstrap stability
-    c2 = results["bootstrap_freq"] >= args.boot_freq
-    # 3. Sign consistency (Marginal R > 0)
-    c3 = results["sign_consistent"]
-    # 4. Anti-confounding (Marginal R_DCT > R_TAL + delta)
-    c4 = results["anti_confounded"]
-    
-    panel_mask = c1 & c2 & c3 & c4
-    
-    print(f"\n10) Filtering stats:")
-    print(f"    Significant (q<{args.q_threshold}): {c1.sum()}")
-    print(f"    Stable (freq>={args.boot_freq}): {c2.sum()}")
-    print(f"    Sign Consistent (r>0): {c3.sum()}")
-    print(f"    Anti-Confounded (δ>{args.diff_threshold}): {c4.sum()}")
+    if not fallback_mode:
+        # ── PRIMARY path: OLS was powered ──
+        # 1. Significant positive beta
+        c1 = (results["beta_dct"] > 0) & (results["q_BH"] < args.q_threshold)
+        # 2. Bootstrap stability
+        c2 = results["bootstrap_freq"] >= args.boot_freq
+        # 3. Sign consistency (Marginal R > 0)
+        c3 = results["sign_consistent"]
+        # 4. Anti-confounding (Marginal R_DCT > R_TAL + delta)
+        c4 = results["anti_confounded"]
+        
+        panel_mask = c1 & c2 & c3 & c4
+        
+        print(f"\n10) Filtering stats (OLS primary path):")
+        print(f"    Significant (q<{args.q_threshold}): {c1.sum()}")
+        print(f"    Stable (freq>={args.boot_freq}): {c2.sum()}")
+        print(f"    Sign Consistent (r>0): {c3.sum()}")
+        print(f"    Anti-Confounded (δ>{args.diff_threshold}): {c4.sum()}")
+    else:
+        # ── FALLBACK path: OLS under-powered, use marginal correlation ──
+        # BH-correct the marginal p-values
+        marginal_q = bh_fdr(marginal_p)
+        results["marginal_q_BH"] = marginal_q
+
+        # f1. Marginal correlation: r > 0 AND q < threshold
+        f1 = (marginal_r > 0) & (marginal_q < args.q_threshold)
+        # f2. Bootstrap stability (marginal-correlation bootstrap)
+        f2 = results["bootstrap_freq"] >= args.boot_freq
+        # f3. Anti-confounding delta
+        f3 = results["anti_confounded"]
+        # f4. OLS β_DCT > 0 (sign must agree, even if not significant)
+        f4 = results["beta_dct"] > 0
+
+        panel_mask = f1 & f2 & f3 & f4
+
+        print(f"\n10) Filtering stats (FALLBACK: marginal correlation path):")
+        print(f"    Marginal sig (r>0, q<{args.q_threshold}): {f1.sum()}")
+        print(f"    Marginal-boot stable (freq>={args.boot_freq}): {f2.sum()}")
+        print(f"    Anti-Confounded (δ>{args.diff_threshold}): {f3.sum()}")
+        print(f"    OLS β_DCT > 0 (sign): {f4.sum()}")
+        print(f"    Combined: {panel_mask.sum()}")
     
     if args.require_specific:
         panel_mask = panel_mask & is_specific
@@ -544,7 +683,8 @@ def main():
     cols_order = ["gene", "beta_dct", "t_stat", "p_value", "q_BH",
                   "partial_r2", "dct_top3", "bootstrap_freq",
                   "pearson_r_vst_dct", "pearson_r_dct_resid",
-                  "sign_consistent", "anti_confounded",
+                  "marginal_q_BH",
+                  "delta_confound", "sign_consistent", "anti_confounded",
                   "pearson_r_vst_tal", "pearson_r_vst_cd",
                   "pearson_p_vst_dct", "sign_flip"]
     # Only include columns that exist
@@ -569,16 +709,29 @@ def main():
     print("Summary")
     print(f"{'=' * 60}")
     print(f"  Total genes tested:       {len(gene_names)}")
-    print(f"  Significant (β>0, q<{args.q_threshold}): {sig_pos.sum()}")
-    print(f"  + DCT top-3:              {sig_specific.sum()}")
-    print(f"  + Bootstrap stable:       {panel_mask.sum()}")
+    if fallback_mode:
+        print(f"  Mode:                     FALLBACK (marginal correlation)")
+        print(f"  Reason:                   OLS under-powered ({X.shape[1]} predictors / {X.shape[0]} samples)")
+        print(f"  Marginal sig (r>0, q<{args.q_threshold}): {f1.sum()}")
+        print(f"  + Anti-confounded:        {(f1 & f3).sum()}")
+        print(f"  + Bootstrap stable:       {(f1 & f3 & f2).sum()}")
+        print(f"  + OLS β>0 sign:           {panel_mask.sum()}")
+    else:
+        print(f"  Mode:                     PRIMARY (OLS)")
+        print(f"  Significant (β>0, q<{args.q_threshold}): {sig_pos.sum()}")
+        print(f"  + DCT top-3:              {sig_specific.sum()}")
+        print(f"  + Bootstrap stable:       {panel_mask.sum()}")
     n_flips = results.loc[panel_mask, "sign_flip"].sum()
     print(f"  Sign flips (β>0, r<0):    {n_flips}/{panel_mask.sum()}")
-    print(f"\n  Top 10 DCT markers by β_DCT:")
-    top = results.loc[panel_mask].head(10)
+    print(f"\n  Top 10 DCT markers by {'marginal r' if fallback_mode else 'β_DCT'}:")
+    if fallback_mode:
+        top = results.loc[panel_mask].sort_values("pearson_r_vst_dct", ascending=False).head(10)
+    else:
+        top = results.loc[panel_mask].head(10)
     for _, row in top.iterrows():
         print(f"    {row['gene']:25s}  β={row['beta_dct']:+.4f}  "
-              f"q={row['q_BH']:.2e}  R²={row['partial_r2']:.4f}  "
+              f"q={row['q_BH']:.2e}  r_DCT={row.get('pearson_r_vst_dct', float('nan')):.4f}  "
+              f"δ={row.get('delta_confound', float('nan')):+.4f}  "
               f"boot={row['bootstrap_freq']:.2f}")
 
     print(f"\n[OK] Phase 1.5 complete → {outdir}")

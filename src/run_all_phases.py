@@ -373,13 +373,41 @@ def phase_7(dry_run: bool = False) -> bool:
         "LAR_OLD_FLT_minus_GC",
     ]
 
-    # Ensure ID map exists
+    # Ensure ID map exists — use full expressed gene list (not just network HVGs)
+    # so that pathway genes outside the 2500-gene skeleton are still mappable.
     map_path = REPO_ROOT / "data/processed/resources" / "id_map.tsv"
-    if not map_path.exists():
+    # Rebuild if map is stale (covers fewer genes than what Rtech has)
+    rtech_path = REPO_ROOT / "data/processed/phase1_residuals" / "Rtech.tsv.gz"
+    needs_rebuild = not map_path.exists()
+    if map_path.exists() and rtech_path.exists():
+        # Check if existing map covers all expressed genes
+        existing_lines = sum(1 for _ in open(map_path)) - 1  # subtract header
+        if existing_lines < 5000:  # likely only covers 2500 HVGs
+            log(f"ID map has only {existing_lines} genes — rebuilding with full expressed gene set")
+            needs_rebuild = True
+    if needs_rebuild:
         log("Building Ensembl→Symbol ID map (first run)...")
         networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
+        # Prefer the full Rtech gene list (all expressed genes) over phase2_genes.txt
+        rtech_path = REPO_ROOT / "data/processed/phase1_residuals" / "Rtech.tsv.gz"
         gene_list = Path(networks_dir) / "phase2_genes.txt"
-        if gene_list.exists():
+        if rtech_path.exists():
+            # Extract gene list from Rtech (first column = gene IDs)
+            import gzip, csv
+            full_gene_path = map_path.parent / "all_expressed_genes.txt"
+            full_gene_path.parent.mkdir(parents=True, exist_ok=True)
+            with gzip.open(rtech_path, "rt") as f:
+                reader = csv.reader(f, delimiter="\t")
+                header = next(reader)  # skip header
+                gene_ids = [row[0] for row in reader if row]
+            with open(full_gene_path, "w") as f:
+                f.write("\n".join(gene_ids) + "\n")
+            log(f"Extracted {len(gene_ids)} genes from Rtech for ID map")
+            run_python("src.data.build_id_map", [
+                f"--genes={full_gene_path}",
+                f"--outdir={map_path.parent}",
+            ], dry_run=dry_run)
+        elif gene_list.exists():
             run_python("src.data.build_id_map", [
                 f"--genes={gene_list}",
                 f"--outdir={map_path.parent}",
@@ -393,6 +421,16 @@ def phase_7(dry_run: bool = False) -> bool:
     else:
         log("ID map not available; gene set enrichment may show 0 overlap", "WARN")
 
+    # Find a gene-level DE file to expand the enrichment universe
+    de_dir = REPO_ROOT / "data/processed/gene_level_DE"
+    gene_de_args = []
+    if de_dir.exists():
+        de_files = sorted(de_dir.glob("*_gene_DE.tsv"))
+        if de_files:
+            # Use the first DE file (all have the same gene universe)
+            gene_de_args = [f"--gene_de={de_files[0]}"]
+            log(f"Expanding enrichment universe with {de_files[0].name}")
+
     for contrast in contrasts:
         rewiring_file = Path(results_dir) / f"phase3_rewiring/{contrast}_rewiring_agg.tsv"
         if not rewiring_file.exists():
@@ -401,7 +439,8 @@ def phase_7(dry_run: bool = False) -> bool:
 
         outdir = Path(results_dir) / f"phase7_grounding/{contrast}"
         if not run_python("src.enrichment.biological_grounding",
-                          [f"--rewiring={rewiring_file}", f"--outdir={outdir}"] + map_args,
+                          [f"--rewiring={rewiring_file}", f"--outdir={outdir}"]
+                          + map_args + gene_de_args,
                           dry_run=dry_run):
             log(f"Warning: enrichment failed for {contrast}", "WARN")
 

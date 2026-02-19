@@ -1,0 +1,8 @@
+gene_set	set_size_in_universe	hits_in_top_decile	odds_ratio	p	hit_symbols	q_BH
+ECM_remodeling	6	2	28.143145161290324	0.004411681293464653	Col3a1; Fn1	0.030881769054252575
+DCT_NCC_WNK_axis	9	0	0.0	1.0		1.0
+Oxidative_stress	8	0	0.0	1.0		1.0
+Lipid_metabolism	7	0	0.0	1.0		1.0
+Calcium_handling	6	0	0.0	1.0		1.0
+Inflammation	4	0	0.0	1.0		1.0
+Apoptosis	6	0	0.0	1.0		1.0
