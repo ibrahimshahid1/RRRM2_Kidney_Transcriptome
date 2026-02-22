@@ -88,7 +88,7 @@ def main():
                     help="Filename of LIONESS z-scores matrix (N x E)")
     ap.add_argument("--outdir", 
                     default=str(REPO_ROOT / "data/results/phase6_uncertainty"),
-                    help="Outpußt directory")
+                    help="Output directory")
     ap.add_argument("--K_perm", type=int, default=2000,
                     help="Number of permutations")
     ap.add_argument("--B_boot", type=int, default=2000,
@@ -97,7 +97,14 @@ def main():
                     help="Random seed")
     ap.add_argument("--covariates", default="",
                     help="Optional: comma-separated covariates to regress out from Z")
+    ap.add_argument("--pool-controls", action="store_true",
+                    help="Pool GC+VIV+BSL as ground reference (increases control n from 5 to 15)")
+    ap.add_argument("--candidate-genes", default="",
+                    help="Path to a text file with pre-registered gene IDs (one per line). "
+                         "If provided, BH correction is applied only to these genes, "
+                         "drastically reducing the multiple-testing burden.")
     args = ap.parse_args()
+    pool = args.pool_controls
 
     rng = np.random.default_rng(args.seed)
 
@@ -112,6 +119,21 @@ def main():
     genes = [g.strip() for g in genes_path.read_text().splitlines() if g.strip()]
     G = len(genes)
     print(f"Loaded {G} genes")
+
+    # Load candidate gene set for focused BH correction
+    candidate_mask = None
+    if args.candidate_genes and Path(args.candidate_genes).exists():
+        cand_ids = set()
+        with open(args.candidate_genes) as f:
+            for line in f:
+                g = line.strip()
+                if g and not g.startswith("#"):
+                    cand_ids.add(g)
+        candidate_mask = np.array([g in cand_ids for g in genes], dtype=bool)
+        n_cand = candidate_mask.sum()
+        print(f"\n[FOCUSED MODE] {len(cand_ids)} candidate IDs loaded, "
+              f"{n_cand} found in network ({G} total)")
+        print(f"  BH correction on {n_cand} genes instead of {G}")
 
     edge_i = np.load(phase2 / "edge_i.npy")
     edge_j = np.load(phase2 / "edge_j.npy")
@@ -159,45 +181,51 @@ def main():
         Z = Z - X @ B
         print(f"[OK] Residualized Z on covariates: {covs} (P={X.shape[1]})")
 
-    # Define the four contrasts (within each Age×Arm, compare FLT vs GC)
+    # Define the four contrasts (within each Age×Arm, compare FLT vs controls)
+    ctrl_groups = ["FLT", "GC", "VIV", "BSL"] if pool else ["FLT", "GC"]
+    ctrl_tag = "GND" if pool else "GC"
     contrasts = [
-        ("ISS_T_YNG_FLT_minus_GC", {"Age": "YNG", "Arm": "ISS-T"}),
-        ("ISS_T_OLD_FLT_minus_GC", {"Age": "OLD", "Arm": "ISS-T"}),
-        ("LAR_YNG_FLT_minus_GC",   {"Age": "YNG", "Arm": "LAR"}),
-        ("LAR_OLD_FLT_minus_GC",   {"Age": "OLD", "Arm": "LAR"}),
+        (f"ISS_T_YNG_FLT_minus_{ctrl_tag}", {"Age": "YNG", "Arm": "ISS-T"}),
+        (f"ISS_T_OLD_FLT_minus_{ctrl_tag}", {"Age": "OLD", "Arm": "ISS-T"}),
+        (f"LAR_YNG_FLT_minus_{ctrl_tag}",   {"Age": "YNG", "Arm": "LAR"}),
+        (f"LAR_OLD_FLT_minus_{ctrl_tag}",   {"Age": "OLD", "Arm": "LAR"}),
     ]
+
+    if pool:
+        print(f"\n[POOL MODE] Using all non-flight groups as controls: {ctrl_groups}")
 
     for cname, filt in contrasts:
         print(f"\n--- Processing contrast: {cname} ---")
-        mask = (meta["Age"] == filt["Age"]) & (meta["Arm"] == filt["Arm"]) & (meta["EnvGroup"].isin(["FLT", "GC"]))
+        mask = (meta["Age"] == filt["Age"]) & (meta["Arm"] == filt["Arm"]) & (meta["EnvGroup"].isin(ctrl_groups))
         sub_idx = np.where(mask.values)[0]
         sub = meta.iloc[sub_idx].copy()
         zsub = Z[sub_idx, :]  # n x E
 
         flt_idx = np.where(sub["EnvGroup"].values == "FLT")[0]
-        gc_idx = np.where(sub["EnvGroup"].values == "GC")[0]
+        ctrl_idx = np.where(sub["EnvGroup"].values != "FLT")[0]
         
-        if len(flt_idx) < 2 or len(gc_idx) < 2:
-            print(f"  [SKIP] Not enough samples (FLT={len(flt_idx)} GC={len(gc_idx)})")
+        if len(flt_idx) < 2 or len(ctrl_idx) < 2:
+            print(f"  [SKIP] Not enough samples (FLT={len(flt_idx)} CTRL={len(ctrl_idx)})")
             continue
 
-        print(f"  Samples: {len(sub)} total (FLT={len(flt_idx)}, GC={len(gc_idx)})")
+        print(f"  Samples: {len(sub)} total (FLT={len(flt_idx)}, CTRL={len(ctrl_idx)})")
 
         # Observed delta per edge (mean difference)
-        delta_obs = zsub[flt_idx].mean(axis=0) - zsub[gc_idx].mean(axis=0)
+        delta_obs = zsub[flt_idx].mean(axis=0) - zsub[ctrl_idx].mean(axis=0)
         rew_obs = node_rewiring_abs(delta_obs, edge_i, edge_j, G)
 
-        # Permutation null
+        # Permutation null: shuffle FLT vs non-FLT labels
         print(f"  Running {args.K_perm} permutations...")
-        labels = sub["EnvGroup"].values.copy()
+        # Create binary labels: "FLT" vs "CTRL"
+        is_flt = (sub["EnvGroup"].values == "FLT")
         null = np.zeros((args.K_perm, G), dtype=np.float32)
 
         for k in range(args.K_perm):
-            perm = labels.copy()
+            perm = is_flt.copy()
             rng.shuffle(perm)
-            p_flt = np.where(perm == "FLT")[0]
-            p_gc = np.where(perm == "GC")[0]
-            d = zsub[p_flt].mean(axis=0) - zsub[p_gc].mean(axis=0)
+            p_flt = np.where(perm)[0]
+            p_ctrl = np.where(~perm)[0]
+            d = zsub[p_flt].mean(axis=0) - zsub[p_ctrl].mean(axis=0)
             null[k] = node_rewiring_abs(d, edge_i, edge_j, G).astype(np.float32)
 
         # One-sided p-value: P(null >= obs)
@@ -209,10 +237,25 @@ def main():
             "rewiring_abs_obs": rew_obs,
             "p_perm": pvals,
             "q_BH": qvals,
-        }).sort_values("p_perm").reset_index(drop=True)
+        })
+
+        # If candidate genes specified, add focused q-values
+        if candidate_mask is not None:
+            cand_pvals = pvals[candidate_mask]
+            cand_qvals = bh_fdr(cand_pvals)
+            # Map focused q-values back to full array
+            q_focused = np.ones(G, dtype=np.float64)
+            q_focused[candidate_mask] = cand_qvals
+            perm_out["q_BH_focused"] = q_focused
+            n_sig_focused = (cand_qvals < 0.05).sum()
+            print(f"  Focused BH: {n_sig_focused} candidate genes q<0.05 "
+                  f"(of {candidate_mask.sum()} tested)")
+
+        perm_out = perm_out.sort_values("p_perm").reset_index(drop=True)
         perm_path = outdir / f"{cname}_perm_pvals.tsv"
         perm_out.to_csv(perm_path, sep="\t", index=False)
-        print(f"  Wrote {perm_path}")
+        n_sig = (qvals < 0.05).sum()
+        print(f"  Wrote {perm_path} ({n_sig} genes q<0.05)")
 
         # Bootstrap CI (percentile)
         print(f"  Running {args.B_boot} bootstrap resamples...")
@@ -220,8 +263,8 @@ def main():
 
         for b in range(args.B_boot):
             b_flt = rng.choice(flt_idx, size=len(flt_idx), replace=True)
-            b_gc = rng.choice(gc_idx, size=len(gc_idx), replace=True)
-            d = zsub[b_flt].mean(axis=0) - zsub[b_gc].mean(axis=0)
+            b_ctrl = rng.choice(ctrl_idx, size=len(ctrl_idx), replace=True)
+            d = zsub[b_flt].mean(axis=0) - zsub[b_ctrl].mean(axis=0)
             boot[b] = node_rewiring_abs(d, edge_i, edge_j, G).astype(np.float32)
 
         lo = np.quantile(boot, 0.025, axis=0)

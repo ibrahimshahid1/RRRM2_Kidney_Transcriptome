@@ -73,19 +73,26 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Required Phase 3.3 agg outputs
+    # Auto-detect control suffix: prefer GND (pooled), fallback to GC
+    def find_file(prefix):
+        for suffix in ["GND", "GC"]:
+            p = in_dir / f"{prefix}_FLT_minus_{suffix}_rewiring_agg.tsv"
+            if p.exists():
+                return p
+        raise FileNotFoundError(
+            f"Missing rewiring file for {prefix}: tried GND and GC in {in_dir}"
+        )
+
     files = {
-        "ISS_YNG": in_dir / "ISS_T_YNG_FLT_minus_GC_rewiring_agg.tsv",
-        "ISS_OLD": in_dir / "ISS_T_OLD_FLT_minus_GC_rewiring_agg.tsv",
-        "LAR_YNG": in_dir / "LAR_YNG_FLT_minus_GC_rewiring_agg.tsv",
-        "LAR_OLD": in_dir / "LAR_OLD_FLT_minus_GC_rewiring_agg.tsv",
+        "ISS_YNG": find_file("ISS_T_YNG"),
+        "ISS_OLD": find_file("ISS_T_OLD"),
+        "LAR_YNG": find_file("LAR_YNG"),
+        "LAR_OLD": find_file("LAR_OLD"),
     }
-    
-    for k, p in files.items():
-        if not p.exists():
-            raise FileNotFoundError(f"Missing {k}: {p}")
 
     print(f"Loading rewiring tables from {in_dir}...")
+    for k, p in files.items():
+        print(f"  {k}: {p.name}")
     iss_y = load_rewiring_agg(files["ISS_YNG"])
     iss_o = load_rewiring_agg(files["ISS_OLD"])
     lar_y = load_rewiring_agg(files["LAR_YNG"])

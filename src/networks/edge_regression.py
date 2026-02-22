@@ -67,7 +67,10 @@ def main():
     ap.add_argument("--outdir", default="data/processed/networks/phase2/regression")
     ap.add_argument("--add_covariates", default="LibraryBatch,SeqInstr,ReadDepth,rRNA",
                     help="Comma-separated covariates to include if present")
+    ap.add_argument("--pool-controls", action="store_true",
+                    help="Pool GC+VIV+BSL as ground reference (increases control n from 5 to 15)")
     args = ap.parse_args()
+    pool = args.pool_controls
 
     phase2 = Path(args.phase2_dir)
     outdir = Path(args.outdir)
@@ -248,20 +251,41 @@ def main():
     for age, arm, env in needed_combos:
         term(age, arm, env)  # Will raise if not found
 
+    # Helper: build the "ground" term — either GC alone or (GC+VIV+BSL)/3
+    def gnd(age, arm):
+        if pool:
+            gc  = bt(term(age, arm, 'GC'))
+            viv = bt(term(age, arm, 'VIV'))
+            bsl = bt(term(age, arm, 'BSL'))
+            return f"({gc} + {viv} + {bsl}) / 3"
+        else:
+            return bt(term(age, arm, 'GC'))
+
+    # Suffix for contrast names
+    ctrl_tag = "GND" if pool else "GC"
+    if pool:
+        # Validate VIV+BSL terms also exist
+        for age, arm, env in [("YNG", "ISS-T", "VIV"), ("YNG", "ISS-T", "BSL"),
+                              ("OLD", "ISS-T", "VIV"), ("OLD", "ISS-T", "BSL"),
+                              ("YNG", "LAR", "VIV"),   ("YNG", "LAR", "BSL"),
+                              ("OLD", "LAR", "VIV"),   ("OLD", "LAR", "BSL")]:
+            term(age, arm, env)
+        print(f"  Pool controls: FLT vs (GC+VIV+BSL)/3 — control n tripled")
+
     # Contrast effects (Δz for rewiring) - use backticks for safe R parsing
     contrasts = {
-        "ISS_T_YNG_FLT_minus_GC": f"{bt(term('YNG','ISS-T','FLT'))} - {bt(term('YNG','ISS-T','GC'))}",
-        "ISS_T_OLD_FLT_minus_GC": f"{bt(term('OLD','ISS-T','FLT'))} - {bt(term('OLD','ISS-T','GC'))}",
-        "LAR_YNG_FLT_minus_GC":   f"{bt(term('YNG','LAR','FLT'))} - {bt(term('YNG','LAR','GC'))}",
-        "LAR_OLD_FLT_minus_GC":   f"{bt(term('OLD','LAR','FLT'))} - {bt(term('OLD','LAR','GC'))}",
-        "ISS_T_AgeDep_Flight":    (f"({bt(term('OLD','ISS-T','FLT'))} - {bt(term('OLD','ISS-T','GC'))}) - "
-                                  f"({bt(term('YNG','ISS-T','FLT'))} - {bt(term('YNG','ISS-T','GC'))})"),
-        "LAR_AgeDep_Flight":      (f"({bt(term('OLD','LAR','FLT'))} - {bt(term('OLD','LAR','GC'))}) - "
-                                  f"({bt(term('YNG','LAR','FLT'))} - {bt(term('YNG','LAR','GC'))})"),
-        "ISS_minus_LAR_YNG_Flight": (f"({bt(term('YNG','ISS-T','FLT'))} - {bt(term('YNG','ISS-T','GC'))}) - "
-                                    f"({bt(term('YNG','LAR','FLT'))} - {bt(term('YNG','LAR','GC'))})"),
-        "ISS_minus_LAR_OLD_Flight": (f"({bt(term('OLD','ISS-T','FLT'))} - {bt(term('OLD','ISS-T','GC'))}) - "
-                                    f"({bt(term('OLD','LAR','FLT'))} - {bt(term('OLD','LAR','GC'))})"),
+        f"ISS_T_YNG_FLT_minus_{ctrl_tag}": f"{bt(term('YNG','ISS-T','FLT'))} - {gnd('YNG','ISS-T')}",
+        f"ISS_T_OLD_FLT_minus_{ctrl_tag}": f"{bt(term('OLD','ISS-T','FLT'))} - {gnd('OLD','ISS-T')}",
+        f"LAR_YNG_FLT_minus_{ctrl_tag}":   f"{bt(term('YNG','LAR','FLT'))} - {gnd('YNG','LAR')}",
+        f"LAR_OLD_FLT_minus_{ctrl_tag}":   f"{bt(term('OLD','LAR','FLT'))} - {gnd('OLD','LAR')}",
+        f"ISS_T_AgeDep_Flight":    (f"({bt(term('OLD','ISS-T','FLT'))} - {gnd('OLD','ISS-T')}) - "
+                                   f"({bt(term('YNG','ISS-T','FLT'))} - {gnd('YNG','ISS-T')})"),
+        f"LAR_AgeDep_Flight":      (f"({bt(term('OLD','LAR','FLT'))} - {gnd('OLD','LAR')}) - "
+                                   f"({bt(term('YNG','LAR','FLT'))} - {gnd('YNG','LAR')})"),
+        f"ISS_minus_LAR_YNG_Flight": (f"({bt(term('YNG','ISS-T','FLT'))} - {gnd('YNG','ISS-T')}) - "
+                                     f"({bt(term('YNG','LAR','FLT'))} - {gnd('YNG','LAR')})"),
+        f"ISS_minus_LAR_OLD_Flight": (f"({bt(term('OLD','ISS-T','FLT'))} - {gnd('OLD','ISS-T')}) - "
+                                     f"({bt(term('OLD','LAR','FLT'))} - {gnd('OLD','LAR')})"),
     }
 
     # Predicted condition-specific networks (z_hat per cell) - will extract from coefficients
@@ -323,6 +347,30 @@ def main():
         z_hat = coef_matrix[:, coef_idx].astype(np.float32)
         np.save(outdir / f"{name}_z_hat.npy", z_hat)
         print(f"  {name}: z_hat saved ({z_hat.min():.3f} to {z_hat.max():.3f})")
+
+    # If pooling controls, also create averaged GND predicted networks
+    if pool:
+        print("\nCreating pooled ground (GND) predicted networks...")
+        for age_lbl, arm_lbl, arm_tag in [
+            ("YNG", "ISS-T", "ISS_T"), ("OLD", "ISS-T", "ISS_T"),
+            ("YNG", "LAR", "LAR"),     ("OLD", "LAR", "LAR"),
+        ]:
+            gc_term  = term(age_lbl, arm_lbl, "GC")
+            viv_term = term(age_lbl, arm_lbl, "VIV")
+            bsl_term = term(age_lbl, arm_lbl, "BSL")
+            
+            gc_idx  = coef_names.index(gc_term)  if gc_term  in coef_names else None
+            viv_idx = coef_names.index(viv_term) if viv_term in coef_names else None
+            bsl_idx = coef_names.index(bsl_term) if bsl_term in coef_names else None
+            
+            if gc_idx is not None and viv_idx is not None and bsl_idx is not None:
+                z_gnd = ((coef_matrix[:, gc_idx] + coef_matrix[:, viv_idx] + 
+                          coef_matrix[:, bsl_idx]) / 3.0).astype(np.float32)
+                name = f"Pred_{age_lbl}_{arm_tag}_GND"
+                np.save(outdir / f"{name}_z_hat.npy", z_gnd)
+                print(f"  {name}: z_hat saved ({z_gnd.min():.3f} to {z_gnd.max():.3f})")
+            else:
+                print(f"  WARNING: missing coefficient for {age_lbl}/{arm_lbl} GND average")
 
     # Copy edge index for downstream graph building
     edge_index = pd.read_csv(phase2 / "edge_index.tsv", sep="\t")

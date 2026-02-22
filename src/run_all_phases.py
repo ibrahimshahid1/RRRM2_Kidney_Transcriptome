@@ -136,7 +136,8 @@ def phase_0(dry_run: bool = False, skip_r: bool = False) -> bool:
                        args=[f"--outdir={deconv_dir}"], dry_run=dry_run)
 
 
-def phase_1(dry_run: bool = False, skip_r: bool = False) -> bool:
+def phase_1(dry_run: bool = False, skip_r: bool = False,
+            preserve_dct: bool = False) -> bool:
     """Phase 1: VST + Residualization (R)"""
     log("PHASE 1: VST Normalization + Residualization")
     
@@ -145,9 +146,23 @@ def phase_1(dry_run: bool = False, skip_r: bool = False) -> bool:
         return True
     
     # Pass CLR path from the versioned deconvolution directory
+    # Fall back to latest/ or root deconvolution/ if run-specific dir doesn't exist
+    clr_filename = "music_segment_direct_proportions_CLR.csv"
     deconv_dir = os.environ.get("RRRM_DECONV_DIR",
                                 str(REPO_ROOT / "data/processed/deconvolution/latest"))
-    clr_path = Path(deconv_dir) / "music_segment_direct_proportions_CLR.csv"
+    clr_path = Path(deconv_dir) / clr_filename
+    if not clr_path.exists():
+        # Try latest symlink
+        fallback1 = REPO_ROOT / "data/processed/deconvolution/latest" / clr_filename
+        fallback2 = REPO_ROOT / "data/processed/deconvolution" / clr_filename
+        if fallback1.exists():
+            clr_path = fallback1
+            log(f"CLR not found in run dir, using: {clr_path}")
+        elif fallback2.exists():
+            clr_path = fallback2
+            log(f"CLR not found in run dir, using: {clr_path}")
+        else:
+            log(f"CLR file not found at {clr_path} or fallback locations", "ERROR")
     resid_args = [f"--clr={clr_path}"]
 
     # Check for DCT marker panel to force-include
@@ -155,6 +170,10 @@ def phase_1(dry_run: bool = False, skip_r: bool = False) -> bool:
     if dct_panel_path.exists():
         resid_args.append(f"--force_keep={dct_panel_path}")
         log(f"Passing DCT marker panel to residualization: {dct_panel_path}")
+
+    if preserve_dct:
+        resid_args.append("--preserve_dct")
+        log("Preserving DCT proportions (NOT regressing out)")
     
     success = run_rscript("src/preprocessing/residualization.R", args=resid_args, dry_run=dry_run)
     if not success:
@@ -193,7 +212,8 @@ def phase_1_5(dry_run: bool = False) -> bool:
 
 
 def phase_2(dry_run: bool = False, skip_r: bool = False,
-            max_genes: int = 2500, topk: int = 80) -> bool:
+            max_genes: int = 2500, topk: int = 80,
+            pool_controls: bool = False) -> bool:
     """Phase 2: Network Construction"""
     log("PHASE 2: Network Skeleton + LIONESS + Edge Regression")
 
@@ -226,16 +246,19 @@ def phase_2(dry_run: bool = False, skip_r: bool = False,
     if skip_r:
         log("Skipping R-dependent edge regression", "WARN")
     else:
-        if not run_python("src.networks.edge_regression",
-                          [f"--phase2_dir={networks_dir}",
-                           f"--outdir={networks_dir}/regression"],
-                          dry_run=dry_run):
+        reg_args = [f"--phase2_dir={networks_dir}",
+                    f"--outdir={networks_dir}/regression"]
+        if pool_controls:
+            reg_args.append("--pool-controls")
+            log("Edge regression: pooling GC+VIV+BSL as ground controls")
+        if not run_python("src.networks.edge_regression", reg_args, dry_run=dry_run):
             return False
 
     return True
 
 
-def phase_3(dry_run: bool = False, num_seeds: int = 10) -> bool:
+def phase_3(dry_run: bool = False, num_seeds: int = 10,
+            pool_controls: bool = False) -> bool:
     """Phase 3: Embeddings + Procrustes"""
     log("PHASE 3: Node2Vec Embeddings + Procrustes Alignment")
 
@@ -244,11 +267,18 @@ def phase_3(dry_run: bool = False, num_seeds: int = 10) -> bool:
     results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
 
     # Step 3.2: Node2Vec embeddings
+    # Include GND patterns if pooling controls
+    emb_patterns = "Pred_*_FLT_z_hat.npy,Pred_*_GC_z_hat.npy"
+    if pool_controls:
+        emb_patterns = "Pred_*_FLT_z_hat.npy,Pred_*_GND_z_hat.npy,Pred_*_GC_z_hat.npy"
+        log("Including GND (pooled ground) networks for embedding")
+
     if not run_python("src.networks.embeddings",
                       [f"--phase2_dir={networks_dir}",
                        f"--reg_dir={networks_dir}/regression",
                        f"--outdir={results_dir}/phase3_embeddings",
-                       f"--num_seeds={num_seeds}"],
+                       f"--num_seeds={num_seeds}",
+                       f"--patterns={emb_patterns}"],
                       dry_run=dry_run):
         return False
 
@@ -287,20 +317,15 @@ def phase_5(dry_run: bool = False) -> bool:
     else:
         log("Regression results not found; Silent Shifters will lack statistical support", "WARN")
 
-    # Silent shifters for each contrast
-    contrasts = [
-        "ISS_T_YNG_FLT_minus_GC",
-        "ISS_T_OLD_FLT_minus_GC",
-        "LAR_YNG_FLT_minus_GC",
-        "LAR_OLD_FLT_minus_GC",
-    ]
+    # Auto-detect available contrasts (supports both _GC and _GND suffixes)
+    rewiring_dir = Path(results_dir) / "phase3_rewiring"
+    contrast_files = sorted(rewiring_dir.glob("*_FLT_minus_*_rewiring_agg.tsv"))
+    if not contrast_files:
+        log("No rewiring agg files found for silent shifter analysis", "WARN")
+        return True
 
-    for contrast in contrasts:
-        rewiring_file = Path(results_dir) / f"phase3_rewiring/{contrast}_rewiring_agg.tsv"
-        if not rewiring_file.exists():
-            log(f"Skipping {contrast} - rewiring file not found", "WARN")
-            continue
-
+    for rewiring_file in contrast_files:
+        contrast = rewiring_file.stem.replace("_rewiring_agg", "")
         if not run_python("src.statistics.silent_shifters",
                           [f"--rewiring={rewiring_file}",
                            f"--outdir={results_dir}/phase5_silent_shifters_strict"] + reg_args,
@@ -310,7 +335,8 @@ def phase_5(dry_run: bool = False) -> bool:
     return True
 
 
-def phase_6(dry_run: bool = False, skip_r: bool = False) -> bool:
+def phase_6(dry_run: bool = False, skip_r: bool = False,
+            pool_controls: bool = False) -> bool:
     """Phase 6: Uncertainty Estimation + Full Regression"""
     log("PHASE 6: Permutation + Bootstrap + Full Regression")
 
@@ -319,10 +345,12 @@ def phase_6(dry_run: bool = False, skip_r: bool = False) -> bool:
     networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
 
     # Permutation and bootstrap
-    if not run_python("src.statistics.permutation_bootstrap",
-                      [f"--phase2_dir={networks_dir}",
-                       f"--outdir={results_dir}/phase6_uncertainty"],
-                      dry_run=dry_run):
+    perm_args = [f"--phase2_dir={networks_dir}",
+                 f"--outdir={results_dir}/phase6_uncertainty"]
+    if pool_controls:
+        perm_args.append("--pool-controls")
+        log("Permutation test: pooling GC+VIV+BSL as ground controls")
+    if not run_python("src.statistics.permutation_bootstrap", perm_args, dry_run=dry_run):
         return False
 
     # Full factorial regression
@@ -366,12 +394,15 @@ def phase_7(dry_run: bool = False) -> bool:
     # Get versioned output directory from environment
     results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
 
-    contrasts = [
-        "ISS_T_YNG_FLT_minus_GC",
-        "ISS_T_OLD_FLT_minus_GC",
-        "LAR_YNG_FLT_minus_GC",
-        "LAR_OLD_FLT_minus_GC",
-    ]
+    # Auto-detect available contrasts (supports both _GC and _GND suffixes)
+    rewiring_dir = Path(results_dir) / "phase3_rewiring"
+    contrast_files = sorted(rewiring_dir.glob("*_FLT_minus_*_rewiring_agg.tsv"))
+    if not contrast_files:
+        log("No rewiring agg files found for Phase 7", "WARN")
+        return True
+
+    contrasts = [f.stem.replace("_rewiring_agg", "") for f in contrast_files]
+    log(f"Detected contrasts: {contrasts}")
 
     # Ensure ID map exists — use full expressed gene list (not just network HVGs)
     # so that pathway genes outside the 2500-gene skeleton are still mappable.
@@ -475,6 +506,10 @@ Examples:
                         help="Number of embedding seeds (default: 10)")
     parser.add_argument("--run-id", type=str, default=None,
                         help="Run identifier for versioned outputs (default: auto-generated)")
+    parser.add_argument("--pool-controls", action="store_true",
+                        help="Pool GC+VIV+BSL as ground reference (triples control n)")
+    parser.add_argument("--preserve-dct", action="store_true",
+                        help="Do NOT regress out DCT proportions (preserves DCT signal)")
     
     args = parser.parse_args()
     
@@ -508,12 +543,12 @@ Examples:
     
     phases = {
         0: lambda: phase_0(args.dry_run, args.skip_r),
-        1: lambda: phase_1(args.dry_run, args.skip_r),
+        1: lambda: phase_1(args.dry_run, args.skip_r, args.preserve_dct),
         1.5: lambda: phase_1_5(args.dry_run),
-        2: lambda: phase_2(args.dry_run, args.skip_r, args.max_genes, args.topk),
-        3: lambda: phase_3(args.dry_run, args.num_seeds),
+        2: lambda: phase_2(args.dry_run, args.skip_r, args.max_genes, args.topk, args.pool_controls),
+        3: lambda: phase_3(args.dry_run, args.num_seeds, args.pool_controls),
         5: lambda: phase_5(args.dry_run),
-        6: lambda: phase_6(args.dry_run, args.skip_r),
+        6: lambda: phase_6(args.dry_run, args.skip_r, args.pool_controls),
         7: lambda: phase_7(args.dry_run),
         9: lambda: phase_9(args.dry_run),  # Figure generation runs last
     }

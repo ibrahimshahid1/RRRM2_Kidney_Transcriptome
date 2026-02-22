@@ -34,24 +34,26 @@ def cosine_distance_rows(A: np.ndarray, B: np.ndarray, eps: float = 1e-12) -> np
 def pick_phase2_anchors(node_rewiring_dir: Path, genes: list[str], anchor_k: int) -> np.ndarray:
     """
     Anchor recipe:
-      - read the 4 FLT_minus_GC rewiring tables
+      - read available FLT_minus_* rewiring tables
       - compute per gene median rewiring_abs
       - take bottom K genes as anchors (lowest rewiring = most stable)
     """
-    needed = [
-        "ISS_T_YNG_FLT_minus_GC_node_rewiring.tsv",
-        "ISS_T_OLD_FLT_minus_GC_node_rewiring.tsv",
-        "LAR_YNG_FLT_minus_GC_node_rewiring.tsv",
-        "LAR_OLD_FLT_minus_GC_node_rewiring.tsv",
-    ]
+    # Auto-detect: look for _FLT_minus_GND or _FLT_minus_GC node rewiring files
+    candidates_gnd = sorted(node_rewiring_dir.glob("*_FLT_minus_GND_node_rewiring.tsv"))
+    candidates_gc  = sorted(node_rewiring_dir.glob("*_FLT_minus_GC_node_rewiring.tsv"))
+    needed_files = candidates_gnd if candidates_gnd else candidates_gc
+
+    if not needed_files:
+        raise FileNotFoundError(
+            f"No *_FLT_minus_GND_node_rewiring.tsv or *_FLT_minus_GC_node_rewiring.tsv found in {node_rewiring_dir}"
+        )
+
+    print(f"  Anchor selection: using {len(needed_files)} rewiring tables")
 
     dfs = []
-    for fn in needed:
-        p = node_rewiring_dir / fn
-        if not p.exists():
-            raise FileNotFoundError(f"Missing required rewiring table for anchors: {p}")
+    for p in needed_files:
         df = pd.read_csv(p, sep="\t")
-        dfs.append(df[["gene", "rewiring_abs"]].rename(columns={"rewiring_abs": fn}))
+        dfs.append(df[["gene", "rewiring_abs"]].rename(columns={"rewiring_abs": p.name}))
 
     merged = dfs[0]
     for d in dfs[1:]:
@@ -125,13 +127,18 @@ def main():
     (outdir / "anchors.txt").write_text("\n".join([genes[i] for i in anchors.tolist()]) + "\n")
     print(f"Anchors selected: {anchors.size} (saved anchors.txt)")
 
-    # Define the key FLT vs GC comparisons (matches Phase 2 contrasts)
-    # Focus on FLT–GC within each Arm/Age
+    # Define the key FLT vs control comparisons
+    # Auto-detect: prefer GND (pooled controls) if available, else GC
+    gnd_files = sorted(emb_dir.glob("Pred_*_GND"))
+    gc_files  = sorted(emb_dir.glob("Pred_*_GC"))
+    ctrl_tag = "GND" if gnd_files else "GC"
+    print(f"  Control tag: {ctrl_tag} ({'pooled GC+VIV+BSL' if ctrl_tag == 'GND' else 'GC only'})")
+
     pairs = [
-        ("ISS_T_YNG_FLT_minus_GC", "Pred_YNG_ISS_T_FLT", "Pred_YNG_ISS_T_GC"),
-        ("ISS_T_OLD_FLT_minus_GC", "Pred_OLD_ISS_T_FLT", "Pred_OLD_ISS_T_GC"),
-        ("LAR_YNG_FLT_minus_GC",   "Pred_YNG_LAR_FLT",   "Pred_YNG_LAR_GC"),
-        ("LAR_OLD_FLT_minus_GC",   "Pred_OLD_LAR_FLT",   "Pred_OLD_LAR_GC"),
+        (f"ISS_T_YNG_FLT_minus_{ctrl_tag}", "Pred_YNG_ISS_T_FLT", f"Pred_YNG_ISS_T_{ctrl_tag}"),
+        (f"ISS_T_OLD_FLT_minus_{ctrl_tag}", "Pred_OLD_ISS_T_FLT", f"Pred_OLD_ISS_T_{ctrl_tag}"),
+        (f"LAR_YNG_FLT_minus_{ctrl_tag}",   "Pred_YNG_LAR_FLT",   f"Pred_YNG_LAR_{ctrl_tag}"),
+        (f"LAR_OLD_FLT_minus_{ctrl_tag}",   "Pred_OLD_LAR_FLT",   f"Pred_OLD_LAR_{ctrl_tag}"),
     ]
 
     seeds = [args.seed0 + k for k in range(args.num_seeds)]

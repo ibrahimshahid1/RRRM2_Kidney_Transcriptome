@@ -114,11 +114,14 @@ rownames(meta2) <- meta2[["Sample Name (raw_counts_colname)"]]
 args <- commandArgs(trailingOnly = TRUE)
 clr_file <- NULL
 force_keep_file <- NULL
+preserve_dct <- FALSE
 for (.a in args) {
     if (grepl("^--clr=", .a)) {
         clr_file <- sub("^--clr=", "", .a)
     } else if (grepl("^--force_keep=", .a)) {
         force_keep_file <- sub("^--force_keep=", "", .a)
+    } else if (.a == "--preserve_dct") {
+        preserve_dct <- TRUE
     } else if (is.null(force_keep_file) && !grepl("^--", .a)) {
         # Legacy: plain trailing arg is the force-keep file
         force_keep_file <- .a
@@ -138,7 +141,17 @@ clr <- clr[rownames(meta2), , drop = FALSE]
 
 # Drop one CLR column to avoid rank deficiency (choose a stable large compartment, e.g. PT)
 drop_part <- "PT"
-clr_use <- clr[, setdiff(colnames(clr), drop_part), drop = FALSE]
+# Optionally preserve DCT: remove it from covariates so DCT-associated
+# variance remains in the residualized expression
+if (preserve_dct) {
+    # Find DCT-like column names (may be "DCT", "Distal_Convoluted_Tubule", etc.)
+    dct_cols <- grep("^DCT$|^distal|^Distal_Convoluted", colnames(clr), ignore.case = TRUE, value = TRUE)
+    drop_parts <- c(drop_part, dct_cols)
+    cat("PRESERVE DCT: excluding from residualization covariates:", paste(dct_cols, collapse = ", "), "\n")
+} else {
+    drop_parts <- drop_part
+}
+clr_use <- clr[, setdiff(colnames(clr), drop_parts), drop = FALSE]
 
 # 3) Build technical covariates from your metadata
 meta2$LibraryBatch <- factor(meta2[["Parameter Value[Library Batch Number]"]])
