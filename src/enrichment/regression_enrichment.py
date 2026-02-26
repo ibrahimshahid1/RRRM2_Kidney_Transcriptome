@@ -21,38 +21,7 @@ from scipy.stats import fisher_exact
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# Predefined gene sets (symbols)
-GENE_SETS: dict[str, list[str]] = {
-    "DCT_NCC_WNK_axis": [
-        "Slc12a3", "Slc12a1", "Wnk1", "Wnk4", "Klhl3",
-        "Cul3", "Stk39", "Oxsr1", "Scnn1b", "Scnn1g", "Clcnkb",
-    ],
-    "Oxidative_stress": [
-        "Sod1", "Sod2", "Cat", "Gpx1", "Gpx4", "Nfe2l2", "Keap1", "Hmox1",
-    ],
-    "ECM_remodeling": [
-        "Col1a1", "Col3a1", "Col4a1", "Fn1", "Mmp2", "Mmp9", "Timp1", "Lox",
-    ],
-    "Lipid_metabolism": [
-        "Ppara", "Pparg", "Acox1", "Cpt1a", "Fabp1", "Hmgcr", "Srebf1",
-    ],
-    "Calcium_handling": [
-        "Trpv5", "Trpv6", "Calb1", "S100g", "Atp2b1", "Ryr1", "Camk2a",
-    ],
-    "Inflammation": [
-        "Il6", "Tnf", "Ccl2", "Il1b", "Nfkb1", "Tlr4", "Cxcl1",
-    ],
-    "Apoptosis": [
-        "Bax", "Bcl2", "Casp3", "Casp9", "Tp53", "Fas",
-    ],
-    "Ion_transport": [
-        "Slc12a3", "Slc12a1", "Kcnj1", "Kcnma1", "Atp1a1", "Atp1b1",
-        "Slc4a1", "Slc9a3", "Slc22a6",
-    ],
-    "Fibrosis": [
-        "Tgfb1", "Acta2", "Col1a1", "Col3a1", "Vim", "Fn1", "Ctgf",
-    ],
-}
+from src.enrichment.gene_set_loader import load_gene_sets
 
 
 def load_id_map(map_path: Path) -> tuple[dict[str, str], dict[str, set[str]]]:
@@ -86,7 +55,8 @@ def run_enrichment(sig_genes: set[str], universe: set[str],
                    gene_sets: dict[str, list[str]],
                    ens_to_sym: dict[str, str],
                    sym_to_ens: dict[str, set[str]],
-                   is_ensembl: bool) -> pd.DataFrame:
+                   is_ensembl: bool,
+                   set_to_library: dict[str, str] | None = None) -> pd.DataFrame:
     """Fisher's exact test for each gene set."""
     results = []
 
@@ -118,7 +88,9 @@ def run_enrichment(sig_genes: set[str], universe: set[str],
 
         if len(overlap) == 0:
             results.append({
-                "gene_set": gs_name, "overlap": 0, "hits": 0,
+                "gene_set": gs_name,
+                "library": set_to_library.get(gs_name, "") if set_to_library else "",
+                "overlap": 0, "hits": 0,
                 "odds_ratio": 0, "p_fisher": 1.0, "sig_genes_in_set": ""
             })
             continue
@@ -133,6 +105,7 @@ def run_enrichment(sig_genes: set[str], universe: set[str],
 
         results.append({
             "gene_set": gs_name,
+            "library": set_to_library.get(gs_name, "") if set_to_library else "",
             "overlap": len(overlap),
             "hits": a,
             "odds_ratio": round(odds, 2),
@@ -162,6 +135,19 @@ def main():
                     help="TSV: ensembl_gene_id, mgi_symbol")
     ap.add_argument("--q_threshold", type=float, default=0.05,
                     help="FDR threshold for 'significant' genes (default: 0.05)")
+    ap.add_argument("--libraries", default="",
+                    help="Comma-separated Enrichr library names (default: KEGG_2019_Mouse,"
+                         "WikiPathway_2023_Mouse,Reactome_2022,MSigDB_Hallmark_2020)")
+    ap.add_argument("--gmt", default="",
+                    help="Comma-separated paths to .gmt gene set files")
+    ap.add_argument("--min_set_size", type=int, default=5,
+                    help="Minimum gene set size (default: 5)")
+    ap.add_argument("--max_set_size", type=int, default=500,
+                    help="Maximum gene set size (default: 500)")
+    ap.add_argument("--include_curated", action="store_true",
+                    help="Also include legacy curated pre-registered gene sets")
+    ap.add_argument("--curated_only", action="store_true",
+                    help="Use ONLY curated sets (skip database fetch)")
     args = ap.parse_args()
 
     reg_dir = Path(args.reg_dir)
@@ -181,6 +167,24 @@ def main():
         return
 
     print(f"Found {len(reg_files)} regression result files")
+
+    # Load gene sets from database / curated
+    libraries = None
+    if args.curated_only:
+        libraries = []
+    elif args.libraries:
+        libraries = [s.strip() for s in args.libraries.split(",") if s.strip()]
+
+    gmt_files = [s.strip() for s in args.gmt.split(",") if s.strip()] if args.gmt else None
+    include_curated = args.include_curated or args.curated_only
+
+    loaded_sets, set_to_library = load_gene_sets(
+        libraries=libraries,
+        gmt_files=gmt_files,
+        min_size=args.min_set_size,
+        max_size=args.max_set_size,
+        include_curated=include_curated,
+    )
 
     for reg_file in reg_files:
         effect_name = reg_file.stem  # e.g. "gene_flight_effect"
@@ -207,17 +211,26 @@ def main():
 
         is_ensembl = sum(1 for g in universe if g.startswith("ENSMUSG")) / len(universe) > 0.5
 
-        enrich = run_enrichment(sig_genes, universe, GENE_SETS,
-                                ens_to_sym, sym_to_ens, is_ensembl)
+        enrich = run_enrichment(sig_genes, universe, loaded_sets,
+                                ens_to_sym, sym_to_ens, is_ensembl,
+                                set_to_library=set_to_library)
 
         out_path = outdir / f"{effect_name}_enrichment.tsv"
         enrich.to_csv(out_path, sep="\t", index=False)
 
-        # Print results
-        for _, row in enrich.iterrows():
+        # Save significant subset
+        sig = enrich[enrich["q_BH"] < 0.05]
+        if len(sig) > 0:
+            sig_path = outdir / f"{effect_name}_enrichment_significant.tsv"
+            sig.to_csv(sig_path, sep="\t", index=False)
+            print(f"  {len(sig)} significant at FDR < 0.05")
+
+        # Print top results (up to 20)
+        show = enrich.head(20)
+        for _, row in show.iterrows():
             flag = " *" if row["q_BH"] < 0.05 else "  "
             genes_str = f" [{row['sig_genes_in_set']}]" if row["hits"] > 0 else ""
-            print(f"{flag} {row['gene_set']:30s} overlap={row['overlap']:2d}  "
+            print(f"{flag} {row['gene_set']:55s} overlap={row['overlap']:3d}  "
                   f"hits={row['hits']}  OR={row['odds_ratio']:.2f}  "
                   f"q={row['q_BH']:.3f}{genes_str}")
 

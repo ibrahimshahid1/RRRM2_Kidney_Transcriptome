@@ -28,6 +28,8 @@ import pandas as pd
 # Repository root (2 levels up from src/enrichment/)
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+from src.enrichment.gene_set_loader import load_gene_sets
+
 
 def fisher_exact(a, b, c, d):
     """Fisher's exact test with scipy fallback."""
@@ -74,6 +76,20 @@ def main():
                     help="Path to gene-level DE TSV (e.g. from Phase 6 regression). "
                          "If provided, expands the gene universe beyond network genes "
                          "to include all expressed genes for enrichment testing.")
+    ap.add_argument("--libraries", default="",
+                    help="Comma-separated Enrichr library names to fetch gene sets from. "
+                         "Default: KEGG_2019_Mouse,WikiPathway_2023_Mouse,"
+                         "Reactome_2022,MSigDB_Hallmark_2020")
+    ap.add_argument("--gmt", default="",
+                    help="Comma-separated paths to .gmt gene set files")
+    ap.add_argument("--min_set_size", type=int, default=5,
+                    help="Minimum gene set size to include (default: 5)")
+    ap.add_argument("--max_set_size", type=int, default=500,
+                    help="Maximum gene set size to include (default: 500)")
+    ap.add_argument("--include_curated", action="store_true",
+                    help="Also include legacy curated pre-registered gene sets")
+    ap.add_argument("--curated_only", action="store_true",
+                    help="Use ONLY curated sets (skip database fetch)")
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
@@ -170,45 +186,36 @@ def main():
     high = set(rw.loc[rw["rewiring_mean"] >= thr, "gene"].astype(str))
     print(f"High rewiring threshold (q={args.top_quantile}): {thr:.4f} ({len(high)} genes)")
 
-    # Pre-registered gene sets — using MOUSE symbol style
-    # (case-insensitive matching handles WNK1 vs Wnk1 vs wnk1)
-    prereg = {
-        "DCT_NCC_WNK_axis": [
-            "Wnk1", "Wnk4", "Stk39", "Slc12a3", "Kcnj10", "Kcnj16", 
-            "Scnn1a", "Scnn1b", "Scnn1g"
-        ],
-        "Oxidative_stress": [
-            "Nfe2l2", "Sod1", "Sod2", "Cat", "Gpx1", "Prdx1", "Prdx2", "Hmox1"
-        ],
-        "ECM_remodeling": [
-            "Col1a1", "Col1a2", "Col3a1", "Fn1", "Mmp2", "Mmp9", "Timp1", "Sparc"
-        ],
-        "Lipid_metabolism": [
-            "Ppara", "Pparg", "Srebf1", "Srebf2", "Acaca", "Fasn", "Cpt1a"
-        ],
-        "Calcium_handling": [
-            "Atp2b1", "Atp2b4", "Itpr1", "Itpr2", "Ryr1", "Ryr2", "Camk2a", "Camk2d"
-        ],
-        "Inflammation": [
-            "Il6", "Tnf", "Il1b", "Ccl2", "Nfkb1", "Nfkb2", "Rela"
-        ],
-        "Apoptosis": [
-            "Bcl2", "Bax", "Casp3", "Casp9", "Trp53", "Cycs"
-        ],
-    }
+    # ── Load gene sets from database / curated ──────────────────────────
+    libraries = None  # use defaults
+    if args.curated_only:
+        libraries = []  # skip Enrichr
+    elif args.libraries:
+        libraries = [s.strip() for s in args.libraries.split(",") if s.strip()]
+
+    gmt_files = [s.strip() for s in args.gmt.split(",") if s.strip()] if args.gmt else None
+    include_curated = args.include_curated or args.curated_only
+
+    loaded_sets, set_to_library = load_gene_sets(
+        libraries=libraries,
+        gmt_files=gmt_files,
+        min_size=args.min_set_size,
+        max_size=args.max_set_size,
+        include_curated=include_curated,
+    )
 
     gene_universe = set(genes) | extra_universe_genes
     results = []
+    total_unresolved = 0
 
-    # Resolve gene sets to universe IDs
-    for setname, symbols in prereg.items():
+    # Resolve gene sets to universe IDs and run Fisher's exact test
+    for setname, symbols in loaded_sets.items():
         set_genes = set()
         unresolved = []
 
         for s in symbols:
             s_lower = s.lower()
             if sym_to_ens and is_ensembl:
-                # Look up symbol → Ensembl IDs, intersect with universe
                 ens_ids = sym_to_ens.get(s_lower, set())
                 matched = ens_ids & gene_universe
                 if matched:
@@ -216,7 +223,6 @@ def main():
                 else:
                     unresolved.append(s)
             else:
-                # Direct symbol matching (case-insensitive)
                 for g in gene_universe:
                     if g.lower() == s_lower:
                         set_genes.add(g)
@@ -224,32 +230,35 @@ def main():
                 else:
                     unresolved.append(s)
 
-        if unresolved:
-            print(f"  {setname}: {len(unresolved)} symbols not in universe "
-                  f"({', '.join(unresolved[:5])}{'...' if len(unresolved) > 5 else ''})")
+        total_unresolved += len(unresolved)
 
-        A = len(high & set_genes)         # high & in set
-        B = len(high - set_genes)         # high & not in set
+        A = len(high & set_genes)
+        B = len(high - set_genes)
         C = len((gene_universe - high) & set_genes)
         D = len((gene_universe - high) - set_genes)
         OR, p = fisher_exact(A, B, C, D)
 
-        # Include matched symbol names for readability
-        matched_syms = []
-        for g in (high & set_genes):
-            matched_syms.append(ens_to_sym.get(g, g))
+        matched_syms = sorted(ens_to_sym.get(g, g) for g in (high & set_genes))
 
-        results.append([setname, len(set_genes), A, OR, p,
-                        "; ".join(sorted(matched_syms)) if matched_syms else ""])
+        results.append({
+            "gene_set": setname,
+            "library": set_to_library.get(setname, "unknown"),
+            "set_size_in_universe": len(set_genes),
+            "hits_in_top_decile": A,
+            "odds_ratio": round(OR, 4),
+            "p": p,
+            "hit_symbols": "; ".join(matched_syms) if matched_syms else "",
+        })
 
-    res = pd.DataFrame(results, columns=[
-        "gene_set", "set_size_in_universe", "hits_in_top_decile",
-        "odds_ratio", "p", "hit_symbols"
-    ])
+    if total_unresolved:
+        print(f"\nNote: {total_unresolved} total symbol→ID lookups unresolved "
+              f"across {len(loaded_sets)} gene sets")
+
+    res = pd.DataFrame(results)
     res["q_BH"] = bh_fdr(res["p"].fillna(1.0).values)
     res = res.sort_values("p").reset_index(drop=True)
-    
-    # Hard-fail if ALL gene sets have 0 overlap (ID mismatch)
+
+    # Warn if ALL gene sets have 0 overlap (ID mismatch)
     total_overlap = res["set_size_in_universe"].sum()
     if total_overlap == 0:
         msg = ("ERROR: All gene sets have 0 overlap with the gene universe. "
@@ -261,17 +270,28 @@ def main():
         print(msg)
         raise RuntimeError(msg)
 
+    # Save full results
     enrich_path = outdir / "gene_set_enrichment.tsv"
     res.to_csv(enrich_path, sep="\t", index=False)
-    print(f"Wrote {enrich_path}")
-    print(f"\nResults:")
-    for _, row in res.iterrows():
+    print(f"\nWrote {enrich_path} ({len(res)} gene sets tested)")
+
+    # Save significant subset
+    sig = res[res["q_BH"] < 0.05]
+    if len(sig) > 0:
+        sig_path = outdir / "gene_set_enrichment_significant.tsv"
+        sig.to_csv(sig_path, sep="\t", index=False)
+        print(f"Wrote {sig_path} ({len(sig)} significant at FDR < 0.05)")
+
+    # Print top results (up to 30)
+    show = res.head(30)
+    print(f"\nTop results ({len(show)} of {len(res)}):")
+    for _, row in show.iterrows():
         marker = "*" if row["q_BH"] < 0.05 else " "
-        print(f"  {marker} {row['gene_set']:25s}  "
-              f"overlap={row['set_size_in_universe']:2d}  "
+        print(f"  {marker} {row['gene_set']:55s}  "
+              f"overlap={row['set_size_in_universe']:3d}  "
               f"hits={row['hits_in_top_decile']}  "
               f"OR={row['odds_ratio']:.2f}  "
-              f"q={row['q_BH']:.3f}")
+              f"q={row['q_BH']:.4f}")
 
     # Optional: embedding module clustering
     if args.embed and Path(args.embed).exists():
