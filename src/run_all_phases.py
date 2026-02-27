@@ -232,7 +232,9 @@ def phase_2(dry_run: bool = False, skip_r: bool = False,
 
     if not run_python("src.networks.shared_topology",
                       [f"--max_genes={max_genes}", f"--topk={topk}",
-                       f"--outdir={networks_dir}"] + force_args,
+                       f"--outdir={networks_dir}",
+                       f"--id_map=data/processed/resources/id_map.tsv",
+                       f"--biotype_filter=protein_coding"] + force_args,
                       dry_run=dry_run):
         return False
 

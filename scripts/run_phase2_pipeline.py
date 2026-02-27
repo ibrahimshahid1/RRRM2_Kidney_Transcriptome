@@ -62,6 +62,14 @@ Examples:
     ap.add_argument("--topk", type=int, default=80)
     ap.add_argument("--cell_cols", default="Age,Arm,EnvGroup")
     
+    # Biotype filter params (passed through to build_phase2_skeleton.py)
+    ap.add_argument("--id_map", default="data/processed/resources/id_map.tsv",
+                    help="Path to id_map.tsv with biotype annotations")
+    ap.add_argument("--biotype_filter", default="protein_coding",
+                    help="Allowed biotypes (comma-sep). 'none' to disable.")
+    ap.add_argument("--no_noise_symbol_filter", action="store_true",
+                    help="Disable Gm-prefix / Rik / unmapped symbol filter")
+    
     # Regression params
     ap.add_argument("--add_covariates", default="LibraryBatch,SeqInstr,ReadDepth,rRNA")
     
@@ -94,7 +102,11 @@ Examples:
         "--max_genes", str(args.max_genes),
         "--topk", str(args.topk),
         "--cell_cols", args.cell_cols,
+        "--id_map", args.id_map,
+        "--biotype_filter", args.biotype_filter,
     ]
+    if args.no_noise_symbol_filter:
+        cmd.append("--no_noise_symbol_filter")
     if not run_step("Build Skeleton E (Step 2.1-2.3)", cmd, skip=args.skip_skeleton):
         print("\n[PIPELINE FAILED] Skeleton building failed")
         return 1

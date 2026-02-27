@@ -10,10 +10,16 @@ The skeleton E is fixed for all downstream sample-specific weighting.
 
 Usage:
     python scripts/build_phase2_skeleton.py --max_genes 2500 --topk 80
+
+With biotype filtering (recommended):
+    python scripts/build_phase2_skeleton.py --max_genes 2500 --topk 80 \\
+        --id_map data/processed/resources/id_map.tsv \\
+        --biotype_filter protein_coding
 """
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -30,17 +36,101 @@ def load_meta(path: str) -> pd.DataFrame:
     return pd.read_csv(path, sep="\t", compression="gzip")
 
 
-def pick_genes(rtech: pd.DataFrame, max_genes: int,
-               force_include: list[str] | None = None) -> list[str]:
-    """Select top genes by variance, with optional force-included genes.
+def load_biotype_map(id_map_path: str) -> pd.DataFrame:
+    """Load Ensembl biotype annotations from id_map.tsv.
 
-    Force-included genes get priority slots; HVGs fill remaining slots
-    so the total never exceeds max_genes.
+    Returns DataFrame with columns: ensembl_gene_id, mgi_symbol, biotype
+    """
+    df = pd.read_csv(id_map_path, sep="\t", comment="#")
+    cols = ["ensembl_gene_id", "mgi_symbol", "biotype"]
+    for c in cols:
+        if c not in df.columns:
+            raise ValueError(f"id_map.tsv missing required column: {c}")
+    return df[cols].copy()
+
+
+# Regex patterns for noise genes to exclude regardless of biotype
+_NOISE_SYMBOL_PATTERNS = [
+    re.compile(r"^Gm\d+$"),          # predicted genes (Gm12345)
+    re.compile(r"^Rik$|Rik\d*$"),    # RIKEN cDNA clones
+    re.compile(r"^\d+-[A-Z]"),       # numeric-prefix BAC clones
+]
+
+
+def _is_noise_symbol(symbol: str) -> bool:
+    """Check if a gene symbol matches known noise patterns."""
+    if not isinstance(symbol, str) or not symbol:
+        return True  # unmapped genes are noise
+    return any(p.search(symbol) for p in _NOISE_SYMBOL_PATTERNS)
+
+
+def pick_genes(
+    rtech: pd.DataFrame,
+    max_genes: int,
+    force_include: list[str] | None = None,
+    biotype_map: pd.DataFrame | None = None,
+    allowed_biotypes: list[str] | None = None,
+    exclude_noise_symbols: bool = True,
+) -> list[str]:
+    """Select top genes by variance, with biotype filtering and force-include.
+
+    Pipeline:
+        1. Drop ERCC spike-ins
+        2. (Optional) Filter to allowed biotypes via id_map.tsv
+        3. (Optional) Exclude Gm-prefix and other noise symbols
+        4. Force-include genes get priority slots
+        5. HVGs fill remaining slots so total ≤ max_genes
+
+    Args:
+        rtech: Expression matrix (genes x samples), index = Ensembl IDs
+        max_genes: Maximum total genes in panel
+        force_include: Ensembl IDs to force-include (bypass biotype filter)
+        biotype_map: DataFrame with ensembl_gene_id, mgi_symbol, biotype
+        allowed_biotypes: List of allowed biotypes (e.g. ["protein_coding"])
+        exclude_noise_symbols: If True, drop Gm\d+, Rik, etc. from HVG pool
     """
     keep = ~rtech.index.str.upper().str.startswith("ERCC")
     r = rtech.loc[keep]
+    n_before = len(r)
 
-    # Determine forced genes that actually exist in the expression data
+    # ── Biotype filter ───────────────────────────────────────────────────
+    if biotype_map is not None and allowed_biotypes:
+        bt = biotype_map.set_index("ensembl_gene_id")
+        # Genes in allowed biotypes
+        bt_pass = set(bt[bt["biotype"].isin(allowed_biotypes)].index)
+        # Force-include genes bypass the biotype filter
+        force_set = set(force_include) if force_include else set()
+        # Keep genes that pass biotype OR are force-included
+        bio_mask = r.index.isin(bt_pass | force_set)
+        n_removed_biotype = (~bio_mask).sum()
+        r = r.loc[bio_mask]
+        print(f"  Biotype filter ({', '.join(allowed_biotypes)}):")
+        print(f"    Removed {n_removed_biotype} non-{'/'.join(allowed_biotypes)} genes")
+        print(f"    Remaining: {len(r)} / {n_before}")
+    else:
+        bt = None
+
+    # ── Noise-symbol filter (Gm\d+, Rik, etc.) ──────────────────────────
+    if exclude_noise_symbols and biotype_map is not None:
+        if bt is None:
+            bt = biotype_map.set_index("ensembl_gene_id")
+        # Build set of noise Ensembl IDs (only from HVG candidates, not forced)
+        force_set = set(force_include) if force_include else set()
+        noise_ids = set()
+        for eid in r.index:
+            if eid in force_set:
+                continue  # never exclude forced genes
+            sym = bt.loc[eid, "mgi_symbol"] if eid in bt.index else ""
+            if _is_noise_symbol(sym):
+                noise_ids.add(eid)
+        if noise_ids:
+            n_noise = len(noise_ids)
+            r = r.loc[~r.index.isin(noise_ids)]
+            print(f"  Noise-symbol filter (Gm\\d+, Rik, unmapped):")
+            print(f"    Removed {n_noise} noise-symbol genes")
+            print(f"    Remaining: {len(r)}")
+
+    # ── Force-include ────────────────────────────────────────────────────
     forced = set()
     if force_include:
         forced = set(force_include) & set(r.index)
@@ -158,6 +248,15 @@ def main():
                     help="Comma-separated columns defining experimental cells")
     ap.add_argument("--topk", type=int, default=80,
                     help="Top-k neighbors per gene (~G*k edges)")
+    # ── Biotype filter arguments ─────────────────────────────────────────
+    ap.add_argument("--id_map", default="data/processed/resources/id_map.tsv",
+                    help="Path to id_map.tsv with biotype annotations "
+                         "(from build_id_map.py)")
+    ap.add_argument("--biotype_filter", default="protein_coding",
+                    help="Comma-separated allowed biotypes. "
+                         "Set to 'none' to disable. Default: protein_coding")
+    ap.add_argument("--no_noise_symbol_filter", action="store_true",
+                    help="Disable filtering of Gm-prefix / Rik / unmapped symbols")
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
@@ -201,7 +300,29 @@ def main():
             if line.strip()
         ]
         print(f"\nLoaded {len(force_include)} force-include genes from {args.force_include}")
-    genes = pick_genes(rtech, args.max_genes, force_include=force_include)
+
+    # Load biotype annotations if filtering is enabled
+    biotype_map = None
+    allowed_biotypes = None
+    if args.biotype_filter.lower() != "none":
+        id_map_path = Path(args.id_map)
+        if id_map_path.exists():
+            biotype_map = load_biotype_map(str(id_map_path))
+            allowed_biotypes = [b.strip() for b in args.biotype_filter.split(",")]
+            print(f"\nBiotype filter enabled: {allowed_biotypes}")
+            print(f"  Loaded {len(biotype_map)} annotations from {id_map_path}")
+        else:
+            print(f"\n  WARNING: id_map not found at {id_map_path}, "
+                  f"skipping biotype filter. Run build_id_map.py first.")
+
+    genes = pick_genes(
+        rtech,
+        args.max_genes,
+        force_include=force_include,
+        biotype_map=biotype_map,
+        allowed_biotypes=allowed_biotypes,
+        exclude_noise_symbols=not args.no_noise_symbol_filter,
+    )
     (outdir / "phase2_genes.txt").write_text("\n".join(genes) + "\n")
     print(f"\nSelected {len(genes)} genes for skeleton")
     print(f"  → Saved to {outdir / 'phase2_genes.txt'}")
