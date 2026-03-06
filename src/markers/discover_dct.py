@@ -361,10 +361,20 @@ def main():
     ap.add_argument("--outdir",
                     default=str(REPO_ROOT / "data/processed/dct_markers"),
                     help="Output directory")
-    ap.add_argument("--diff_threshold", type=float, default=0.10,
-                    help="Anti-confounding threshold: min delta between corr(expr,DCT) and "
-                         "max corr(expr,confounder). Higher = more DCT-specific. "
-                         "(default: 0.10)")
+    ap.add_argument("--diff_threshold", type=float, default=0.0,
+                    help="Anti-confounding threshold: min corr(expr, DCT_resid) after "
+                         "regressing out TAL/CD from DCT (default: 0.0 = positive correlation only)")
+    ap.add_argument("--min_r", type=float, default=0.30,
+                    help="Minimum marginal Pearson r(gene, DCT) to keep in fallback mode "
+                         "(default: 0.30 — eliminates weak correlations that survive BH "
+                         "correction at n=80)")
+    ap.add_argument("--fallback_delta", type=float, default=0.10,
+                    help="Stricter anti-confounding delta used ONLY in fallback mode "
+                         "(default: 0.10 — gene must track DCT ≥0.10 more than any "
+                         "confounder). Primary OLS path still uses --diff_threshold.")
+    ap.add_argument("--max_panel", type=int, default=200,
+                    help="Maximum marker panel size. If more genes pass all filters, "
+                         "keep the top --max_panel ranked by delta (default: 200).")
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
@@ -648,33 +658,52 @@ def main():
         marginal_q = bh_fdr(marginal_p)
         results["marginal_q_BH"] = marginal_q
 
-        # f1. Marginal correlation: r > 0 AND q < threshold
-        f1 = (marginal_r > 0) & (marginal_q < args.q_threshold)
+        # f1. Marginal correlation: r > min_r AND q < threshold
+        #     min_r floor eliminates weak correlations that survive BH at n=80
+        f1 = (marginal_r >= args.min_r) & (marginal_q < args.q_threshold)
         # f2. Bootstrap stability (marginal-correlation bootstrap)
         f2 = results["bootstrap_freq"] >= args.boot_freq
-        # f3. Anti-confounding delta
-        f3 = results["anti_confounded"]
+        # f3. Anti-confounding delta — use the STRICTER fallback_delta, not diff_threshold
+        #     (diff_threshold=0.0 is fine for OLS which already controls for confounders;
+        #      the marginal path has NO confounder control except this δ gate)
+        f3 = results["delta_confound"] > args.fallback_delta
         # f4. OLS β_DCT > 0 (sign must agree, even if not significant)
         f4 = results["beta_dct"] > 0
 
         panel_mask = f1 & f2 & f3 & f4
 
         print(f"\n10) Filtering stats (FALLBACK: marginal correlation path):")
-        print(f"    Marginal sig (r>0, q<{args.q_threshold}): {f1.sum()}")
+        print(f"    Marginal sig (r>={args.min_r}, q<{args.q_threshold}): {f1.sum()}")
         print(f"    Marginal-boot stable (freq>={args.boot_freq}): {f2.sum()}")
-        print(f"    Anti-Confounded (δ>{args.diff_threshold}): {f3.sum()}")
+        print(f"    Anti-Confounded (δ>{args.fallback_delta}): {f3.sum()}")
         print(f"    OLS β_DCT > 0 (sign): {f4.sum()}")
-        print(f"    Combined: {panel_mask.sum()}")
+        print(f"    Combined (before cap): {panel_mask.sum()}")
     
     if args.require_specific:
         panel_mask = panel_mask & is_specific
         spec_label = ", DCT-dominant"
     else:
         spec_label = ""
-        
+
+    # ── Panel size cap: keep top genes by delta_confound ──
+    n_passing = panel_mask.sum()
+    if n_passing > args.max_panel:
+        # Rank by delta_confound descending; keep top max_panel
+        passing_idx = results.index[panel_mask]
+        ranked = results.loc[passing_idx, "delta_confound"].sort_values(ascending=False)
+        keep_idx = ranked.index[:args.max_panel]
+        panel_mask[:] = False
+        panel_mask[keep_idx] = True
+        print(f"\n    Panel cap: {n_passing} → {args.max_panel} (top by δ)")
+
     panel_genes = results.loc[panel_mask, "gene"].tolist()
     print(f"\n    FINAL DCT marker panel: {len(panel_genes)} genes")
-    print(f"    (β>0, q<{args.q_threshold}, boot≥{args.boot_freq}, sign-consistent, anti-conf{spec_label})")
+    if fallback_mode:
+        print(f"    (r≥{args.min_r}, q<{args.q_threshold}, boot≥{args.boot_freq}, "
+              f"δ>{args.fallback_delta}, β>0, max={args.max_panel}{spec_label})")
+    else:
+        print(f"    (β>0, q<{args.q_threshold}, boot≥{args.boot_freq}, "
+              f"sign-consistent, anti-conf{spec_label})")
 
     # Sort by beta_dct descending
     results = results.sort_values("beta_dct", ascending=False)
@@ -712,10 +741,11 @@ def main():
     if fallback_mode:
         print(f"  Mode:                     FALLBACK (marginal correlation)")
         print(f"  Reason:                   OLS under-powered ({X.shape[1]} predictors / {X.shape[0]} samples)")
-        print(f"  Marginal sig (r>0, q<{args.q_threshold}): {f1.sum()}")
-        print(f"  + Anti-confounded:        {(f1 & f3).sum()}")
+        print(f"  Marginal sig (r≥{args.min_r}, q<{args.q_threshold}): {f1.sum()}")
+        print(f"  + Anti-confounded (δ>{args.fallback_delta}): {(f1 & f3).sum()}")
         print(f"  + Bootstrap stable:       {(f1 & f3 & f2).sum()}")
-        print(f"  + OLS β>0 sign:           {panel_mask.sum()}")
+        print(f"  + OLS β>0 sign:           {(f1 & f2 & f3 & f4).sum()}")
+        print(f"  After panel cap ({args.max_panel}): {panel_mask.sum()}")
     else:
         print(f"  Mode:                     PRIMARY (OLS)")
         print(f"  Significant (β>0, q<{args.q_threshold}): {sig_pos.sum()}")

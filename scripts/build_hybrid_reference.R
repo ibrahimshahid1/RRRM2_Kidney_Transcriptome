@@ -36,7 +36,7 @@ OUT_DIR <- file.path(REPO, "data/processed/deconvolution/hybrid_ref")
 dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
 
 # ── 1. Load Chen atlas ──────────────────────────────────────────────────────
-message("▶ Loading Chen atlas…")
+message(" Loading Chen atlas…")
 load(CHEN_RDATA)
 chen_obj <- merge.data.integrated
 chen_counts <- chen_obj@assays$RNA@counts # dgCMatrix: 17655 genes × 9099 cells
