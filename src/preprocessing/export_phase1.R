@@ -1,12 +1,20 @@
 # scripts/export_phase1_to_python.R
 # Export Phase 1 residualized expression data to Python-friendly formats
 
-obj <- readRDS("data/processed/phase1_residuals/phase1_Rtech.rds")
+# Parse --outdir argument
+args <- commandArgs(trailingOnly = TRUE)
+outdir <- "data/processed/phase1_residuals"   # default (legacy)
+for (.a in args) {
+    if (grepl("^--outdir=", .a)) {
+        outdir <- sub("^--outdir=", "", .a)
+    }
+}
+
+obj <- readRDS(file.path(outdir, "phase1_Rtech.rds"))
 
 Rtech <- obj$Rtech # genes x samples
 meta <- obj$meta
 
-outdir <- "data/processed/phase1_residuals"
 dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
 
 # Expression

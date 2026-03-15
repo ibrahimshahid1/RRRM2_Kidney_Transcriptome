@@ -115,6 +115,7 @@ args <- commandArgs(trailingOnly = TRUE)
 clr_file <- NULL
 force_keep_file <- NULL
 preserve_dct <- FALSE
+outdir_arg <- NULL
 for (.a in args) {
     if (grepl("^--clr=", .a)) {
         clr_file <- sub("^--clr=", "", .a)
@@ -122,10 +123,18 @@ for (.a in args) {
         force_keep_file <- sub("^--force_keep=", "", .a)
     } else if (.a == "--preserve_dct") {
         preserve_dct <- TRUE
+    } else if (grepl("^--outdir=", .a)) {
+        outdir_arg <- sub("^--outdir=", "", .a)
     } else if (is.null(force_keep_file) && !grepl("^--", .a)) {
         # Legacy: plain trailing arg is the force-keep file
         force_keep_file <- .a
     }
+}
+# Override output directory if --outdir was provided
+if (!is.null(outdir_arg)) {
+    out_dir <- outdir_arg
+    dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+    cat("Output directory overridden to:", out_dir, "\n")
 }
 if (is.null(clr_file)) {
     # Default: try latest, then fall back

@@ -33,18 +33,77 @@ RESULTS_DIR = None
 NETWORKS_DIR = None
 
 
+# ── Artifact resolution ──────────────────────────────────────────────────────
+
+def _find_latest_run_dir() -> Path | None:
+    """Return the most recent run_* directory under data/results/ that exists."""
+    results_root = REPO_ROOT / "data" / "results"
+    if not results_root.exists():
+        return None
+    run_dirs = sorted(results_root.glob("run_*"), reverse=True)
+    for rd in run_dirs:
+        if rd.is_dir():
+            return rd
+    return None
+
+
+def find_artifact(relpath: str, phase_subdir: str | None = None) -> Path | None:
+    """Resolve an artifact from the current run or the most recent prior run.
+
+    Search order:
+      1. Current run's results dir  (data/results/<current_run>/<relpath>)
+      2. Most recent prior run       (data/results/<latest_run>/<relpath>)
+      3. Legacy global location      (data/processed/<relpath>)
+
+    *phase_subdir* is unused but kept for future sub-folder logic.
+
+    Returns the first existing Path, or None.
+    """
+    candidates: list[Path] = []
+
+    # 1. Current run
+    cur = os.environ.get("RRRM_RESULTS_DIR")
+    if cur:
+        candidates.append(Path(cur) / relpath)
+
+    # 2. Most recent prior run
+    latest = _find_latest_run_dir()
+    if latest and (not cur or str(latest) != cur):
+        candidates.append(latest / relpath)
+
+    # 3. Legacy global locations (for backward compat)
+    candidates.append(REPO_ROOT / "data" / "processed" / relpath)
+
+    for c in candidates:
+        if c.exists():
+            return c
+    return None
+
+
 def init_run(run_id: str, max_genes: int, topk: int, num_seeds: int, 
              phases: list, skip_r: bool) -> tuple:
-    """Initialize versioned output directories and save run metadata."""
+    """Initialize versioned output directories and save run metadata.
+
+    All pipeline outputs live under a single run directory:
+        data/results/<run_id>/
+            deconvolution/     ← Phase 0
+            phase1_residuals/  ← Phase 1
+            dct_markers/       ← Phase 1.5
+            networks/          ← Phase 2
+            phase3_embeddings/ ← Phase 3
+            phase3_rewiring/   ← Phase 3
+            ...                ← Phase 5-9
+            run_metadata.json
+    """
     global RUN_ID, RESULTS_DIR, NETWORKS_DIR
     
     RUN_ID = run_id
     RESULTS_DIR = REPO_ROOT / "data/results" / run_id
-    NETWORKS_DIR = REPO_ROOT / "data/processed/networks" / run_id
+    NETWORKS_DIR = RESULTS_DIR / "networks"
     
-    # Create directories
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    NETWORKS_DIR.mkdir(parents=True, exist_ok=True)
+    # Create all sub-directories up front
+    for subdir in ["deconvolution", "phase1_residuals", "dct_markers", "networks"]:
+        (RESULTS_DIR / subdir).mkdir(parents=True, exist_ok=True)
     
     # Save run metadata
     metadata = {
@@ -75,7 +134,6 @@ def init_run(run_id: str, max_genes: int, topk: int, num_seeds: int,
     
     log(f"Run ID: {run_id}")
     log(f"Results: {RESULTS_DIR}")
-    log(f"Networks: {NETWORKS_DIR}")
     
     return RESULTS_DIR, NETWORKS_DIR
 
@@ -130,8 +188,7 @@ def phase_0(dry_run: bool = False, skip_r: bool = False) -> bool:
         log("Skipping R-dependent deconvolution", "WARN")
         return True
     
-    deconv_dir = os.environ.get("RRRM_DECONV_DIR",
-                                str(REPO_ROOT / "data/processed/deconvolution/latest"))
+    deconv_dir = os.environ.get("RRRM_DECONV_DIR")
     return run_rscript("src/preprocessing/deconvolution.R",
                        args=[f"--outdir={deconv_dir}"], dry_run=dry_run)
 
@@ -145,31 +202,26 @@ def phase_1(dry_run: bool = False, skip_r: bool = False,
         log("Skipping R-dependent residualization", "WARN")
         return True
     
-    # Pass CLR path from the versioned deconvolution directory
-    # Fall back to latest/ or root deconvolution/ if run-specific dir doesn't exist
-    clr_filename = "music_segment_direct_proportions_CLR.csv"
-    deconv_dir = os.environ.get("RRRM_DECONV_DIR",
-                                str(REPO_ROOT / "data/processed/deconvolution/latest"))
-    clr_path = Path(deconv_dir) / clr_filename
-    if not clr_path.exists():
-        # Try latest symlink
-        fallback1 = REPO_ROOT / "data/processed/deconvolution/latest" / clr_filename
-        fallback2 = REPO_ROOT / "data/processed/deconvolution" / clr_filename
-        if fallback1.exists():
-            clr_path = fallback1
-            log(f"CLR not found in run dir, using: {clr_path}")
-        elif fallback2.exists():
-            clr_path = fallback2
-            log(f"CLR not found in run dir, using: {clr_path}")
-        else:
-            log(f"CLR file not found at {clr_path} or fallback locations", "ERROR")
-    resid_args = [f"--clr={clr_path}"]
+    # Resolve CLR from current or latest run
+    clr_path = find_artifact("deconvolution/music_segment_direct_proportions_CLR.csv")
+    if clr_path is None:
+        log("CLR file not found in any run directory", "ERROR")
+        return False
+    log(f"Using CLR: {clr_path}")
 
-    # Check for DCT marker panel to force-include
-    dct_panel_path = REPO_ROOT / "data/processed/dct_markers" / "dct_marker_panel.txt"
-    if dct_panel_path.exists():
-        resid_args.append(f"--force_keep={dct_panel_path}")
-        log(f"Passing DCT marker panel to residualization: {dct_panel_path}")
+    phase1_dir = os.environ.get("RRRM_PHASE1_DIR")
+    resid_args = [f"--clr={clr_path}", f"--outdir={phase1_dir}"]
+
+    # Check for DCT marker panel (current run first, then latest)
+    dct_panel = find_artifact("dct_markers/dct_marker_panel.txt")
+    if dct_panel is None:
+        # Also check legacy global location
+        legacy = REPO_ROOT / "data/processed/dct_markers/dct_marker_panel.txt"
+        if legacy.exists():
+            dct_panel = legacy
+    if dct_panel is not None:
+        resid_args.append(f"--force_keep={dct_panel}")
+        log(f"Passing DCT marker panel to residualization: {dct_panel}")
 
     if preserve_dct:
         resid_args.append("--preserve_dct")
@@ -179,28 +231,37 @@ def phase_1(dry_run: bool = False, skip_r: bool = False,
     if not success:
         return False
 
-    # Export to Python format
-    return run_rscript("src/preprocessing/export_phase1.R", dry_run=dry_run)
+    # Export to Python format — pass the output dir so it writes into the run
+    return run_rscript("src/preprocessing/export_phase1.R",
+                       args=[f"--outdir={phase1_dir}"], dry_run=dry_run)
 
 
 def phase_1_5(dry_run: bool = False) -> bool:
     """Phase 1.5: Dataset-Derived DCT Marker Discovery"""
     log("PHASE 1.5: DCT Marker Discovery")
 
-    # Use VST (NOT Rtech) to avoid the landmine where Rtech already has CLR regressed out
+    # Static input (not pipeline-generated)
     vst_path = REPO_ROOT / "data/processed/vst_normalized" / "GLDS-674_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv"
-    deconv_dir = os.environ.get("RRRM_DECONV_DIR",
-                                str(REPO_ROOT / "data/processed/deconvolution/latest"))
-    clr_path = Path(deconv_dir) / "music_segment_direct_proportions_CLR.csv"
-    meta_path = REPO_ROOT / "data/processed/phase1_residuals" / "meta_phase1.tsv.gz"
-    outdir = REPO_ROOT / "data/processed/dct_markers"
-
     if not vst_path.exists():
         log(f"VST file not found: {vst_path}", "WARN")
         return False
-    if not clr_path.exists():
-        log(f"CLR file not found: {clr_path}", "WARN")
+
+    # Resolve CLR from current or latest run
+    clr_path = find_artifact("deconvolution/music_segment_direct_proportions_CLR.csv")
+    if clr_path is None:
+        log("CLR file not found in any run directory", "WARN")
         return False
+    log(f"Using CLR: {clr_path}")
+
+    # Resolve metadata from current or latest run
+    meta_path = find_artifact("phase1_residuals/meta_phase1.tsv.gz")
+    if meta_path is None:
+        log("meta_phase1.tsv.gz not found in any run directory", "WARN")
+        return False
+    log(f"Using metadata: {meta_path}")
+
+    # Output goes into current run
+    outdir = os.environ.get("RRRM_DCT_DIR")
 
     return run_python("src.markers.discover_dct", [
         f"--vst={vst_path}",
@@ -217,16 +278,14 @@ def phase_2(dry_run: bool = False, skip_r: bool = False,
     """Phase 2: Network Construction"""
     log("PHASE 2: Network Skeleton + LIONESS + Edge Regression")
 
-    # Get versioned output directory from environment
-    networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
+    networks_dir = os.environ.get("RRRM_NETWORKS_DIR")
 
-    # Step 2.1-2.3: Build shared sparse skeleton
-    # Check if DCT marker panel exists for force-inclusion
-    dct_panel_path = REPO_ROOT / "data/processed/dct_markers" / "dct_marker_panel.txt"
+    # Check if DCT marker panel exists (current run first, then latest)
+    dct_panel = find_artifact("dct_markers/dct_marker_panel.txt")
     force_args = []
-    if dct_panel_path.exists():
-        force_args = [f"--force_include={dct_panel_path}"]
-        log(f"Including DCT marker panel: {dct_panel_path}")
+    if dct_panel is not None:
+        force_args = [f"--force_include={dct_panel}"]
+        log(f"Including DCT marker panel: {dct_panel}")
     else:
         log("No DCT marker panel found; using variance-only gene selection", "WARN")
 
@@ -264,9 +323,8 @@ def phase_3(dry_run: bool = False, num_seeds: int = 10,
     """Phase 3: Embeddings + Procrustes"""
     log("PHASE 3: Node2Vec Embeddings + Procrustes Alignment")
 
-    # Get versioned directories from environment
-    networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
-    results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
+    networks_dir = os.environ.get("RRRM_NETWORKS_DIR")
+    results_dir = os.environ.get("RRRM_RESULTS_DIR")
 
     # Step 3.2: Node2Vec embeddings
     # Include GND patterns if pooling controls
@@ -300,8 +358,7 @@ def phase_5(dry_run: bool = False) -> bool:
     """Phase 5: Silent Shifters + Interaction Metrics"""
     log("PHASE 5: Silent Shifters + Interaction Metrics")
 
-    # Get versioned output directory from environment
-    results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
+    results_dir = os.environ.get("RRRM_RESULTS_DIR")
 
     # Interaction metrics
     if not run_python("src.statistics.interaction_metrics",
@@ -338,13 +395,14 @@ def phase_5(dry_run: bool = False) -> bool:
 
 
 def phase_6(dry_run: bool = False, skip_r: bool = False,
-            pool_controls: bool = False) -> bool:
+            pool_controls: bool = False,
+            focused_permutation: bool = False,
+            pathway_permutation: bool = False) -> bool:
     """Phase 6: Uncertainty Estimation + Full Regression"""
     log("PHASE 6: Permutation + Bootstrap + Full Regression")
 
-    # Get versioned output directory from environment
-    results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
-    networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
+    results_dir = os.environ.get("RRRM_RESULTS_DIR")
+    networks_dir = os.environ.get("RRRM_NETWORKS_DIR")
 
     # Permutation and bootstrap
     perm_args = [f"--phase2_dir={networks_dir}",
@@ -352,6 +410,16 @@ def phase_6(dry_run: bool = False, skip_r: bool = False,
     if pool_controls:
         perm_args.append("--pool-controls")
         log("Permutation test: pooling GC+VIV+BSL as ground controls")
+    if focused_permutation:
+        perm_args.append("--focused-permutation")
+        log("Permutation test: focused BH on top-decile genes")
+    if pathway_permutation:
+        perm_args.append("--pathway-permutation")
+        # Auto-detect gene map for pathway symbol resolution
+        map_path = REPO_ROOT / "data/processed/resources" / "id_map.tsv"
+        if map_path.exists():
+            perm_args.append(f"--gene-map={map_path}")
+        log("Permutation test: pathway-level competitive enrichment")
     if not run_python("src.statistics.permutation_bootstrap", perm_args, dry_run=dry_run):
         return False
 
@@ -375,8 +443,7 @@ def phase_9(dry_run: bool = False) -> bool:
     """Phase 9: Generate Publication-Ready Figures (runs last)"""
     log("PHASE 9: Figure Generation")
 
-    # Get versioned results directory from environment
-    results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
+    results_dir = os.environ.get("RRRM_RESULTS_DIR")
     figures_dir = Path(results_dir) / "figures"
 
     # Generate figures using publication_plots module
@@ -393,8 +460,7 @@ def phase_7(dry_run: bool = False) -> bool:
     """Phase 7: Biological Grounding"""
     log("PHASE 7: Biological Grounding + Enrichment")
 
-    # Get versioned output directory from environment
-    results_dir = os.environ.get("RRRM_RESULTS_DIR", str(REPO_ROOT / "data/results"))
+    results_dir = os.environ.get("RRRM_RESULTS_DIR")
 
     # Auto-detect available contrasts (supports both _GC and _GND suffixes)
     rewiring_dir = Path(results_dir) / "phase3_rewiring"
@@ -410,9 +476,9 @@ def phase_7(dry_run: bool = False) -> bool:
     # so that pathway genes outside the 2500-gene skeleton are still mappable.
     map_path = REPO_ROOT / "data/processed/resources" / "id_map.tsv"
     # Rebuild if map is stale (covers fewer genes than what Rtech has)
-    rtech_path = REPO_ROOT / "data/processed/phase1_residuals" / "Rtech.tsv.gz"
+    rtech_check = find_artifact("phase1_residuals/Rtech.tsv.gz")
     needs_rebuild = not map_path.exists()
-    if map_path.exists() and rtech_path.exists():
+    if map_path.exists() and rtech_check and rtech_check.exists():
         # Check if existing map covers all expressed genes
         existing_lines = sum(1 for _ in open(map_path)) - 1  # subtract header
         if existing_lines < 5000:  # likely only covers 2500 HVGs
@@ -420,16 +486,16 @@ def phase_7(dry_run: bool = False) -> bool:
             needs_rebuild = True
     if needs_rebuild:
         log("Building Ensembl→Symbol ID map (first run)...")
-        networks_dir = os.environ.get("RRRM_NETWORKS_DIR", str(REPO_ROOT / "data/processed/networks/phase2"))
+        networks_dir = os.environ.get("RRRM_NETWORKS_DIR")
         # Prefer the full Rtech gene list (all expressed genes) over phase2_genes.txt
-        rtech_path = REPO_ROOT / "data/processed/phase1_residuals" / "Rtech.tsv.gz"
+        rtech_resolved = find_artifact("phase1_residuals/Rtech.tsv.gz")
         gene_list = Path(networks_dir) / "phase2_genes.txt"
-        if rtech_path.exists():
+        if rtech_resolved and rtech_resolved.exists():
             # Extract gene list from Rtech (first column = gene IDs)
             import gzip, csv
             full_gene_path = map_path.parent / "all_expressed_genes.txt"
             full_gene_path.parent.mkdir(parents=True, exist_ok=True)
-            with gzip.open(rtech_path, "rt") as f:
+            with gzip.open(rtech_resolved, "rt") as f:
                 reader = csv.reader(f, delimiter="\t")
                 header = next(reader)  # skip header
                 gene_ids = [row[0] for row in reader if row]
@@ -512,6 +578,12 @@ Examples:
                         help="Pool GC+VIV+BSL as ground reference (triples control n)")
     parser.add_argument("--preserve-dct", action="store_true",
                         help="Do NOT regress out DCT proportions (preserves DCT signal)")
+    parser.add_argument("--focused-permutation", action="store_true",
+                        help="Run focused BH correction on top-decile genes only (~250). "
+                             "Reduces the multiple-testing burden from 2500 to ~250 hypotheses.")
+    parser.add_argument("--pathway-permutation", action="store_true",
+                        help="Run pathway-level permutation testing (competitive GSEA-style). "
+                             "Tests ~100 pathways instead of ~2500 individual genes.")
     
     args = parser.parse_args()
     
@@ -538,10 +610,14 @@ Examples:
         log(f"[DRY-RUN] Would create run: {run_id}")
     
     # Define phase runners - pass versioned paths via environment
+    # All outputs live under data/results/<run_id>/
+    run_root = str(REPO_ROOT / "data/results" / run_id)
     os.environ["RRRM_RUN_ID"] = run_id
-    os.environ["RRRM_RESULTS_DIR"] = str(REPO_ROOT / "data/results" / run_id)
-    os.environ["RRRM_NETWORKS_DIR"] = str(REPO_ROOT / "data/processed/networks" / run_id)
-    os.environ["RRRM_DECONV_DIR"] = str(REPO_ROOT / "data/processed/deconvolution" / run_id)
+    os.environ["RRRM_RESULTS_DIR"] = run_root
+    os.environ["RRRM_DECONV_DIR"] = str(Path(run_root) / "deconvolution")
+    os.environ["RRRM_PHASE1_DIR"] = str(Path(run_root) / "phase1_residuals")
+    os.environ["RRRM_DCT_DIR"] = str(Path(run_root) / "dct_markers")
+    os.environ["RRRM_NETWORKS_DIR"] = str(Path(run_root) / "networks")
     
     phases = {
         0: lambda: phase_0(args.dry_run, args.skip_r),
@@ -550,7 +626,8 @@ Examples:
         2: lambda: phase_2(args.dry_run, args.skip_r, args.max_genes, args.topk, args.pool_controls),
         3: lambda: phase_3(args.dry_run, args.num_seeds, args.pool_controls),
         5: lambda: phase_5(args.dry_run),
-        6: lambda: phase_6(args.dry_run, args.skip_r, args.pool_controls),
+        6: lambda: phase_6(args.dry_run, args.skip_r, args.pool_controls,
+                           args.focused_permutation, args.pathway_permutation),
         7: lambda: phase_7(args.dry_run),
         9: lambda: phase_9(args.dry_run),  # Figure generation runs last
     }
