@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from src.common import REPO_ROOT
 DEFAULT_CACHE = REPO_ROOT / "data" / "processed" / "gene_sets"
 
 # ── Default Enrichr libraries (mouse-specific first) ──────────────────────

@@ -22,8 +22,7 @@ import argparse
 import re
 from pathlib import Path
 
-# Repository root (2 levels up from src/networks/)
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from src.common import REPO_ROOT
 import numpy as np
 import pandas as pd
 from sklearn.covariance import LedoitWolf

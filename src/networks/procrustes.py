@@ -18,8 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-# Repository root (2 levels up from src/networks/)
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from src.common import REPO_ROOT
 
 
 def cosine_distance_rows(A: np.ndarray, B: np.ndarray, eps: float = 1e-12) -> np.ndarray:

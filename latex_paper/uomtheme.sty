@@ -1,0 +1,86 @@
+% uomtheme.sty - Custom tikzposter theme
+% Adapted for use without the University of Melbourne package
+\ProvidesPackage{uomtheme}[2026/03/25 Custom poster theme]
+
+% Define color palette
+\definecolor{UoMBlue}{HTML}{003366}
+\definecolor{UoMNavy}{HTML}{002147}
+\definecolor{UoMLightBlue}{HTML}{0066CC}
+\definecolor{UoMGray}{HTML}{F2F2F2}
+\definecolor{UoMDarkGray}{HTML}{333333}
+\definecolor{UoMWhite}{HTML}{FFFFFF}
+
+% Color style
+\definecolorstyle{UoMStyle}{
+    \definecolor{colorOne}{named}{UoMNavy}
+    \definecolor{colorTwo}{named}{UoMLightBlue}
+    \definecolor{colorThree}{named}{UoMGray}
+}{
+    % Background Colors
+    \colorlet{backgroundcolor}{white}
+    \colorlet{framecolor}{colorOne}
+    % Title Colors
+    \colorlet{titlefgcolor}{white}
+    \colorlet{titlebgcolor}{colorOne}
+    % Block Colors
+    \colorlet{blocktitlebgcolor}{colorOne}
+    \colorlet{blocktitlefgcolor}{white}
+    \colorlet{blockbodybgcolor}{white}
+    \colorlet{blockbodyfgcolor}{UoMDarkGray}
+    % Innerblock Colors
+    \colorlet{innerblocktitlebgcolor}{colorTwo}
+    \colorlet{innerblocktitlefgcolor}{white}
+    \colorlet{innerblockbodybgcolor}{UoMGray}
+    \colorlet{innerblockbodyfgcolor}{UoMDarkGray}
+    % Note colors
+    \colorlet{notefgcolor}{white}
+    \colorlet{notebgcolor}{colorTwo}
+    \colorlet{notefrcolor}{colorTwo}
+}
+
+% Title style
+\definetitlestyle{UoMTitle}{
+    width=\textwidth, linewidth=0pt,
+    titletotopverticalspace=0mm, titletoblockverticalspace=15mm,
+    innersep=12mm
+}{
+    \begin{scope}[line width=0pt]
+        \draw[fill=titlebgcolor, rounded corners=10pt]
+            (\titleposleft,\titleposbottom)
+            rectangle
+            (\titleposright,\titlepostop);
+    \end{scope}
+}
+
+% Block style
+\defineblockstyle{UoMBlock}{
+    titlewidthscale=1, bodywidthscale=1,
+    titleleft, titleoffsetx=0pt, titleoffsety=0pt,
+    bodyoffsetx=0pt, bodyoffsety=0pt,
+    bodyverticalshift=0pt, roundedcorners=5,
+    linewidth=0.5pt, titleinnersep=8mm, bodyinnersep=8mm
+}{
+    \draw[fill=blockbodybgcolor, rounded corners=\blockroundedcorners]
+        (blockbody.south west) rectangle (blockbody.north east);
+    \ifBlockHasTitle
+        \draw[fill=blocktitlebgcolor, rounded corners=\blockroundedcorners]
+            (blocktitle.south west) rectangle (blocktitle.north east);
+    \fi
+}
+
+% Background style
+\definebackgroundstyle{UoMBackground}{
+    \draw[line width=0pt, bottom color=white, top color=white]
+        (bottomleft) rectangle (topright);
+    \draw[line width=3pt, color=UoMNavy]
+        ([shift={(6mm,6mm)}]bottomleft) rectangle ([shift={(-6mm,-6mm)}]topright);
+}
+
+% Layout theme
+\definelayouttheme{UoMTheme}{
+    \usecolorstyle{UoMStyle}
+    \usetitlestyle{UoMTitle}
+    \useblockstyle{UoMBlock}
+    \usebackgroundstyle{UoMBackground}
+    \usenotestyle{Default}
+}

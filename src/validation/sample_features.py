@@ -274,11 +274,4 @@ def extract_all_features(
     )
 
 
-if __name__ == "__main__":
-    print("Sample Features Module")
-    print("Available functions:")
-    print("  - node_strength: Sum of incident edge weights")
-    print("  - pathway_edge_summary: Within-pathway edge statistics")
-    print("  - shifter_connectivity: Silent shifter neighborhood weights")
-    print("  - edge_pca_features: PCA on edge weights")
-    print("  - extract_all_features: Comprehensive feature extraction")
+

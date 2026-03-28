@@ -25,8 +25,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-# Repository root (2 levels up from src/enrichment/)
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from src.common import REPO_ROOT, bh_fdr
 
 from src.enrichment.gene_set_loader import load_gene_sets
 
@@ -43,17 +42,7 @@ def fisher_exact(a, b, c, d):
         return OR, np.nan
 
 
-def bh_fdr(p: np.ndarray) -> np.ndarray:
-    """Benjamini-Hochberg FDR correction."""
-    p = np.asarray(p, dtype=float)
-    n = p.size
-    order = np.argsort(p)
-    ranked = p[order]
-    q = ranked * n / (np.arange(1, n + 1))
-    q = np.minimum.accumulate(q[::-1])[::-1]
-    out = np.empty_like(q)
-    out[order] = np.clip(q, 0, 1)
-    return out
+
 
 
 def main():

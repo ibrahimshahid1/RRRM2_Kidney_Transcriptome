@@ -1,0 +1,108 @@
+\documentclass[20pt,margin=1in,innermargin=-4.5in,blockverticalspace=-0.25in]{tikzposter}
+\geometry{paperwidth=42in,paperheight=32.5in}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{mathrsfs}
+\usepackage{graphicx}
+\usepackage{adjustbox}
+\usepackage{enumitem}
+\usepackage[backend=biber,style=numeric]{biblatex}
+\usepackage{uomtheme}
+
+
+
+\addbibresource{references.bib}
+
+% set theme parameters
+\tikzposterlatexaffectionproofoff
+\usetheme{UoMTheme}
+\usecolorstyle{UoMStyle}
+
+\usepackage[scaled]{helvet}
+\renewcommand\familydefault{\sfdefault} 
+\usepackage[T1]{fontenc}
+
+
+\title{Age- and Arm-Stratified Co-expression Network Rewiring in the Murine Kidney During and After Spaceflight}
+\author{Ibrahim M.~Shahid}
+\institute{Middle College, The University of North Carolina at Greensboro}
+% No title graphic
+
+% begin document
+\begin{document}
+\maketitle
+\begin{columns}
+    \column{0.32}
+    \block{Abstract}{
+         Astronauts exhibit elevated nephrolithiasis risk following spaceflight, and prior work links microgravity to distal nephron remodeling and renal transporter dysregulation. Whether spaceflight alters the regulatory coordination among genes---shifting co-expression architecture without necessarily changing mean expression levels---and whether such rewiring differs by age or by spaceflight habitat, remains uncharacterized. We addressed this using OSD-771 (RRRM-2), bulk kidney RNA-seq from 80 female C57BL/6NTac mice under a full $2\times4\times2$ factorial design crossing Age (young, 16 weeks; old, 34 weeks), Environment Group (FLT, GC, VIV, BSL), and Arm (ISS Terminal sacrifice, ISS-T; Live Animal Return, LAR). Nephron segment proportions were estimated via MuSiC deconvolution against a murine single-cell kidney reference and used to remove compositional confounding while preserving biological contrasts. Sample-specific co-expression networks were inferred via LIONESS on a shared sparse skeleton constructed with cell-standardized Ledoit-Wolf partial correlations, and edge-wise regression over the full factorial design yielded model-predicted contrast-specific networks. Node2vec embeddings of these networks, aligned by orthogonal Procrustes across multi-seed runs, produced per-gene rewiring scores (cosine distance) for four primary flight contrasts. Focused permutation testing identified 11 significantly rewired genes in young ISS-T animals (FDR $<$ 0.05), including the renal amino acid transporter \textit{Slc6a20a}, the circadian regulator \textit{Cry2}, and the vitamin D-binding protein \textit{Gc}, with two additional hits in old ISS-T animals (\textit{Prlr}, \textit{Nr4a1}). Pathway enrichment revealed coordinated ECM and complement remodeling in young ISS-T mice, an EMT and steroid biosynthesis signature in old ISS-T mice, and retinoic acid metabolism as the most statistically robust signal across both arms---with strongest enrichment in the LAR recovery condition, suggesting active renal repair signaling during re-adaptation to terrestrial gravity. The ISS-T arm consistently showed greater and more significant rewiring than LAR across all contrasts, consistent with partial network recovery following return to Earth. This framework identifies retinoic acid signaling, ECM remodeling, and circadian network disruption as age-stratified transcriptomic responses to spaceflight invisible to standard differential expression analysis, and establishes a statistically defensible methodology for network rewiring inference in small-n factorial space biology datasets.
+    }
+    \block{Model}{
+         In this study, we employed a multi-layered analytical pipeline to infer co-expression network rewiring from bulk RNA-seq data. Nephron segment proportions were estimated via MuSiC deconvolution against a murine single-cell kidney reference atlas, enabling removal of compositional confounding while preserving biological contrasts of interest. Sample-specific co-expression networks were constructed using LIONESS (Linear Interpolation to Obtain Network Estimates for Single Samples) on a shared sparse skeleton built from cell-standardized Ledoit-Wolf partial correlations. Edge-wise regression over the full factorial design yielded model-predicted, contrast-specific networks for each comparison of interest.
+
+         Network topology was captured using Node2vec graph embeddings, which were aligned across multi-seed runs via orthogonal Procrustes rotation to ensure stable, reproducible gene-level representations. Per-gene rewiring scores were computed as cosine distances between flight and control embeddings for each of four primary contrasts.
+    }
+    \block{Inverse Problem}{
+        A central challenge in network rewiring analysis is distinguishing genuine biological signal from noise arising from small sample sizes and high-dimensional gene space. To address this, we implemented a rigorous permutation testing framework that shuffles sample labels within each contrast while respecting the factorial design structure.
+
+        Statistical significance of per-gene rewiring scores was assessed using focused permutation tests with 10,000 permutations per contrast. False discovery rate correction was applied using the Benjamini-Hochberg procedure to control for multiple testing across all genes. Bootstrap confidence intervals were computed for rewiring scores to quantify estimation uncertainty. Pre-registered NCC-WNK axis genes were tracked as a hypothesis-driven validation set alongside the genome-wide discovery analysis.
+    }
+
+    \column{0.36}
+    \block{Results}{
+        Focused permutation testing identified 11 significantly rewired genes in young ISS-T animals (FDR $<$ 0.05), including the renal amino acid transporter \textit{Slc6a20a}, the circadian regulator \textit{Cry2}, and the vitamin D-binding protein \textit{Gc}. Two additional hits emerged in old ISS-T animals: \textit{Prlr} (prolactin receptor) and \textit{Nr4a1} (nuclear receptor subfamily 4 group A member 1).
+
+        Pathway enrichment analysis revealed distinct age-stratified signatures:
+        \begin{itemize}[leftmargin=*]
+            \item \textbf{Young ISS-T mice:} Coordinated ECM and complement remodeling
+            \item \textbf{Old ISS-T mice:} EMT and steroid biosynthesis signature
+            \item \textbf{Both arms:} Retinoic acid metabolism as the most statistically robust signal
+        \end{itemize}
+
+        The strongest enrichment appeared in the LAR recovery condition, suggesting active renal repair signaling during re-adaptation to terrestrial gravity.
+
+        \vspace{1em}
+        \begin{tikzfigure}[Rewiring scores across flight contrasts.]
+            \rule{0.9\linewidth}{4cm}% Placeholder for figure
+        \end{tikzfigure}
+        \vspace{1em}
+
+        The ISS-T arm consistently showed greater and more significant rewiring than LAR across all contrasts, consistent with partial network recovery following return to Earth. Pre-registered NCC-WNK axis genes did not emerge among top individual rewiring hits, though pathway-level retinol and circadian signals offer candidate upstream mechanisms for known DCT dysregulation.
+
+        This framework identifies retinoic acid signaling, ECM remodeling, and circadian network disruption as age-stratified transcriptomic responses to spaceflight invisible to standard differential expression analysis.
+    }
+
+    \column{0.32}
+    \block{Comparison}{
+        Our network rewiring approach complements standard differential expression analysis by capturing changes in gene-gene coordination that persist even when mean expression levels remain stable. Key methodological advantages include:
+
+        \begin{itemize}[leftmargin=*]
+            \item LIONESS-based sample-specific networks enable within-sample contrast estimation
+            \item Node2vec embeddings provide a compact, topology-aware representation of network neighborhoods
+            \item Orthogonal Procrustes alignment across seeds ensures reproducibility
+            \item The permutation framework respects the factorial design structure
+        \end{itemize}
+
+        \begin{tikzfigure}[Network rewiring comparison between ISS-T and LAR arms.]
+            \rule{0.5\linewidth}{4cm}% Placeholder for figure
+        \end{tikzfigure}
+    }
+    
+    \block{Remarks}{
+        This study establishes a statistically defensible methodology for network rewiring inference in small-n factorial space biology datasets. The identification of retinoic acid signaling, ECM remodeling, and circadian network disruption as age-stratified transcriptomic responses to spaceflight provides new mechanistic hypotheses for kidney dysfunction associated with space travel. Future work will integrate proteomic data and validate key rewiring targets using independent spaceflight cohorts.
+    }
+    
+    \block{Acknowledgements}{
+        This work utilized data from the NASA Open Science Data Repository (OSD-771, RRRM-2 mission). We thank the GeneLab data processing team for providing the normalized RNA-seq counts and associated metadata.
+    }
+    
+    \block{References}{
+        \vspace{-1em}
+        \begin{footnotesize}
+        \printbibliography[heading=none]
+        \end{footnotesize}
+    }
+\end{columns}
+\end{document}

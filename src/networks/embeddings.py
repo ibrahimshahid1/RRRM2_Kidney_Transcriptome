@@ -26,8 +26,7 @@ import pandas as pd
 import random
 import inspect
 
-# Repository root (2 levels up from src/networks/)
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from src.common import REPO_ROOT
 
 
 def write_edgelist_weighted(

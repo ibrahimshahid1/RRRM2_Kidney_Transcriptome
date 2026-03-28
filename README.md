@@ -81,6 +81,12 @@ Female C57BL/6NTac mice, whole kidney RNA-seq
 - Pathway-level rewiring quantification
 - Module analysis via k-means on embeddings
 
+### Phase 8: Leakage-Safe Predictive Validation
+- Stratified K-fold CV (FLT vs GC, stratified by Age×Arm)
+- Fold-wise skeleton E built on training data only
+- LIONESS features extracted per fold; no test data leakage
+- Classification performance (accuracy, AUC) with LogisticRegression and RandomForest
+
 ---
 
 ## 📦 Installation
@@ -225,18 +231,15 @@ RRRM2_Kidney_Transcriptome/
 
 ---
 
-## 🔍 Key Results (Example)
+## 🔍 Key Outputs (Per Run)
 
-### Silent Shifters (High Rewiring + Low DE)
-Genes with substantial network context changes but minimal expression changes:
-- WNK4 (NCC-WNK pathway kinase)
-- KCNJ10 (potassium channel)
-- Calcium handling regulators
-
-### Validation Performance
-Cross-validated classification (5-fold):
-- **Accuracy**: ~75-85% (Environment Group prediction)
-- **AUC**: ~0.80-0.90
+Each pipeline run produces versioned outputs in `data/results/<run_id>/`:
+- **Rewiring scores**: per-gene cosine-distance shifts for each contrast
+- **Permutation p-values**: gene-level significance with BH-FDR
+- **Silent shifters**: genes with high rewiring but low differential expression
+- **Cross-validation results**: leakage-safe accuracy and AUC for FLT vs GC classification
+- **Enrichment tables**: pathway enrichment for rewired gene sets
+- **Publication figures**: volcano plots, rewiring distributions, QQ plots
 
 ---
 

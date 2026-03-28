@@ -30,35 +30,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-# Repository root (2 levels up from src/statistics/)
-REPO_ROOT = Path(__file__).resolve().parents[2]
-
-
-def find_sample_col(meta: pd.DataFrame) -> str:
-    """Find the sample identifier column in metadata."""
-    for col in ["Sample Name (raw_counts_colname)", "Sample Name", "sample"]:
-        if col in meta.columns:
-            return col
-    return meta.columns[0]
-
-
-def normalize_labels(meta: pd.DataFrame) -> pd.DataFrame:
-    """Normalize Age, Arm, EnvGroup labels for consistency."""
-    meta = meta.copy()
-    meta["Age"] = meta["Age"].astype(str).replace({
-        "Young": "YNG", "Yng": "YNG", "young": "YNG",
-        "Old": "OLD", "old": "OLD"
-    })
-    meta["Arm"] = meta["Arm"].astype(str).replace({
-        "ISS": "ISS-T", "ISST": "ISS-T", "ISS_T": "ISS-T", "ISS T": "ISS-T"
-    })
-    meta["Arm"] = meta["Arm"].astype(str).replace({
-        "LAR_T": "LAR", "LAR-T": "LAR", "LAR T": "LAR"
-    })
-    meta["EnvGroup"] = meta["EnvGroup"].astype(str).replace({
-        "HGC": "GC", "VGC": "VIV", "HGC/GC": "GC", "VIV/VGC": "VIV"
-    })
-    return meta
+from src.common import REPO_ROOT, find_sample_col, normalize_labels, bh_fdr
 
 
 def node_rewiring_abs(delta: np.ndarray, edge_i: np.ndarray, edge_j: np.ndarray, G: int) -> np.ndarray:
@@ -68,19 +40,6 @@ def node_rewiring_abs(delta: np.ndarray, edge_i: np.ndarray, edge_j: np.ndarray,
     np.add.at(abs_sum, edge_i, dabs)
     np.add.at(abs_sum, edge_j, dabs)
     return abs_sum
-
-
-def bh_fdr(p: np.ndarray) -> np.ndarray:
-    """Benjamini-Hochberg FDR correction."""
-    p = np.asarray(p, dtype=float)
-    n = p.size
-    order = np.argsort(p)
-    ranked = p[order]
-    q = ranked * n / (np.arange(1, n + 1))
-    q = np.minimum.accumulate(q[::-1])[::-1]
-    out = np.empty_like(q)
-    out[order] = np.clip(q, 0, 1)
-    return out
 
 
 def main():

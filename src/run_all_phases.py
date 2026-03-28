@@ -446,14 +446,48 @@ def phase_9(dry_run: bool = False) -> bool:
     results_dir = os.environ.get("RRRM_RESULTS_DIR")
     figures_dir = Path(results_dir) / "figures"
 
-    # Generate figures using publication_plots module
+    # 9a — Existing diagnostic / QC plots (publication_plots)
     if not run_python("src.visualization.publication_plots",
                       [f"--results_dir={results_dir}",
                        f"--out_dir={figures_dir}"],
                       dry_run=dry_run):
+        log("publication_plots module failed (non-fatal, continuing)", "WARN")
+
+    # 9b — New key publication figures (rewiring-vs-DE, focused perm, pathway,
+    #       age comparison, arm comparison, pipeline schematic, retinol subnetwork)
+    log("PHASE 9b: Key Publication Figures")
+    if not run_python("src.visualization.publication_figures",
+                      [f"--results_dir={results_dir}"],
+                      dry_run=dry_run):
+        log("publication_figures module failed (non-fatal)", "WARN")
+
+    pub_dir = Path(results_dir) / "figures" / "publication"
+    log(f"Publication figures → {pub_dir}")
+    return True
+
+
+def phase_8(dry_run: bool = False, max_genes: int = 2500, topk: int = 80) -> bool:
+    """Phase 8: Leakage-Safe Cross-Validation"""
+    log("PHASE 8: Leakage-Safe Cross-Validation")
+
+    results_dir = os.environ.get("RRRM_RESULTS_DIR")
+    networks_dir = os.environ.get("RRRM_NETWORKS_DIR")
+
+    meta_path = find_artifact("phase1_residuals/meta_phase1.tsv.gz")
+    rtech_path = find_artifact("phase1_residuals/Rtech.tsv.gz")
+
+    if meta_path is None or rtech_path is None:
+        log("Phase 1 outputs not found; cannot run validation", "WARN")
         return False
 
-    return True
+    return run_python("src.validation.cross_validation", [
+        f"--phase2_dir={networks_dir}",
+        f"--rtech={rtech_path}",
+        f"--meta={meta_path}",
+        f"--outdir={results_dir}/phase8_validation",
+        f"--max_genes={max_genes}",
+        f"--topk={topk}",
+    ], dry_run=dry_run)
 
 
 def phase_7(dry_run: bool = False) -> bool:
@@ -591,7 +625,7 @@ Examples:
     
     # Determine which phases to run first (needed for init_run)
     # Note: Phase 9 (figures) runs last, after all data phases
-    phases_available = [0, 1, 1.5, 2, 3, 5, 6, 7, 9]
+    phases_available = [0, 1, 1.5, 2, 3, 5, 6, 7, 8, 9]
     if args.phases:
         to_run = sorted(set(args.phases) & set(phases_available))
     else:
@@ -629,6 +663,7 @@ Examples:
         6: lambda: phase_6(args.dry_run, args.skip_r, args.pool_controls,
                            args.focused_permutation, args.pathway_permutation),
         7: lambda: phase_7(args.dry_run),
+        8: lambda: phase_8(args.dry_run, args.max_genes, args.topk),
         9: lambda: phase_9(args.dry_run),  # Figure generation runs last
     }
     
@@ -640,7 +675,7 @@ Examples:
     print()
     
     # Run phases in dependency-aware order (Phase 6 BEFORE Phase 5 for regression support)
-    execution_order = [0, 1, 1.5, 2, 3, 6, 5, 7, 9]
+    execution_order = [0, 1, 1.5, 2, 3, 6, 5, 7, 8, 9]
     phases_to_execute = [p for p in execution_order if p in to_run]
     
     failed = []

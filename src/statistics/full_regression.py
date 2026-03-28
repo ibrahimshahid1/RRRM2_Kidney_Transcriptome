@@ -37,36 +37,9 @@ import pandas as pd
 from scipy import stats
 import warnings
 
+from src.common import REPO_ROOT, find_sample_col, normalize_labels, bh_fdr
+
 warnings.filterwarnings("ignore", category=RuntimeWarning)
-
-# Repository root (2 levels up from src/statistics/)
-REPO_ROOT = Path(__file__).resolve().parents[2]
-
-
-def find_sample_col(meta: pd.DataFrame) -> str:
-    """Find sample identifier column."""
-    for col in ["Sample Name (raw_counts_colname)", "Sample Name", "sample"]:
-        if col in meta.columns:
-            return col
-    return meta.columns[0]
-
-
-def normalize_labels(meta: pd.DataFrame) -> pd.DataFrame:
-    """Normalize Age, Arm, EnvGroup labels."""
-    meta = meta.copy()
-    meta["Age"] = meta["Age"].astype(str).str.upper().replace({
-        "YOUNG": "YNG", "YNG": "YNG", "OLD": "OLD"
-    })
-    meta["Arm"] = meta["Arm"].astype(str).str.upper().replace({
-        "ISS": "ISS-T", "ISST": "ISS-T", "ISS_T": "ISS-T", "ISS-T": "ISS-T",
-        "LAR_T": "LAR", "LAR-T": "LAR", "LAR": "LAR"
-    })
-    meta["EnvGroup"] = meta["EnvGroup"].astype(str).str.upper().replace({
-        "FLIGHT": "FLT", "FLT": "FLT",
-        "GROUND CONTROL": "GC", "GC": "GC",
-        "HGC": "HGC", "VIV": "VIV", "VGC": "VIV"
-    })
-    return meta
 
 
 def stouffer_combine(pvals: np.ndarray) -> float:
@@ -88,19 +61,6 @@ def stouffer_combine(pvals: np.ndarray) -> float:
     combined_p = 1 - stats.norm.cdf(combined_z)
     
     return combined_p
-
-
-def bh_fdr(p: np.ndarray) -> np.ndarray:
-    """Benjamini-Hochberg FDR correction."""
-    p = np.asarray(p, dtype=float)
-    n = p.size
-    order = np.argsort(p)
-    ranked = p[order]
-    q = ranked * n / (np.arange(1, n + 1))
-    q = np.minimum.accumulate(q[::-1])[::-1]
-    out = np.empty_like(q)
-    out[order] = np.clip(q, 0, 1)
-    return out
 
 
 def fit_edge_regression(W: np.ndarray, X: np.ndarray, term_indices: dict) -> dict:

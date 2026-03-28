@@ -22,6 +22,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from src.common import find_sample_col
+
 
 # Numerical stabilization constants
 CLIP_R = 0.9995   # Clip correlations before atanh to prevent explosion from r≈±1
@@ -93,13 +95,7 @@ def main():
     meta = pd.read_csv(args.meta, sep="\t", compression="gzip")
 
     # Find sample column
-    sample_col = None
-    for col in ["Sample Name (raw_counts_colname)", "Sample Name", "sample"]:
-        if col in meta.columns:
-            sample_col = col
-            break
-    if sample_col is None:
-        sample_col = meta.columns[0]
+    sample_col = find_sample_col(meta)
     meta = meta.set_index(sample_col, drop=False)
 
     # Align

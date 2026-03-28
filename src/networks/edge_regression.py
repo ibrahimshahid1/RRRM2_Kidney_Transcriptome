@@ -22,41 +22,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
-def find_sample_col(meta: pd.DataFrame) -> str:
-    """Find the sample ID column in metadata."""
-    for col in ["Sample Name (raw_counts_colname)", "Sample Name", "sample"]:
-        if col in meta.columns:
-            return col
-    return meta.columns[0]
+from src.common import find_sample_col, normalize_labels
 
 
-def normalize_labels(meta: pd.DataFrame) -> pd.DataFrame:
-    """Normalize factor labels to canonical forms."""
-    meta = meta.copy()
-    
-    # Age normalization
-    if "Age" in meta.columns:
-        meta["Age"] = meta["Age"].astype(str).replace({
-            "Young": "YNG", "Yng": "YNG", "young": "YNG",
-            "Old": "OLD", "old": "OLD"
-        })
-    
-    # Arm normalization
-    if "Arm" in meta.columns:
-        meta["Arm"] = meta["Arm"].astype(str).replace({
-            "ISS": "ISS-T", "ISST": "ISS-T", "ISS_T": "ISS-T", "ISS T": "ISS-T",
-            "LAR_T": "LAR", "LAR-T": "LAR", "LAR T": "LAR"
-        })
-    
-    # EnvGroup normalization (HGC→GC, VGC→VIV)
-    if "EnvGroup" in meta.columns:
-        meta["EnvGroup"] = meta["EnvGroup"].astype(str).replace({
-            "HGC": "GC", "VGC": "VIV",
-            "HGC/GC": "GC", "VIV/VGC": "VIV"
-        })
-    
-    return meta
+
 
 
 def main():

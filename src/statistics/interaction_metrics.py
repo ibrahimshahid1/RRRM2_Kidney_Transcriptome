@@ -19,8 +19,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-# Repository root (2 levels up from src/statistics/)
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from src.common import REPO_ROOT
 
 
 def load_rewiring_agg(path: Path) -> pd.DataFrame:

@@ -33,23 +33,16 @@ import numpy as np
 import pandas as pd
 from scipy import stats as sp_stats
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+from src.common import REPO_ROOT, find_sample_col, bh_fdr as _bh_fdr
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def bh_fdr(p: np.ndarray) -> np.ndarray:
-    """Benjamini-Hochberg FDR correction (NaN-safe)."""
+    """BH-FDR with NaN/Inf guard (wraps src.common.bh_fdr)."""
     p = np.asarray(p, dtype=float)
-    p = np.where(np.isfinite(p), p, 1.0)  # guard against NaN/Inf
-    n = p.size
-    order = np.argsort(p)
-    ranked = p[order]
-    q = ranked * n / np.arange(1, n + 1)
-    q = np.minimum.accumulate(q[::-1])[::-1]
-    out = np.empty_like(q)
-    out[order] = np.clip(q, 0, 1)
-    return out
+    p = np.where(np.isfinite(p), p, 1.0)
+    return _bh_fdr(p)
 
 
 def build_design_matrix(meta: pd.DataFrame, clr: pd.DataFrame,
@@ -399,10 +392,8 @@ def main():
     print(f"\n2) Loading metadata: {args.meta}")
     meta = pd.read_csv(args.meta, sep="\t")
     # Find sample column
-    for col in ["Sample Name (raw_counts_colname)", "Sample Name", "sample"]:
-        if col in meta.columns:
-            meta = meta.set_index(col, drop=False)
-            break
+    sample_col = find_sample_col(meta)
+    meta = meta.set_index(sample_col, drop=False)
 
     # ── 3. Load CLR proportions ─────────────────────────────────────────
     print(f"\n3) Loading CLR proportions: {args.clr}")
