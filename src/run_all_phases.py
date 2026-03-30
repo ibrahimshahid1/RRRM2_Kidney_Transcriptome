@@ -180,6 +180,56 @@ def run_rscript(script: str, args: list = None, dry_run: bool = False) -> bool:
     return True
 
 
+def build_id_map_if_needed(dry_run: bool = False) -> None:
+    """Build/rebuild the Ensembl→Symbol ID map if needed.
+
+    Uses the full Rtech gene list (all expressed genes) to ensure pathway
+    genes outside the network skeleton are still mappable.  Also auto-resolves
+    curated gene symbols from config/gene_sets.yaml.
+    """
+    import gzip, csv
+
+    map_path = REPO_ROOT / "data/processed/resources" / "id_map.tsv"
+    rtech_resolved = find_artifact("phase1_residuals/Rtech.tsv.gz")
+
+    needs_rebuild = not map_path.exists()
+    if map_path.exists() and rtech_resolved and rtech_resolved.exists():
+        existing_lines = sum(1 for _ in open(map_path)) - 1
+        if existing_lines < 5000:
+            log(f"ID map has only {existing_lines} genes — rebuilding with full gene set")
+            needs_rebuild = True
+
+    if not needs_rebuild:
+        return
+
+    log("Building Ensembl→Symbol ID map...")
+
+    networks_dir = os.environ.get("RRRM_NETWORKS_DIR", "")
+    gene_list = Path(networks_dir) / "phase2_genes.txt" if networks_dir else None
+
+    if rtech_resolved and rtech_resolved.exists():
+        full_gene_path = map_path.parent / "all_expressed_genes.txt"
+        full_gene_path.parent.mkdir(parents=True, exist_ok=True)
+        with gzip.open(rtech_resolved, "rt") as f:
+            reader = csv.reader(f, delimiter="\t")
+            next(reader)  # skip header
+            gene_ids = [row[0] for row in reader if row]
+        with open(full_gene_path, "w") as f:
+            f.write("\n".join(gene_ids) + "\n")
+        log(f"Extracted {len(gene_ids)} genes from Rtech for ID map")
+        run_python("src.data.build_id_map", [
+            f"--genes={full_gene_path}",
+            f"--outdir={map_path.parent}",
+        ], dry_run=dry_run)
+    elif gene_list and gene_list.exists():
+        run_python("src.data.build_id_map", [
+            f"--genes={gene_list}",
+            f"--outdir={map_path.parent}",
+        ], dry_run=dry_run)
+    else:
+        log("Gene list not found, cannot build ID map", "WARN")
+
+
 def phase_0(dry_run: bool = False, skip_r: bool = False) -> bool:
     """Phase 0: Deconvolution (R)"""
     log("PHASE 0: Cell-type Deconvolution")
@@ -232,8 +282,13 @@ def phase_1(dry_run: bool = False, skip_r: bool = False,
         return False
 
     # Export to Python format — pass the output dir so it writes into the run
-    return run_rscript("src/preprocessing/export_phase1.R",
-                       args=[f"--outdir={phase1_dir}"], dry_run=dry_run)
+    if not run_rscript("src/preprocessing/export_phase1.R",
+                       args=[f"--outdir={phase1_dir}"], dry_run=dry_run):
+        return False
+
+    # Build Ensembl→Symbol ID map early (needed by gene_set_loader for YAML resolution)
+    build_id_map_if_needed(dry_run)
+    return True
 
 
 def phase_1_5(dry_run: bool = False) -> bool:
@@ -269,6 +324,36 @@ def phase_1_5(dry_run: bool = False) -> bool:
         f"--clr={clr_path}",
         f"--outdir={outdir}",
         "--tech_cols=LibraryBatch,ReadDepth,rRNA",
+    ], dry_run=dry_run)
+
+
+def phase_1_5b(dry_run: bool = False) -> bool:
+    """Phase 1.5b: All-Segment Marker Discovery"""
+    log("PHASE 1.5b: All-Segment Marker Discovery")
+
+    vst_path = REPO_ROOT / "data/processed/vst_normalized" / "GLDS-674_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv"
+    if not vst_path.exists():
+        log(f"VST file not found: {vst_path}", "WARN")
+        return False
+
+    clr_path = find_artifact("deconvolution/music_segment_direct_proportions_CLR.csv")
+    if clr_path is None:
+        log("CLR file not found", "WARN")
+        return False
+
+    meta_path = find_artifact("phase1_residuals/meta_phase1.tsv.gz")
+    if meta_path is None:
+        log("meta_phase1.tsv.gz not found", "WARN")
+        return False
+
+    results_dir = os.environ.get("RRRM_RESULTS_DIR")
+    outdir = Path(results_dir) / "segment_markers"
+
+    return run_python("src.markers.discover_markers", [
+        f"--vst={vst_path}",
+        f"--meta={meta_path}",
+        f"--clr={clr_path}",
+        f"--outdir={outdir}",
     ], dry_run=dry_run)
 
 
@@ -506,47 +591,10 @@ def phase_7(dry_run: bool = False) -> bool:
     contrasts = [f.stem.replace("_rewiring_agg", "") for f in contrast_files]
     log(f"Detected contrasts: {contrasts}")
 
-    # Ensure ID map exists — use full expressed gene list (not just network HVGs)
-    # so that pathway genes outside the 2500-gene skeleton are still mappable.
+    # Ensure ID map exists (may have been built by Phase 1, but rebuild if stale)
+    build_id_map_if_needed(dry_run)
+
     map_path = REPO_ROOT / "data/processed/resources" / "id_map.tsv"
-    # Rebuild if map is stale (covers fewer genes than what Rtech has)
-    rtech_check = find_artifact("phase1_residuals/Rtech.tsv.gz")
-    needs_rebuild = not map_path.exists()
-    if map_path.exists() and rtech_check and rtech_check.exists():
-        # Check if existing map covers all expressed genes
-        existing_lines = sum(1 for _ in open(map_path)) - 1  # subtract header
-        if existing_lines < 5000:  # likely only covers 2500 HVGs
-            log(f"ID map has only {existing_lines} genes — rebuilding with full expressed gene set")
-            needs_rebuild = True
-    if needs_rebuild:
-        log("Building Ensembl→Symbol ID map (first run)...")
-        networks_dir = os.environ.get("RRRM_NETWORKS_DIR")
-        # Prefer the full Rtech gene list (all expressed genes) over phase2_genes.txt
-        rtech_resolved = find_artifact("phase1_residuals/Rtech.tsv.gz")
-        gene_list = Path(networks_dir) / "phase2_genes.txt"
-        if rtech_resolved and rtech_resolved.exists():
-            # Extract gene list from Rtech (first column = gene IDs)
-            import gzip, csv
-            full_gene_path = map_path.parent / "all_expressed_genes.txt"
-            full_gene_path.parent.mkdir(parents=True, exist_ok=True)
-            with gzip.open(rtech_resolved, "rt") as f:
-                reader = csv.reader(f, delimiter="\t")
-                header = next(reader)  # skip header
-                gene_ids = [row[0] for row in reader if row]
-            with open(full_gene_path, "w") as f:
-                f.write("\n".join(gene_ids) + "\n")
-            log(f"Extracted {len(gene_ids)} genes from Rtech for ID map")
-            run_python("src.data.build_id_map", [
-                f"--genes={full_gene_path}",
-                f"--outdir={map_path.parent}",
-            ], dry_run=dry_run)
-        elif gene_list.exists():
-            run_python("src.data.build_id_map", [
-                f"--genes={gene_list}",
-                f"--outdir={map_path.parent}",
-            ], dry_run=dry_run)
-        else:
-            log(f"Gene list not found at {gene_list}, cannot build ID map", "WARN")
 
     map_args = []
     if map_path.exists():
@@ -625,7 +673,7 @@ Examples:
     
     # Determine which phases to run first (needed for init_run)
     # Note: Phase 9 (figures) runs last, after all data phases
-    phases_available = [0, 1, 1.5, 2, 3, 5, 6, 7, 8, 9]
+    phases_available = [0, 1, 1.5, 1.6, 2, 3, 5, 6, 7, 8, 9]
     if args.phases:
         to_run = sorted(set(args.phases) & set(phases_available))
     else:
@@ -657,6 +705,7 @@ Examples:
         0: lambda: phase_0(args.dry_run, args.skip_r),
         1: lambda: phase_1(args.dry_run, args.skip_r, args.preserve_dct),
         1.5: lambda: phase_1_5(args.dry_run),
+        1.6: lambda: phase_1_5b(args.dry_run),
         2: lambda: phase_2(args.dry_run, args.skip_r, args.max_genes, args.topk, args.pool_controls),
         3: lambda: phase_3(args.dry_run, args.num_seeds, args.pool_controls),
         5: lambda: phase_5(args.dry_run),
@@ -675,7 +724,7 @@ Examples:
     print()
     
     # Run phases in dependency-aware order (Phase 6 BEFORE Phase 5 for regression support)
-    execution_order = [0, 1, 1.5, 2, 3, 6, 5, 7, 8, 9]
+    execution_order = [0, 1, 1.5, 1.6, 2, 3, 6, 5, 7, 8, 9]
     phases_to_execute = [p for p in execution_order if p in to_run]
     
     failed = []

@@ -31,10 +31,12 @@ import time
 from pathlib import Path
 from datetime import datetime
 
+import yaml
 import requests
 import pandas as pd
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+from src.common import REPO_ROOT
+
 ENSEMBL_REST = "https://rest.ensembl.org"
 
 
@@ -132,6 +134,10 @@ def main():
     ap.add_argument("--extra_symbols", default="",
                     help="Comma-separated extra symbols for annotation/reporting "
                          "(NOT added to enrichment universe). E.g. Wnk1,Slc12a3")
+    ap.add_argument("--curated_yaml", default="",
+                    help="Path to curated gene sets YAML. All symbols in the YAML "
+                         "will be auto-resolved and added to the extras map. "
+                         "(default: config/gene_sets.yaml if it exists)")
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
@@ -198,16 +204,43 @@ def main():
     print(f"\n  Mapped: {n_mapped}/{len(gene_ids)} universe genes have symbols")
 
     # ── Step 2: Extra symbols for reporting (NOT in universe) ────────────
-    df_extras = pd.DataFrame()
+    # Collect extra symbols from --extra_symbols flag AND --curated_yaml
+    extra_syms: list[str] = []
     if args.extra_symbols:
-        extra = [s.strip() for s in args.extra_symbols.split(",") if s.strip()]
-        print(f"\nStep 2: xref lookup for {len(extra)} extra symbols...")
+        extra_syms.extend(s.strip() for s in args.extra_symbols.split(",") if s.strip())
+
+    # Auto-resolve curated YAML symbols
+    curated_yaml_path = Path(args.curated_yaml) if args.curated_yaml else (REPO_ROOT / "config" / "gene_sets.yaml")
+    if curated_yaml_path.exists():
+        print(f"\nLoading curated gene sets from: {curated_yaml_path}")
+        with open(curated_yaml_path) as f:
+            curated_config = yaml.safe_load(f)
+        for key, val in curated_config.items():
+            if isinstance(val, dict) and "genes" in val:
+                genes_raw = val["genes"]
+                if isinstance(genes_raw, list):
+                    for item in genes_raw:
+                        if isinstance(item, str):
+                            extra_syms.append(item.strip())
+                        elif isinstance(item, list):
+                            extra_syms.extend(s.strip() for s in item if isinstance(s, str))
+                        elif isinstance(item, dict):
+                            for sublist in item.values():
+                                if isinstance(sublist, list):
+                                    extra_syms.extend(s.strip() for s in sublist if isinstance(s, str))
+        # Deduplicate
+        extra_syms = list(dict.fromkeys(extra_syms))
+        print(f"  Collected {len(extra_syms)} unique symbols from YAML + CLI")
+
+    df_extras = pd.DataFrame()
+    if extra_syms:
+        print(f"\nStep 2: xref lookup for {len(extra_syms)} extra symbols...")
 
         present = set(df_universe["ensembl_gene_id"])
         xref_ens_ids = []
         xref_requested: dict[str, str] = {}  # ens_id → requested symbol
 
-        for sym in extra:
+        for sym in extra_syms:
             ens_ids = ensembl_xref_symbol(sym)
             for eid in ens_ids:
                 if eid not in present:
