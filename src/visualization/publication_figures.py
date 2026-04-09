@@ -789,7 +789,7 @@ def fig_retinol_subnetwork(results_dir: Path, repo_root: Path, out_dir: Path) ->
     ax_b.set_xticks(x)
     ax_b.set_xticklabels(labels, rotation=15, ha="right")
     ax_b.set_ylabel("Mean rewiring (cosine distance)")
-    ax_b.set_title("Retinol Genes vs Background Rewiring\n(LAR Young: OR = 19.9, q = 1.6×10⁻⁵)")
+    ax_b.set_title("Retinol Genes vs Background Rewiring")
     ax_b.legend(fontsize=8)
 
     fig.suptitle("Retinol / Retinoic Acid Metabolism — Convergent Multi-Scale Signal",

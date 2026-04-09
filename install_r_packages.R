@@ -51,10 +51,10 @@ for (pkg in cran_packages) {
 # 4) MuSiC package (GitHub)
 if (!require("MuSiC", quietly = TRUE)) {
     cat("\nInstalling MuSiC from GitHub...\n")
-    if (!require("devtools", quietly = TRUE)) {
-        install.packages("devtools", repos = "https://cloud.r-project.org")
+    if (!require("remotes", quietly = TRUE)) {
+        install.packages("remotes", repos = "https://cloud.r-project.org")
     }
-    devtools::install_github("xuranw/MuSiC")
+    remotes::install_github("xuranw/MuSiC")
 } else {
     cat("\nAlready installed: MuSiC\n")
 }
