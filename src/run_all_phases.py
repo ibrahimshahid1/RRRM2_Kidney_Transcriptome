@@ -709,7 +709,7 @@ Examples:
     
     # Determine which phases to run first (needed for init_run)
     # Note: Phase 9 (figures) runs last, after all data phases
-    phases_available = [0, 1, 1.5, 1.6, 2, 3, 5, 6, 7, 8, 8.5, 9]
+    phases_available = [0, 1, 1.5, 2, 3, 5, 6, 7, 8, 9]
     if args.phases:
         to_run = sorted(set(args.phases) & set(phases_available))
     else:
@@ -761,7 +761,7 @@ Examples:
     print()
     
     # Run phases in dependency-aware order (Phase 6 BEFORE Phase 5 for regression support)
-    execution_order = [0, 1, 1.5, 1.6, 2, 3, 6, 5, 7, 8, 8.5, 9]
+    execution_order = [0, 1, 1.5, 2, 3, 6, 5, 7, 8, 9]
     phases_to_execute = [p for p in execution_order if p in to_run]
     
     failed = []
