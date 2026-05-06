@@ -1,0 +1,31 @@
+{
+  "version": "2026-05-05",
+  "independent_replication": {
+    "primary": {
+      "study": "OSD-102",
+      "scope": "LAR-Young-like flight/ground findings and pathways only",
+      "no_combat_seq": true,
+      "q_threshold": 0.1,
+      "criteria": [
+        "same direction for pre-registered genes/pathways",
+        "gene/pathway q-value threshold fixed in protocol before loading OSD-102 results",
+        "pathway replication judged on fixed pathway list and direction"
+      ]
+    },
+    "secondary": {
+      "study": "OSD-513",
+      "scope": "sex-stratification and sex-robustness only",
+      "no_combat_seq": true,
+      "q_threshold": 0.1
+    },
+    "excluded": [
+      "OSD-568"
+    ]
+  },
+  "non_claims": [
+    "ISS-T validation",
+    "old-arm validation",
+    "global cohort expansion",
+    "classifier validation"
+  ]
+}

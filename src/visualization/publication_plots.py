@@ -433,16 +433,20 @@ def plot_phase6_uncertainty(data_dir: Path, out_dir: Path, gene_symbols: Dict[st
             df["symbol"] = df["gene"].map(gene_symbols).fillna(df["gene"])
             all_pvals.append(df)
             
+            q_col = next((c for c in ["q_BH_edge_sum", "q_BH_candidate", "q_BH"] if c in df.columns), None)
+            p_col = next((c for c in ["p_perm_edge_sum", "p_perm"] if c in df.columns), None)
             # Significant genes table (q < 0.05)
-            if "q_BH" in df.columns:
-                sig_genes = df[df["q_BH"] < 0.05].sort_values("q_BH")
+            if q_col is not None:
+                sig_genes = df[df[q_col] < 0.05].sort_values(q_col)
                 if len(sig_genes) > 0:
                     out_cols = ["gene", "symbol"]
+                    if "edge_sum_node_rewiring_obs" in df.columns:
+                        out_cols.append("edge_sum_node_rewiring_obs")
                     if "rewiring_abs_obs" in df.columns:
                         out_cols.append("rewiring_abs_obs")
-                    if "p_perm" in df.columns:
-                        out_cols.append("p_perm")
-                    out_cols.append("q_BH")
+                    if p_col:
+                        out_cols.append(p_col)
+                    out_cols.append(q_col)
                     sig_genes[out_cols].to_csv(
                         phase_out / f"{contrast}_significant_genes.tsv", sep="\t", index=False)
                     tables_created += 1
@@ -457,11 +461,14 @@ def plot_phase6_uncertainty(data_dir: Path, out_dir: Path, gene_symbols: Dict[st
     combined = pd.concat(all_pvals, ignore_index=True)
 
     # 1. P-value histogram
-    if "p_perm" in combined.columns:
+    p_col_combined = next((c for c in ["p_perm_edge_sum", "p_perm"] if c in combined.columns), None)
+    q_col_combined = next((c for c in ["q_BH_edge_sum", "q_BH_candidate", "q_BH"] if c in combined.columns), None)
+
+    if p_col_combined:
         fig, ax = plt.subplots(figsize=(10, 6))
         for contrast in combined["contrast"].unique():
             subset = combined[combined["contrast"] == contrast]
-            ax.hist(subset["p_perm"], bins=50, alpha=0.4, label=contrast)
+            ax.hist(subset[p_col_combined], bins=50, alpha=0.4, label=contrast)
         ax.axhline(y=len(combined) / len(combined["contrast"].unique()) / 50, 
                    color="red", linestyle="--", alpha=0.5, label="Uniform expectation")
         ax.set_xlabel("Permutation P-value")
@@ -472,13 +479,13 @@ def plot_phase6_uncertainty(data_dir: Path, out_dir: Path, gene_symbols: Dict[st
         plots_created += 1
 
     # 2. Q-Q plot
-    if "p_perm" in combined.columns:
+    if p_col_combined:
         fig, axes = plt.subplots(2, 2, figsize=(12, 10))
         axes = axes.flatten()
         
         for i, contrast in enumerate(combined["contrast"].unique()[:4]):
             subset = combined[combined["contrast"] == contrast]
-            observed = np.sort(subset["p_perm"].dropna().values)
+            observed = np.sort(subset[p_col_combined].dropna().values)
             expected = np.linspace(0, 1, len(observed))
             
             ax = axes[i]
@@ -495,9 +502,9 @@ def plot_phase6_uncertainty(data_dir: Path, out_dir: Path, gene_symbols: Dict[st
         plots_created += 1
 
     # 3. -log10(q) distribution
-    if "q_BH" in combined.columns:
+    if q_col_combined:
         fig, ax = plt.subplots(figsize=(10, 6))
-        combined["neg_log10_q"] = -np.log10(combined["q_BH"].clip(lower=1e-10))
+        combined["neg_log10_q"] = -np.log10(combined[q_col_combined].clip(lower=1e-10))
         sns.boxplot(data=combined, x="contrast", y="neg_log10_q", ax=ax, palette="Set3")
         ax.axhline(y=-np.log10(0.05), color="red", linestyle="--", label="q=0.05")
         ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
@@ -512,14 +519,14 @@ def plot_phase6_uncertainty(data_dir: Path, out_dir: Path, gene_symbols: Dict[st
     summary_rows = []
     for contrast in combined["contrast"].unique():
         subset = combined[combined["contrast"] == contrast]
-        n_sig = (subset["q_BH"] < 0.05).sum() if "q_BH" in subset.columns else 0
-        n_sig_01 = (subset["q_BH"] < 0.01).sum() if "q_BH" in subset.columns else 0
+        n_sig = (subset[q_col_combined] < 0.05).sum() if q_col_combined else 0
+        n_sig_01 = (subset[q_col_combined] < 0.01).sum() if q_col_combined else 0
         summary_rows.append({
             "contrast": contrast,
             "n_genes": len(subset),
             "n_significant_q05": n_sig,
             "n_significant_q01": n_sig_01,
-            "median_pvalue": subset["p_perm"].median() if "p_perm" in subset.columns else np.nan,
+            "median_pvalue": subset[p_col_combined].median() if p_col_combined else np.nan,
         })
     
     summary_df = pd.DataFrame(summary_rows)
@@ -564,12 +571,15 @@ def plot_phase6_regression(data_dir: Path, out_dir: Path, gene_symbols: Dict[str
     for effect_type, df in results.items():
         effect_label = effect_type.replace("_", " ").title()
         
+        q_col = "q_BH_empirical_signed" if "q_BH_empirical_signed" in df.columns else "q_BH"
+        p_col = "p_empirical_signed" if "p_empirical_signed" in df.columns else "p_stouffer"
+
         # 1. Export top significant genes (q < 0.05)
-        sig_genes = df[df["q_BH"] < 0.05].copy()
+        sig_genes = df[df[q_col] < 0.05].copy()
         if len(sig_genes) > 0:
             # Top 100 or all significant
-            top_sig = sig_genes.nsmallest(min(100, len(sig_genes)), "p_stouffer")
-            out_cols = ["gene", "symbol", "n_edges", "median_beta", "median_t", "p_stouffer", "q_BH"]
+            top_sig = sig_genes.nsmallest(min(100, len(sig_genes)), p_col)
+            out_cols = ["gene", "symbol", "n_edges", "median_beta", "median_t", p_col, q_col]
             top_sig[out_cols].to_csv(phase_out / f"{effect_type}_top_significant.tsv", sep="\t", index=False)
             tables_created += 1
             print(f"  Saved: {effect_type}_top_significant.tsv ({len(top_sig)} genes)")
@@ -581,17 +591,17 @@ def plot_phase6_regression(data_dir: Path, out_dir: Path, gene_symbols: Dict[str
         
         # 3. Volcano plot (-log10(p) vs median_beta)
         fig, ax = plt.subplots(figsize=(10, 8))
-        df["neg_log10_p"] = -np.log10(df["p_stouffer"].clip(lower=1e-300))
+        df["neg_log10_p"] = -np.log10(df[p_col].clip(lower=1e-300))
         
         # Color by significance
-        colors = np.where(df["q_BH"] < 0.05, "red", "gray")
-        alpha = np.where(df["q_BH"] < 0.05, 0.7, 0.3)
+        colors = np.where(df[q_col] < 0.05, "red", "gray")
+        alpha = np.where(df[q_col] < 0.05, 0.7, 0.3)
         
         ax.scatter(df["median_beta"], df["neg_log10_p"], c=colors, alpha=0.5, s=10)
         
         # Significance threshold line
-        if (df["q_BH"] < 0.05).any():
-            sig_threshold = df[df["q_BH"] < 0.05]["neg_log10_p"].min()
+        if (df[q_col] < 0.05).any():
+            sig_threshold = df[df[q_col] < 0.05]["neg_log10_p"].min()
             ax.axhline(y=sig_threshold, color="red", linestyle="--", alpha=0.5, label=f"q=0.05")
         
         ax.axvline(x=0, color="gray", linestyle="-", alpha=0.3)
@@ -600,7 +610,7 @@ def plot_phase6_regression(data_dir: Path, out_dir: Path, gene_symbols: Dict[str
         ax.set_title(f"Volcano Plot: {effect_label}\n(Red = FDR < 0.05)")
         
         # Annotate top 10 genes
-        top10 = df.nsmallest(10, "p_stouffer")
+        top10 = df.nsmallest(10, p_col)
         for _, row in top10.iterrows():
             ax.annotate(row["symbol"], (row["median_beta"], row["neg_log10_p"]),
                        fontsize=7, alpha=0.8)
@@ -610,9 +620,9 @@ def plot_phase6_regression(data_dir: Path, out_dir: Path, gene_symbols: Dict[str
         
         # 4. Distribution of p-values (histogram)
         fig, ax = plt.subplots(figsize=(10, 6))
-        ax.hist(df["p_stouffer"].dropna(), bins=50, color="steelblue", alpha=0.7, edgecolor="black")
+        ax.hist(df[p_col].dropna(), bins=50, color="steelblue", alpha=0.7, edgecolor="black")
         ax.axhline(y=len(df) / 50, color="red", linestyle="--", label="Uniform expectation")
-        ax.set_xlabel("Stouffer P-value")
+        ax.set_xlabel("Empirical signed gene p-value")
         ax.set_ylabel("Number of Genes")
         ax.set_title(f"P-value Distribution: {effect_label}")
         ax.legend()
@@ -634,10 +644,16 @@ def plot_phase6_regression(data_dir: Path, out_dir: Path, gene_symbols: Dict[str
     if "flight_effect" in results and "age_flight_interaction" in results:
         flight_df = results["flight_effect"]
         interaction_df = results["age_flight_interaction"]
-        
+        q_col_flight = "q_BH_empirical_signed" if "q_BH_empirical_signed" in flight_df.columns else "q_BH"
+        q_col_interaction = "q_BH_empirical_signed" if "q_BH_empirical_signed" in interaction_df.columns else "q_BH"
+
         # Merge on gene
-        merged = flight_df[["gene", "symbol", "q_BH", "median_beta"]].merge(
-            interaction_df[["gene", "q_BH", "median_beta"]],
+        merged = flight_df[["gene", "symbol", q_col_flight, "median_beta"]].rename(
+            columns={q_col_flight: "q_value"}
+        ).merge(
+            interaction_df[["gene", q_col_interaction, "median_beta"]].rename(
+                columns={q_col_interaction: "q_value"}
+            ),
             on="gene", suffixes=("_flight", "_interaction")
         )
         
@@ -647,17 +663,17 @@ def plot_phase6_regression(data_dir: Path, out_dir: Path, gene_symbols: Dict[str
             # Color by significance category
             colors = []
             for _, row in merged.iterrows():
-                if row["q_BH_flight"] < 0.05 and row["q_BH_interaction"] < 0.05:
+                if row["q_value_flight"] < 0.05 and row["q_value_interaction"] < 0.05:
                     colors.append("purple")  # Both
-                elif row["q_BH_flight"] < 0.05:
+                elif row["q_value_flight"] < 0.05:
                     colors.append("blue")    # Flight only
-                elif row["q_BH_interaction"] < 0.05:
+                elif row["q_value_interaction"] < 0.05:
                     colors.append("orange")  # Interaction only
                 else:
                     colors.append("gray")
             
-            merged["neg_log_q_flight"] = -np.log10(merged["q_BH_flight"].clip(lower=1e-300))
-            merged["neg_log_q_interaction"] = -np.log10(merged["q_BH_interaction"].clip(lower=1e-300))
+            merged["neg_log_q_flight"] = -np.log10(merged["q_value_flight"].clip(lower=1e-300))
+            merged["neg_log_q_interaction"] = -np.log10(merged["q_value_interaction"].clip(lower=1e-300))
             
             ax.scatter(merged["neg_log_q_flight"], merged["neg_log_q_interaction"],
                       c=colors, alpha=0.5, s=15)
@@ -672,7 +688,7 @@ def plot_phase6_regression(data_dir: Path, out_dir: Path, gene_symbols: Dict[str
                         "Blue=Flight only, Orange=Interaction only, Purple=Both")
             
             # Annotate genes significant in both
-            both_sig = merged[(merged["q_BH_flight"] < 0.05) & (merged["q_BH_interaction"] < 0.05)]
+            both_sig = merged[(merged["q_value_flight"] < 0.05) & (merged["q_value_interaction"] < 0.05)]
             for _, row in both_sig.head(15).iterrows():
                 ax.annotate(row["symbol"], 
                            (row["neg_log_q_flight"], row["neg_log_q_interaction"]),
@@ -685,10 +701,10 @@ def plot_phase6_regression(data_dir: Path, out_dir: Path, gene_symbols: Dict[str
             summary = {
                 "category": ["Flight Effect Only", "Age×Flight Only", "Both", "Neither"],
                 "count": [
-                    ((merged["q_BH_flight"] < 0.05) & (merged["q_BH_interaction"] >= 0.05)).sum(),
-                    ((merged["q_BH_flight"] >= 0.05) & (merged["q_BH_interaction"] < 0.05)).sum(),
-                    ((merged["q_BH_flight"] < 0.05) & (merged["q_BH_interaction"] < 0.05)).sum(),
-                    ((merged["q_BH_flight"] >= 0.05) & (merged["q_BH_interaction"] >= 0.05)).sum(),
+                    ((merged["q_value_flight"] < 0.05) & (merged["q_value_interaction"] >= 0.05)).sum(),
+                    ((merged["q_value_flight"] >= 0.05) & (merged["q_value_interaction"] < 0.05)).sum(),
+                    ((merged["q_value_flight"] < 0.05) & (merged["q_value_interaction"] < 0.05)).sum(),
+                    ((merged["q_value_flight"] >= 0.05) & (merged["q_value_interaction"] >= 0.05)).sum(),
                 ]
             }
             pd.DataFrame(summary).to_csv(phase_out / "significance_category_counts.tsv", sep="\t", index=False)
@@ -698,14 +714,16 @@ def plot_phase6_regression(data_dir: Path, out_dir: Path, gene_symbols: Dict[str
     # 7. Summary statistics
     summary_rows = []
     for effect_type, df in results.items():
+        q_col = "q_BH_empirical_signed" if "q_BH_empirical_signed" in df.columns else "q_BH"
+        p_col = "p_empirical_signed" if "p_empirical_signed" in df.columns else "p_stouffer"
         summary_rows.append({
             "effect": effect_type,
             "n_genes": len(df),
-            "n_significant_q05": (df["q_BH"] < 0.05).sum(),
-            "n_significant_q01": (df["q_BH"] < 0.01).sum(),
-            "n_significant_q001": (df["q_BH"] < 0.001).sum(),
-            "median_p_stouffer": df["p_stouffer"].median(),
-            "min_p_stouffer": df["p_stouffer"].min(),
+            "n_significant_q05": (df[q_col] < 0.05).sum(),
+            "n_significant_q01": (df[q_col] < 0.01).sum(),
+            "n_significant_q001": (df[q_col] < 0.001).sum(),
+            "median_p_empirical_signed": df[p_col].median(),
+            "min_p_empirical_signed": df[p_col].min(),
         })
     
     summary_df = pd.DataFrame(summary_rows)

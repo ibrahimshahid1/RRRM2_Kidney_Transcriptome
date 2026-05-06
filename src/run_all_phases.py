@@ -375,11 +375,12 @@ def phase_2(dry_run: bool = False, skip_r: bool = False,
         log("No DCT marker panel found; using variance-only gene selection", "WARN")
 
     if not run_python("src.networks.shared_topology",
-                      [f"--max_genes={max_genes}", f"--topk={topk}",
-                       f"--outdir={networks_dir}",
-                       f"--id_map=data/processed/resources/id_map.tsv",
-                       f"--biotype_filter=protein_coding"] + force_args,
-                      dry_run=dry_run):
+	                      [f"--max_genes={max_genes}", f"--topk={topk}",
+	                       f"--outdir={networks_dir}",
+	                       f"--id_map=data/processed/resources/id_map.tsv",
+                           f"--anchor_config=config/anchor_genes.yaml",
+	                       f"--biotype_filter=protein_coding"] + force_args,
+	                      dry_run=dry_run):
         return False
 
     # Step A1: LIONESS edge weights
@@ -429,11 +430,13 @@ def phase_3(dry_run: bool = False, num_seeds: int = 10,
 
     # Step 3.3: Procrustes alignment
     if not run_python("src.networks.procrustes",
-                      [f"--phase2_dir={networks_dir}",
-                       f"--emb_dir={results_dir}/phase3_embeddings",
-                       f"--outdir={results_dir}/phase3_rewiring",
-                       f"--num_seeds={num_seeds}"],
-                      dry_run=dry_run):
+	                      [f"--phase2_dir={networks_dir}",
+	                       f"--emb_dir={results_dir}/phase3_embeddings",
+	                       f"--outdir={results_dir}/phase3_rewiring",
+                           f"--anchor_config=config/anchor_genes.yaml",
+                           f"--id_map=data/processed/resources/id_map.tsv",
+	                       f"--num_seeds={num_seeds}"],
+	                      dry_run=dry_run):
         return False
 
     return True
@@ -452,15 +455,6 @@ def phase_5(dry_run: bool = False) -> bool:
                       dry_run=dry_run):
         return False
 
-    # Check for regression results to use as support
-    reg_file = Path(results_dir) / "phase6_regression/gene_arm_flight_interaction.tsv"
-    reg_args = []
-    if reg_file.exists():
-        reg_args = [f"--regression_results={reg_file}"]
-        log(f"Using regression results for support: {reg_file}")
-    else:
-        log("Regression results not found; Silent Shifters will lack statistical support", "WARN")
-
     # Auto-detect available contrasts (supports both _GC and _GND suffixes)
     rewiring_dir = Path(results_dir) / "phase3_rewiring"
     contrast_files = sorted(rewiring_dir.glob("*_FLT_minus_*_rewiring_agg.tsv"))
@@ -470,9 +464,17 @@ def phase_5(dry_run: bool = False) -> bool:
 
     for rewiring_file in contrast_files:
         contrast = rewiring_file.stem.replace("_rewiring_agg", "")
+        support_args = []
+        perm_edge_sum = Path(results_dir) / f"phase6_uncertainty/{contrast}_perm_edge_sum_pvals.tsv"
+        perm_legacy = Path(results_dir) / f"phase6_uncertainty/{contrast}_perm_pvals.tsv"
+        if perm_edge_sum.exists():
+            support_args = [f"--perm={perm_edge_sum}"]
+        elif perm_legacy.exists():
+            support_args = [f"--perm={perm_legacy}"]
         if not run_python("src.statistics.silent_shifters",
                           [f"--rewiring={rewiring_file}",
-                           f"--outdir={results_dir}/phase5_silent_shifters_strict"] + reg_args,
+                           f"--gene_de_dir={REPO_ROOT / 'data/processed/gene_level_DE'}",
+                           f"--outdir={results_dir}/phase5_silent_shifters_strict"] + support_args,
                           dry_run=dry_run):
             log(f"Warning: silent_shifters failed for {contrast}", "WARN")
 
@@ -481,8 +483,8 @@ def phase_5(dry_run: bool = False) -> bool:
 
 def phase_6(dry_run: bool = False, skip_r: bool = False,
             pool_controls: bool = False,
-            focused_permutation: bool = False,
-            pathway_permutation: bool = False) -> bool:
+            candidate_genes: str = "",
+            hierarchical_fdr: bool = False) -> bool:
     """Phase 6: Uncertainty Estimation + Full Regression"""
     log("PHASE 6: Permutation + Bootstrap + Full Regression")
 
@@ -495,21 +497,16 @@ def phase_6(dry_run: bool = False, skip_r: bool = False,
     if pool_controls:
         perm_args.append("--pool-controls")
         log("Permutation test: pooling GC+VIV+BSL as ground controls")
-    if focused_permutation:
-        perm_args.append("--focused-permutation")
-        # Increase permutation budget for focused testing to push p-values
-        # below the BH threshold for the top-decile (~250 genes).
-        # With K=50,000, min achievable p = 1/50001 ≈ 2×10⁻⁵,
-        # vs BH threshold for rank-1: 0.05/250 = 2×10⁻⁴ — comfortably reachable.
-        perm_args.append("--K_perm=50000")
-        log("Permutation test: focused BH on top-decile genes (K=50,000)")
-    if pathway_permutation:
-        perm_args.append("--pathway-permutation")
-        # Auto-detect gene map for pathway symbol resolution
-        map_path = REPO_ROOT / "data/processed/resources" / "id_map.tsv"
-        if map_path.exists():
-            perm_args.append(f"--gene-map={map_path}")
-        log("Permutation test: pathway-level competitive enrichment")
+    if candidate_genes:
+        perm_args.append(f"--candidate-genes={candidate_genes}")
+        log("Permutation test: pre-registered candidate-only BH")
+    if hierarchical_fdr:
+        perm_args.extend([
+            "--hierarchical-fdr",
+            f"--hierarchical-gene-sets={REPO_ROOT / 'config/gene_sets.yaml'}",
+            f"--gene-map={REPO_ROOT / 'data/processed/resources/id_map.tsv'}",
+        ])
+        log("Permutation test: hierarchical FDR over pre-specified gene sets")
     if not run_python("src.statistics.permutation_bootstrap", perm_args, dry_run=dry_run):
         return False
 
@@ -554,6 +551,25 @@ def phase_9(dry_run: bool = False) -> bool:
     pub_dir = Path(results_dir) / "figures" / "publication"
     log(f"Publication figures → {pub_dir}")
     return True
+
+
+def phase_external_validation(
+    dry_run: bool = False,
+    external_root: str = "data/external/osdr",
+    k_perm: int = 5000,
+) -> bool:
+    """Protocol-gated independent validation in OSD-102 and OSD-513."""
+    log("EXTERNAL VALIDATION: OSD-102 primary + OSD-513 secondary")
+
+    results_dir = os.environ.get("RRRM_RESULTS_DIR")
+    outdir = Path(results_dir) / "external_validation"
+    return run_python("src.validation.osd_external_validation", [
+        f"--external_root={REPO_ROOT / external_root}",
+        f"--protocol_dir={REPO_ROOT / 'docs/external_replication_protocol'}",
+        f"--id_map={REPO_ROOT / 'data/processed/resources/id_map.tsv'}",
+        f"--outdir={outdir}",
+        f"--K_perm={k_perm}",
+    ], dry_run=dry_run)
 
 
 def phase_8(dry_run: bool = False, max_genes: int = 2500, topk: int = 80) -> bool:
@@ -696,12 +712,18 @@ Examples:
                         help="Pool GC+VIV+BSL as ground reference (triples control n)")
     parser.add_argument("--preserve-dct", action="store_true",
                         help="Do NOT regress out DCT proportions (preserves DCT signal)")
-    parser.add_argument("--focused-permutation", action="store_true",
-                        help="Run focused BH correction on top-decile genes only (~250). "
-                             "Reduces the multiple-testing burden from 2500 to ~250 hypotheses.")
-    parser.add_argument("--pathway-permutation", action="store_true",
-                        help="Run pathway-level permutation testing (competitive GSEA-style). "
-                             "Tests ~100 pathways instead of ~2500 individual genes.")
+    parser.add_argument("--candidate-genes", default="",
+                        help="Pre-registered candidate Ensembl-ID file for candidate-only BH.")
+    parser.add_argument("--hierarchical-fdr", action="store_true",
+                        help="Run Benjamini-Bogomolov-style hierarchical FDR over configured gene sets.")
+    parser.add_argument("--external-validation", action="store_true",
+                        help="After selected phases, run protocol-gated OSD-102/OSD-513 external validation.")
+    parser.add_argument("--external-validation-only", action="store_true",
+                        help="Run only OSD-102/OSD-513 external validation and skip OSD-771 phases.")
+    parser.add_argument("--external-root", default="data/external/osdr",
+                        help="Root directory containing OSD-102 and OSD-513 downloaded files.")
+    parser.add_argument("--external-validation-perms", type=int, default=5000,
+                        help="Sample-label permutations per external pathway feature.")
     
     args = parser.parse_args()
     
@@ -709,8 +731,11 @@ Examples:
     
     # Determine which phases to run first (needed for init_run)
     # Note: Phase 9 (figures) runs last, after all data phases
-    phases_available = [0, 1, 1.5, 2, 3, 5, 6, 7, 8, 9]
-    if args.phases:
+    phases_available = [0, 1, 1.5, 2, 3, 5, 6, 7, 8, 8.5, 9]
+    if args.external_validation_only:
+        to_run = []
+        args.external_validation = True
+    elif args.phases:
         to_run = sorted(set(args.phases) & set(phases_available))
     else:
         to_run = [p for p in sorted(phases_available) if p >= args.start]
@@ -746,7 +771,7 @@ Examples:
         3: lambda: phase_3(args.dry_run, args.num_seeds, args.pool_controls),
         5: lambda: phase_5(args.dry_run),
         6: lambda: phase_6(args.dry_run, args.skip_r, args.pool_controls,
-                           args.focused_permutation, args.pathway_permutation),
+                           args.candidate_genes, args.hierarchical_fdr),
         7: lambda: phase_7(args.dry_run),
         8: lambda: phase_8(args.dry_run, args.max_genes, args.topk),
         8.5: lambda: phase_8b(args.dry_run, args.max_genes, args.topk),
@@ -761,7 +786,7 @@ Examples:
     print()
     
     # Run phases in dependency-aware order (Phase 6 BEFORE Phase 5 for regression support)
-    execution_order = [0, 1, 1.5, 2, 3, 6, 5, 7, 8, 9]
+    execution_order = [0, 1, 1.5, 2, 3, 6, 5, 7, 8, 8.5, 9]
     phases_to_execute = [p for p in execution_order if p in to_run]
     
     failed = []
@@ -769,6 +794,15 @@ Examples:
         if not phases[phase_num]():
             failed.append(phase_num)
             log(f"Phase {phase_num} failed", "ERROR")
+
+    if args.external_validation:
+        if not phase_external_validation(
+            args.dry_run,
+            external_root=args.external_root,
+            k_perm=args.external_validation_perms,
+        ):
+            failed.append("external_validation")
+            log("External validation failed", "ERROR")
     
     # Summary
     print()
@@ -785,4 +819,3 @@ Examples:
 
 if __name__ == "__main__":
     main()
-

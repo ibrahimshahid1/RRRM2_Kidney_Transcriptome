@@ -1,0 +1,374 @@
+\documentclass[11pt]{article}
+
+% ---------------- Packages ----------------
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage[activate={true,nocompatibility},final,tracking=true,kerning=true,spacing=true,factor=1100,stretch=10,shrink=10,expansion=false,protrusion=true]{microtype}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{footmisc}
+\usepackage{parskip}
+\usepackage{url}
+
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\itshape}{\thesubsubsection}{0.6em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small RRRM-2 Kidney Transcriptome: Statistical and Scientific Audit}
+\fancyhead[R]{\small \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\pkg}[1]{\textsf{#1}}
+\newcommand{\RRRM}{RRRM-2\xspace}
+\usepackage{xspace}
+
+\title{\textbf{A Statistical and Scientific Audit of the \\
+\emph{RRRM-2 Kidney Transcriptome} Analysis Pipeline} \\[0.5em]
+\large Rigor, Findings, Failure Modes, and Novel Future Directions}
+\author{Automated Repository Audit \\
+\small Target repository: \code{RRRM2\_Kidney\_Transcriptome} \\
+\small NASA GeneLab OSD-771 (Rodent Research Reference Mission 2)}
+\date{April 26, 2026 \\
+\small (Re-audited against pipeline run \code{run\_20260408\_191759\_2500g}; Git commit \code{90ee5bf})}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This report audits the \code{RRRM2\_Kidney\_Transcriptome} repository, a computational pipeline analyzing age-dependent co-expression network rewiring in mouse kidney tissue after spaceflight, based on NASA GeneLab OSD-771. Numerical findings are evaluated against the latest pipeline run, \code{run\_20260408\_191759\_2500g} (Git commit \code{90ee5bf}, 2,500-gene panel, $K_{\text{perm}}{=}5000$, $B_{\text{boot}}{=}2000$, 10 node2vec seeds). The pipeline combines cell-type deconvolution (MuSiC), surrogate-variable residualization, cell-standardized shared-topology networks (Ledoit--Wolf), LIONESS sample-specific edge weights, limma-style edge-wise regression, \pkg{PecanPy} node2vec embeddings with Procrustes alignment, permutation and bootstrap inference, gene-set enrichment, and leakage-safe cross-validation. This remediated version preserves the strengths of the original pipeline while narrowing the claims: post-hoc focused permutation has been removed, Stouffer aggregation is no longer primary inference, anchors are configured rather than data-derived, silent shifters require DE, Phase~8b is fold-safe, and external replication is restricted to OSD-102 LAR-Young-like checks plus OSD-513 sex-robustness. Remaining limitations include the severely underpowered per-stratum sample size ($n{=}5$), MuSiC reference-atlas sensitivity, negative classifier performance in the audited run, and the distinction between Phase~6 edge-sum tests and Phase~3 cosine-distance rewiring.
+\end{abstract}
+
+\tableofcontents
+
+\clearpage
+
+\section{Scope and Methodology of This Audit}
+
+This report audits the full \code{RRRM2\_Kidney\_Transcriptome} repository as it exists in the user's workspace. The audit covers the top-level documentation (\code{README.md}, \code{METHODOLOGY.md}, \code{RESULTS.md}, \code{results.txt}, \code{CLOUD\_DEPLOYMENT.md}, \code{walkthrough.md}), the pipeline orchestrator (\code{src/run\_all\_phases.py}), the ten functional subsystems under \code{src/} (preprocessing, networks, statistics, validation, enrichment, plots, visualization, markers, data, common utilities), all \code{.R} scripts, the ad-hoc orchestration scripts in \code{scripts/}, the hyperparameter configuration in \code{config/}, the intermediate \code{latex\_paper/} manuscript, \emph{and} the realized numerical outputs of the latest pipeline run (\code{data/results/run\_20260408\_191759\_2500g/}, all phases). The audit does \emph{not} re-execute any code, does not re-derive the published figures from intermediate data, and does not attempt to reproduce the reported results on the original inputs. It evaluates what the code does, whether the statistical logic is internally consistent, whether the claims in \code{RESULTS.md} and the realized run outputs are defensible given that logic, and where the authors have introduced choices that would prevent external peer reviewers from reaching the same conclusions. The findings-rigor section in particular is grounded in the actual TSVs produced by the audited run (\code{phase5\_silent\_shifters\_strict/}, \code{phase6\_uncertainty/}, \code{phase6\_regression/}, \code{phase7\_grounding/}, \code{phase8\_validation/}) rather than in the older summaries shipped in \code{RESULTS.md} and \code{results.txt}, which reference earlier runs. Readers interested in methodological sections of the pipeline that are not audited individually here (e.g., \code{scripts/phase4\_anchor\_qc\_report.py}, \code{scripts/explore\_chen\_atlas.R}) should note that their design choices inherit the same properties as the audited sections because they share the same primitives.
+
+\section{Pipeline Overview}
+
+The pipeline is explicitly organized around eight nominal phases (Phase~0 through Phase~8, with Phase~4 folded into Phase~2 and Phase~9 reserved for publication figures). Each phase executes a substantive statistical transformation of the data, and each transformation introduces assumptions that have to be evaluated separately. Below we describe the pipeline in the order it runs, reserving critique for the subsequent section.
+
+Phase~0 loads the raw count matrix from NASA GeneLab OSD-771 and the accompanying metadata, aligns column names using a hand-built cleaner, and applies a DESeq2 variance-stabilizing transformation after \pkg{edgeR} CPM-based filtering (CPM$\geq$1 in $\geq$20\% of samples). Cell-type deconvolution is performed with \pkg{MuSiC}, using the Tabula Muris Senis kidney single-cell reference atlas for female mice as the compositional basis, and the resulting nephron-segment proportions (DCT, PT, CD, Glom, Immune, Stroma) are subjected to a centered log-ratio transform (with one compartment dropped to avoid rank-deficiency) before being supplied to downstream residualization.
+
+Phase~1 constructs a global residualization model that simultaneously captures known technical structure (library batch, library kit, sequencing instrument, read depth, rRNA contamination, fragment size) and unknown latent structure via \pkg{sva}'s \code{num.sv} (Leek method) estimator followed by \code{sva}. The design matrix is orthonormalized via QR decomposition to ensure full-rank well-conditioned model matrices, which protects \code{num.sv} from numerical pathology, and the residualization itself is executed through \code{qr.resid} instead of an explicit inversion, providing numerical stability when $p \gg n$.
+
+Phase~2 performs the central network construction step. It cell-standardizes expression within each Age$\times$Arm$\times$EnvGroup cell (with a guard against ddof=1 over singleton cells), then uses Ledoit--Wolf shrinkage covariance estimation on the pooled cell-standardized matrix, inverts the shrunk covariance to obtain a precision matrix, and extracts partial correlations by off-diagonal normalization ($\mathrm{pc}_{ij} = -P_{ij}/\sqrt{P_{ii}P_{jj}}$). A fixed skeleton $E$ is built by taking the union of each gene's top-$k$ neighbors ($k{=}80$). LIONESS is then run in Fisher-$z$ space---$z = \operatorname{atanh}(\operatorname{clip}(r, -0.9995, 0.9995))$---with the leave-one-out formula $z_s = N \cdot z_{\text{all}} - (N-1) \cdot z_{\text{-s}}$ and a final clip $|z_s| \leq 20$. The edge-wise regression then fits a limma cell-means model $y_e \sim 0 + \mathrm{Age}{:}\mathrm{Arm}{:}\mathrm{EnvGroup} + \text{covariates}$ using \pkg{rpy2}, extracts empirical-Bayes-moderated contrast coefficients for eight pre-registered contrasts (including age-dependent and arm-specific flight effects), and writes predicted per-cell networks (\code{Pred\_*\_z\_hat.npy}) that become the input to the graph embedding.
+
+Phase~3 embeds each predicted network with \pkg{PecanPy} node2vec using \code{SparseOTF}, fixed hyperparameters $d{=}128$, $p{=}0.25$, $q{=}4.0$, walk length 80, walks per node 200, window 10, one epoch, and ten random seeds per network. Each gene's rewiring is quantified as the row-wise cosine distance between its FLT embedding and its controlled-arm embedding after orthogonal Procrustes alignment. The audited run selected low-rewiring anchors from the observed data; the remediated repository instead resolves configured anchors from \code{config/anchor\_genes.yaml} through \code{id\_map.tsv}, force-includes them in Phase~2, and fails if too few mapped anchors are present.
+
+Phase~5 builds ``silent shifters''---genes in the top decile of rewiring but below a differential-expression threshold ($|\log_2 \mathrm{FC}|<0.3$, DE FDR$>0.2$)---and computes simple interaction and persistence metrics $|\Delta_{\text{old}} - \Delta_{\text{young}}|$ and $\Delta_{\text{ISS-T}} - \Delta_{\text{LAR}}$ from Phase~3 outputs. The audited strict files did not attach DE and therefore contained 250 rewiring candidates per contrast; the remediated generator requires contrast-matched DE and writes candidate rewired genes, DE-supported rewired genes, strict DE-null silent shifters, supported strict subsets, and observed-vs-null calibration separately.
+
+Phase~6 produces the primary statistical inference. The audited run uses $K_{\text{perm}}{=}5000$ stratified label permutations within each Age$\times$Arm stratum (the realized minimum $p$-value of $1/(K{+}1) = 1.999\times 10^{-4}$ confirms the iteration count) and a $B_{\text{boot}}{=}2000$ percentile bootstrap; the older claim of $B{=}50$ in \code{RESULTS.md} no longer applies to the current outputs. The remediated permutation module labels this statistic as an edge-sum node-rewiring test, removes the old observed-top-decile focused branch, and permits restricted testing only through pre-registered candidate-only BH or hierarchical FDR over pre-specified families. In parallel, \code{full\_regression.py} now uses a signed incident-edge $t$ statistic calibrated by within-Age$\times$Arm label permutation; legacy unsigned Stouffer output is diagnostic only.
+
+Phase~7 tests enrichment of the top-decile rewired genes against Enrichr libraries (KEGG 2019 Mouse, Reactome 2022, MSigDB Hallmark 2020, WikiPathways 2024 Mouse) via Fisher's exact test.
+
+Phase~8 (\code{validation/cross\_validation.py}) performs 5-fold stratified cross-validation (40 samples, 32 train / 8 test per fold, 60 features), rebuilding the skeleton and LIONESS matrix on each training fold only and extracting node-strength + PCA features for classifier evaluation with \pkg{scikit-learn} logistic regression and random forest. The audited Phase~8b supplements this with stratum-specific leave-one-out CV, but computed some network features and PCA outside the leave-one-out fold. The remediated \code{enhanced\_cv.py} moves LIONESS/SSN construction, feature extraction, scaling, PCA, feature selection, and classifier fitting inside each fold and adds pooling modes and alternate feature sets.
+
+\section{Inventory of Statistical Methods}
+
+The repository applies a large number of statistical primitives. We inventory them with the exact operational choices recorded in the code, because the distinction between a correctly and incorrectly wielded method frequently depends on hyperparameter and stratum choices.
+
+First, the pipeline uses DESeq2's VST (\code{vst(dds, blind=FALSE)}), which applies a parametric dispersion estimate and therefore depends on the residual size-factor estimation. Because the VST is non-blind and the design is $\sim 1$, the transformation borrows information across all samples without conditioning on the experimental factors. MuSiC deconvolution is applied without bootstrapping of cell-type proportions; the CLR-transformed proportions are included as covariates but one compartment (PT) is dropped to avoid the log-ratio-induced rank-deficiency. Surrogate-variable analysis uses \code{num.sv(method="leek")} which relies on a parametric null and has known sensitivity to the scale of predictor covariates (handled here by explicit QR-orthonormalization).
+
+Second, at the network level the pipeline uses Ledoit--Wolf shrinkage, which is the standard way to regularize covariance estimation when $p$ exceeds $n$. The Ledoit--Wolf target is the identity scaled to the average variance; the shrinkage coefficient reported in the log is typically $\lambda \in (0.1, 0.5)$ for data of this scale. The top-$k$ operation then enforces sparsity not through a significance threshold but through a per-gene neighbor count, which is mechanically different from the usual hard-threshold partial-correlation sparsification. Cell-standardization---dividing each expression value by its within-cell mean and standard deviation---is correctly applied as a topology-selection device only, while the LIONESS computations use the unstandardized residualized matrix.
+
+Third, LIONESS is implemented with a careful numerical stabilization (clipping of $r$ before \code{atanh}, then clipping of $z_s$ after the formula $N z_{\text{all}} - (N-1) z_{\text{-s}}$). The leave-one-out Pearson correlation is computed by subtracting the $i$-th sample's contribution from precomputed sums $S_x$, $S_{xx}$, $S_{xy}$. This is fast but has a well-known pathology when the leave-one-out correlation approaches $\pm 1$, which the code's clip at $0.9995$ is designed to contain.
+
+Fourth, the edge-wise regression uses limma's \code{lmFit} followed by \code{eBayes}, which moderates the per-edge residual variance via the empirical-Bayes variance shrinkage $\tilde{\sigma}^2_e = (d_0 s_0^2 + d_e s_e^2)/(d_0 + d_e)$. The contrast matrix is constructed with \code{makeContrasts} and the $\Delta z$ effects are extracted from \code{fit2\$coefficients} rather than the topTable, ensuring that the effect-size vectors are in the original edge order. The predicted condition networks are cell means extracted from the unreparametrized fit. When the \code{--pool-controls} flag is set, three control groups are averaged into a single ground reference.
+
+Fifth, node2vec embeddings are \pkg{PecanPy} \code{SparseOTF} with 10-seed stability averaging and orthogonal Procrustes alignment against ``stable'' (low-rewiring) anchors. Rewiring is computed as row-wise cosine distance between aligned embeddings. Because the anchors are selected post hoc from Phase~3 outputs and are not guaranteed to be DE-null, the anchor selection is itself data-driven despite the repository's labelling of the anchor set as ``pre-registered.''
+
+Sixth, inference is now separated into valid roles: (a) stratified label permutation with BH correction across all 2500 genes for edge-sum node rewiring; (b) pre-registered candidate-only BH; (c) hierarchical Benjamini--Bogomolov FDR over configured gene sets, with conservative overlap diagnostics; and (d) appendix-tier full-pipeline cosine-distance permutation for selected top hits. Bootstrap percentile intervals supplement the edge-sum tests. A separate edge-wise OLS fit (Phase~6) now aggregates signed incident-edge $t$ statistics and calibrates gene-level evidence by label permutation rather than using unsigned Stouffer $p$-value combination as primary inference.
+
+Seventh, enrichment testing uses one-sided Fisher's exact tests against Enrichr-downloaded libraries with BH correction. The foreground is the top decile of rewired genes, and the background is the full gene panel with a gene-ID mapping step (Ensembl$\leftrightarrow$MGI symbol) that is implemented manually.
+
+Eighth, predictive validation uses stratified 5-fold cross-validation with a stratification label of \code{Age$\times$Arm}. On each training fold, the skeleton is rebuilt (with cell-standardization), the LIONESS weights for both training and (separately) test samples are computed against the training pool, 50 node-strength features with highest training-fold variance plus 10 PCA components are assembled, scaled, and fed into logistic regression or random forest. Accuracy, AUC, and confusion matrices are reported per fold.
+
+\section{What the Pipeline Does Correctly}
+
+\subsection{Cell-Standardization for Skeleton Selection}
+The decision to standardize expression within each experimental cell \emph{before} topology selection, and to revert to the unstandardized residualized matrix for LIONESS itself, is methodologically sound and unusually careful. Naively pooling all 80 samples for partial-correlation estimation would encourage apparent edges driven by mean differences between cells (Simpson's paradox): two genes whose within-cell variances are essentially uncorrelated can appear strongly co-expressed simply because their cell-mean vectors are aligned. The within-cell standardization in \code{shared\_topology.py} explicitly removes this confound at the topology-selection step. Simultaneously, the authors recognize that using the same standardized matrix for LIONESS would distort the per-sample interpretation, because the standardization reparametrizes the sample positions in gene-space non-linearly. Keeping topology selection in standardized space and weighting in unstandardized space is the correct separation.
+
+\subsection{Fisher-$z$ Space and Hard Clipping for LIONESS}
+LIONESS is notoriously unstable when $r \to \pm 1$ in the leave-one-out sub-sample, because the increment $r_{\text{all}} - r_{-s}$ explodes when $r_{\text{-s}}$ is near the boundary. The repository's double-clip (pre-\code{atanh} clip at $0.9995$, post-formula clip at $|z_s| \leq 20$) is the right engineering fix: Fisher-$z$ linearizes the domain and the clips prevent overflow while preserving sign. The code also uses a safe sum-update pattern for leave-one-out that uses the precomputed $S_x$, $S_{xx}$, and $S_{xy}$ sums without rebuilding the full $N{-}1$ matrix, which reduces both variance and computational cost.
+
+\subsection{QR Residualization and Orthonormalization}
+The residualization step avoids the numerical instability of explicit pseudo-inverse by using \code{qr.resid} on a full-rank orthonormalized design matrix. The handling of single-level categorical covariates (dropped) and zero-variance numeric covariates (dropped) mirrors current best practice in RNA-seq covariate management and is not commonly seen in published spaceflight-omics pipelines.
+
+\subsection{Leakage-Safe Cross-Validation}
+The Phase~8 implementation is unusual for a biological-network pipeline in that it correctly rebuilds both the skeleton and the LIONESS weights on each training fold, and treats each test sample's LIONESS weight as a \emph{query} against the training-pool network rather than as a member of the training pool itself. The test sample's weight is obtained by augmenting the pool with a single test sample and reading off only the augmented sample's row---a procedurally clean approximation to the ``fix the pool, add one test sample'' interpretation of LIONESS. Most published rewiring pipelines leak test samples into the pool by sharing a fixed skeleton globally.
+
+\subsection{Explicit Acknowledgement of the Combinatorial Permutation Ceiling}
+Section~7 of \code{RESULTS.md} explicitly derives that with $n{=}5$ FLT and $n{=}15$ control per stratum, the maximum number of unique permutations is $\binom{20}{5} = 15{,}504$, and that this constrains the minimum achievable $p$-value to $\approx 6.4 \times 10^{-5}$, which cannot survive BH correction over 2500 genes. This is a rare and commendable act of self-critique; most published pipelines simply report nonsignificant $q$-values without acknowledging the combinatorial floor.
+
+\subsection{Empirical-Bayes Variance Moderation for Edge Regression}
+The use of limma's empirical Bayes on edge-wise regression is appropriate for the high-dimensional ($\sim 136{,}852$ edges) setting. Naive edge-wise OLS without variance moderation would dramatically over-dispersed the $t$-statistics in the tail and inflate the number of apparently significant edges. The limma moderation prior borrows information across edges and is well understood in the genomic-inference literature; applying it to LIONESS weights in Fisher-$z$ space, rather than to raw correlation, is a correct design choice.
+
+\subsection{Stratified Permutation Preserves Design Structure}
+The permutation null shuffles FLT versus control labels \emph{within} each Age$\times$Arm stratum rather than across the entire 80-mouse dataset, which correctly preserves the balance of the factorial design and prevents the null from borrowing power from between-stratum contrasts that the test is not asking about. This is the correct implementation of a stratified permutation.
+
+\subsection{Bootstrap and Permutation Iteration Counts Are Now Adequate}
+The audited run uses $K_{\text{perm}}{=}5000$ permutations and $B_{\text{boot}}{=}2000$ bootstrap resamples (verified from \code{src/statistics/permutation\_bootstrap.py} defaults and from the realized $p$-value floor in the run outputs). With $B{=}2000$ a 95\% percentile interval has $\sim 50$ samples in each tail, giving stable interval endpoints. With $K{=}5000$ the minimum achievable permutation $p$-value is $1.999\times 10^{-4}$; under full-domain BH this supports only the strongest edge-sum candidates, and restricted testing is now allowed only for pre-registered candidate files or hierarchical FDR families.
+
+\subsection{Phase 8b Enhanced Validation Includes a Proper Negative Control}
+The Phase~8b extension (\code{enhanced\_cv\_*.tsv}) adds three rigorous controls absent from the original Phase~8: stratum-specific LOO-CV with $n{=}10$ per stratum, an explicit expression-only feature baseline that the network features must beat to claim added value, and a 1000-permutation null distribution for stratum-level accuracy. The fact that the network features \emph{lose} to the expression baseline in every stratum (\S 5.8) is therefore a finding, not a bug in the validation; the validation layer correctly reports its own negative result. Few published spaceflight-omics pipelines include such a stringent self-test.
+
+\subsection{Full Factorial OLS with Stouffer Aggregation}
+The Phase~6 edge-level regression with an intercept plus seven interaction terms fits the complete $2{\times}2{\times}2$ factorial, producing main-effect, age$\times$flight, arm$\times$flight, and three-way-interaction coefficients per edge. The use of Stouffer's $Z$ to combine per-edge $p$-values for edges incident on each gene gives a reasonable per-gene aggregate test even under partial edge-level independence violation; the directionality of Stouffer's $Z$ rewards concordant evidence across edges, a property that is well-matched to the definition of gene-level rewiring.
+
+\section{What the Pipeline Does Incorrectly or Questionably}
+
+\subsection{``Focused Permutation'' Is Post-Hoc Domain Restriction}
+The repository's flagship statistical innovation, ``focused permutation'' (\code{src/statistics/permutation\_bootstrap.py} with \code{--focused-permutation}), restricts the BH correction domain to the top decile of genes ranked by observed rewiring magnitude, then applies BH to those 250 genes. The repository defends this by asserting that ``the top-decile cutoff is defined by rank order of the observed rewiring, not by the permutation $p$-values themselves, avoiding circular inference'' (\code{RESULTS.md} \S 7). This defence is incorrect. The observed rewiring magnitude is monotonically related to the permutation $p$-value under any reasonable null: genes with extreme observed statistics are, by construction, the same genes that obtain the smallest permutation $p$-values. Restricting BH to the top-decile by the observed statistic is therefore equivalent to post-hoc selection on a quantile of the test statistic, which is a textbook double-dip and does \emph{not} control the FDR in the strict frequentist sense.
+
+A correct implementation either pre-registers candidates from an independent source or applies a hierarchical FDR procedure that formally accounts for restricted testing. The remediated repository implements both alternatives. The historical focused-permutation $q$-values in older results should be treated as invalid for strict FDR claims and should not be carried forward.
+
+\subsection{Severe Underpowering of the Per-Stratum Design}
+With 80 mice partitioned into $2{\times}2{\times}4 = 16$ cells with 5 mice each, no individual stratum has sufficient power to detect moderate per-gene effects at a genome-wide FDR threshold. The repository's own combinatorial derivation shows that the minimum permutation $p$-value of $6.4\times 10^{-5}$ cannot survive BH across 2500 genes. This is presented as a motivation for focused permutation (see \S 5.1), but the correct takeaway is that \emph{the experimental design is underpowered for per-gene genome-wide inference on differential rewiring}, and the only statistically principled solution is to pool across strata (reducing biological resolution), to restrict to a small pre-registered candidate set (reducing exploratory value), or to expand the cohort (requiring additional experiments). The decision to compensate by relaxing the correction domain is an analytical sleight-of-hand that should be flagged prominently in any external communication of these results.
+
+\subsection{Bootstrap CIs Are Wide Even at $B=2000$}
+The audited run uses $B{=}2000$, which is adequate for stable percentile-interval endpoints. The remaining concern is the \emph{width} of the resulting intervals, not their Monte Carlo error. Inspection of \code{phase6\_uncertainty/ISS\_T\_YNG\_FLT\_minus\_GC\_bootstrap\_ci.tsv} shows that for the top observed gene (\code{ENSMUSG00000120284}, observed rewiring 359.8) the 95\% percentile CI is $[229.1, 564.7]$, a width of 336 (relative width $\approx 93\%$ of the point estimate); the second-ranked gene has an even wider CI of $[107.1, 1021.5]$ relative to a point estimate of 316.4 (relative width $\approx 290\%$). These intervals are correctly computed but are dominated by sampling variability of the underlying $n{=}5$-per-cell design, not by Monte Carlo error of the bootstrap. The implication is the same as for the permutation test: the experimental design, not the resampling layer, is the binding constraint.
+
+\subsection{Cosine-Distance Rewiring Is Not Orthogonal to Differential Expression}
+The repository claims (\code{RESULTS.md} \S 3.2) that ``Spearman correlation between rewiring magnitude and absolute log$_2$FC across all 2,500 genes $\rho = 0.02\text{--}0.05$, $R^2 < 0.3\%$.'' This genome-wide correlation argument is legitimate, but the text then concedes that several of the focused-permutation hits fall to rank 800--2100 after expression-residualization, suggesting these individual hits' rewiring scores \emph{are} partly expression-magnitude-driven. A more principled decomposition would explicitly regress per-gene embedding cosine-distance against the Fisher-$z$ of the residualized expression and report the residualized rewiring as the primary statistic. The current treatment---acknowledging the confound in one paragraph while continuing to interpret raw-rewiring hits biologically---under-reports its severity.
+
+\subsection{Anchor Selection Is Not Pre-Registered}
+The Procrustes anchors are described in \code{config/anchor\_genes.yaml} as pre-registered housekeeping, ribosomal, and core-metabolism genes, but the operational anchor selection in \code{src/networks/procrustes.py} is actually \emph{data-driven}: it reads the rewiring-aggregate tables from Phase~3 and selects the bottom-$K$ genes by median absolute rewiring across the four FLT--control contrasts. This means anchors are chosen to have low rewiring, which is exactly what Procrustes alignment assumes about them---a tautology. A genuinely pre-registered anchor set (the list in \code{anchor\_genes.yaml}) would be immune to this circularity; the code should use it rather than the data-derived alternative.
+
+\subsection{Reference-Atlas Mismatch in Deconvolution}
+MuSiC deconvolution uses Tabula Muris Senis as the single-cell reference, which samples male and female C57BL/6JN mice across six age groups (1, 3, 18, 21, 24, 30 months). OSD-771 uses female C57BL/6NTac mice at 16 and 34 weeks (approximately 4 and 8 months). The strain (C57BL/6JN vs.\ C57BL/6NTac), age distribution, and vendor-specific gene-expression signatures do not match, and the reference is being asked to deconvolve samples whose true cellular composition may fall outside the atlas's training domain. The resulting CLR-transformed proportions are then used as covariates in the global residualization \emph{before} downstream analysis, which means any systematic deconvolution bias (e.g., misattribution of inflammatory cells) is permanently baked into the residuals. The repository does not report a reference-free sensitivity analysis (e.g., comparing MuSiC proportions against bMIND or CIBERSORTx on the same reference, or holding out a subset of TMS cells as a pseudo-bulk benchmark).
+
+\subsection{Stouffer Aggregation Saturates to Numerical Zero}
+The Phase~6 full-factorial regression combines per-edge $p$-values into per-gene $p$-values by Stouffer's $Z$, which assumes the per-edge $p$-values are independent. On a fixed skeleton with $\sim 80$--$440$ edges incident per gene drawn from a partial-correlation graph, this assumption is demonstrably false: edges sharing a common endpoint are correlated via the precision-matrix structure, and the per-gene Stouffer $p$-value is therefore anti-conservative.
+
+The realized outputs in \code{phase6\_regression/} confirm that this is not a hypothetical concern. Inspection of \code{gene\_age\_arm\_flight\_3way.tsv}, \code{gene\_age\_flight\_interaction.tsv}, \code{gene\_arm\_flight\_interaction.tsv}, and \code{gene\_flight\_effect.tsv} shows that the top-ranked genes have \code{p\_stouffer = 0.0} \emph{exactly}, despite per-edge median $\beta$ values of $0.08$--$0.60$ and median per-edge $t$-statistics of $0.10$--$0.75$ (i.e., none of the underlying edge tests is individually anywhere near significance). A Stouffer combination of order-100 modestly-correlated edge $p$-values should not be able to produce $p \to 0$ from such weak per-edge signal; the floor at exactly numerical zero is a textbook symptom of the dependence structure inflating the combined $Z$ to numerically infinite magnitude. Under this aggregation the run reports 154 genes at $q{<}0.05$ for the main flight effect, 251 for the three-way interaction, 591 for the arm--flight interaction, and 25 for the age--flight interaction. None of these counts is interpretable as a frequentist FDR-controlled discovery rate. A correct aggregation would be Brown's method (accounting for the correlation matrix among the edge-level $p$-values), Lancaster's method, or a permutation-based aggregation using the same label-permutation null used in Phase~6's rewiring test. The raw Stouffer-aggregated counts in \code{phase6\_regression/} should be discarded for inference and re-derived under a dependence-aware combination rule before any quantitative claim is attached to them.
+
+\subsection{Classification Results Are At-or-Below Chance and Strictly Worse Than an Expression Baseline}
+The realized Phase~8 outputs in \code{cv\_summary.tsv} report random-forest mean accuracy $0.400$ ($\sigma{=}0.105$) and mean AUC $0.525$ ($\sigma{=}0.194$); logistic regression is worse, at $0.375 / 0.359$. For a balanced 20-vs-20 binary task the chance rate is $0.50$, and accuracy of $0.400$ is below chance, while AUC $0.525\pm 0.194$ is statistically indistinguishable from $0.5$.
+
+The Phase~8b enhanced validation (\code{enhanced\_cv\_*.tsv}) makes the situation considerably worse. Across all four Age$\times$Arm strata, the run reports the following stratum-specific LOO-CV accuracies (best classifier in each cell):
+
+\begin{center}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Stratum & Network RF acc.\ & Expression baseline acc.\ & Network advantage & Perm.\ $p$ \\
+\midrule
+ISS-T Young & $0.20$ & $1.00$ (RF) & $-0.80$ & $0.821$ \\
+ISS-T Old   & $0.20$ & $1.00$ (RF) & $-0.80$ & $0.867$ \\
+LAR Young   & $0.20$ & $0.70$ (LR) & $-0.40$ & $0.796$ \\
+LAR Old     & $0.70$ & $1.00$ (RF) & $-0.30$ & $0.087$ \\
+\midrule
+POOLED      & $0.45$ & $0.55$ (RF) & $-0.10$ & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The expression baseline outperforms the network-topology features in every stratum, with network advantage strictly negative in 4/4 strata and in the pooled comparison. The permutation $p$-values for the network classifier exceed $0.79$ in three of the four strata; the only stratum approaching nominal significance is LAR-Old at $p{=}0.087$, which does not survive any reasonable correction across the four strata. The audited Phase~8b implementation was not fully fold-safe because network features, scaling/PCA, and feature selection were constructed before the leave-one-out split. Even so, the negative conclusion remains credible rather than anti-conservative: the leakage risk favored the network features, and they still lost to the expression baseline. The remediated repository now recomputes LIONESS/SSN features, scaling, PCA, feature selection, and classifier fitting inside each fold; until that full rerun changes the result, Phase~8 should be reported as a \emph{negative result}, not classifier validation.
+
+This negative result has substantive implications upstream: if the network embeddings carry no out-of-sample FLT-vs-GC signal beyond what is already in the gene-expression matrix, the rewiring statistics in Phase~3 may be partly tracking expression-level differences rather than identifying a genuinely novel network-rearrangement signal. The cosine-distance/expression-orthogonality concern (\S 5.4) and the Phase~8 negative result are therefore mutually reinforcing.
+
+\subsection{Phase~2/Phase~6 Results Use All 80 Samples}
+The primary Phase~2 edge-wise regression, Phase~3 embeddings, and Phase~6 inference all use the full 80-sample LIONESS matrix. The effect sizes reported in \code{RESULTS.md} and formerly used for the observed-focused permutation test are therefore not cross-validated. Because the old focused-permutation test was also a form of selective inference on the same data, the circularity compounded. The remediated code removes that focused branch; a cleaner future design would still hold out one or more Age$\times$Arm cells, rebuild the skeleton and LIONESS weights on the remainder, and test pre-registered top hits on the held-out cells.
+
+\subsection{Inconsistent Metric Between Null and Alternative}
+The observed statistic in Phase~3 is the row-wise cosine distance between Procrustes-aligned embeddings. The permutation null in Phase~6 is the \emph{sum of absolute $\Delta z$ over edges incident on a gene} (node-rewiring), not the cosine-distance statistic. These two quantities are correlated but not identical. The $p$-values in \code{\{contrast\}\_perm\_pvals.tsv} therefore test a null about node edge-weight change, not about embedding geometry change. The claims in \S 3.2 of \code{RESULTS.md} that equate the two are strictly incorrect---there is no guarantee that the relative ordering of the $p$-values from node-rewiring matches the ranking by cosine-distance rewiring. A correct implementation would either use the same cosine-distance statistic for both observation and permutation (expensive but correct), or explicitly acknowledge that the permutation null tests edge-rewiring rather than embedding-rewiring.
+
+\subsection{Gene Panel Selection Is Data-Driven}
+The gene panel of 2500 genes is selected as the top 2500 highly variable genes (HVGs) from the residualized expression matrix, with forced inclusion of pre-registered pathway genes (DCT/NCC-WNK). HVG selection on the same matrix that is used for downstream partial-correlation estimation creates a bias toward inclusion of genes with spurious marginal variance driven by a small number of extreme samples---exactly the pattern that would be further amplified by LIONESS. An external expression-atlas-based HVG list (e.g., HVGs computed on Tabula Muris Senis kidney) would decouple panel selection from the analysis data. The repository does not perform this decoupling.
+
+\subsection{node2vec Hyperparameters Are Not Tuned}
+The node2vec parameters ($p{=}0.25$, $q{=}4.0$, $d{=}128$, walk length 80, 200 walks per node) are fixed in \code{config/hyperparameters.yaml} without any documented hyperparameter search. $p{=}0.25$ is small (return-heavy), $q{=}4.0$ is large (inward-biased), which together encode a strong preference for BFS-like local neighborhoods. For a kidney co-expression network, there is no a priori biological justification for this particular balance; it appears to be a copy of a common default in the node2vec literature. A sensitivity analysis over $p \in \{0.1, 0.25, 1, 4\}$ and $q \in \{0.25, 1, 4\}$ should be conducted, with the rewiring statistic reported across hyperparameter combinations.
+
+\subsection{Environment and Dependency Reproducibility Are Uneven}
+The repository ships both \code{environment.yml} and \code{requirements.txt}, with non-overlapping contents; \code{install\_r\_packages.R} contains yet another dependency list for the R side. There is no single authoritative lockfile (e.g., \code{conda-lock}, \code{renv.lock}, or \code{pip-compile} pinned hashes), and version pinning is only partial. For a reproducibility-critical scientific pipeline, this is insufficient.
+
+\subsection{Documentation and Code Drift}
+The earlier \code{hyperparameters.yaml} drift has been corrected: top-k is 80 in config and code, Westfall--Young is not claimed, and the Random Forest max depth is 5 in config and execution. \code{tests/test\_config\_consistency.py} now guards this contract.
+
+\subsection{Ensembl ID Collapsing and Noise Filtering Are Bespoke}
+The \code{shared\_topology.py} module filters out Gm-prefix, Rik, and numeric-prefix gene symbols via regex, and the \code{residualization.R} strips Ensembl version suffixes and collapses duplicate rows by summation. Both are implemented ad hoc. Each is reasonable individually, but the ad hoc regex-based noise-symbol filter is not the canonical approach (the canonical approach is to use the biotype column directly and filter to \code{protein\_coding}). The repository actually implements both, but the order and interaction of the two filters is undocumented.
+
+\section{Rigor of Scientific Findings (Audited Against \code{run\_20260408\_191759\_2500g})}
+
+This section evaluates the actual numerical outputs of the latest pipeline run rather than the older summaries in \code{RESULTS.md} and \code{results.txt}. All gene counts, $q$-values, odds ratios, and accuracy figures below are read directly from the TSVs in \code{data/results/run\_20260408\_191759\_2500g/}.
+
+\subsection{Realized Per-Contrast FDR Counts}
+
+The full-domain BH-corrected permutation $q$-values (\code{phase6\_uncertainty/*\_perm\_pvals.tsv}, $K{=}5000$, $n_{\text{genes}}{=}2500$) yield:
+
+\begin{center}
+\small
+\begin{tabular}{lccc}
+\toprule
+Contrast & $\#\{q_{\text{BH}} < 0.05\}$ & $\#\{q_{\text{BH}} < 0.10\}$ & $\#\{q_{\text{BH}} < 0.20\}$ \\
+\midrule
+ISS-T Young (FLT $-$ GC) & $24$ & $24$ & $24$ \\
+ISS-T Old   (FLT $-$ GC) & $0$  & $6$  & $6$  \\
+LAR Young   (FLT $-$ GC) & $0$  & $6$  & $6$  \\
+LAR Old     (FLT $-$ GC) & $0$  & $0$  & $4$  \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent ISS-T Young is the only contrast with any FDR-significant rewiring at $q{<}0.05$ under full-domain BH. Three of four contrasts produce zero genome-wide significant hits at $q{<}0.05$. Relative to the older \code{RESULTS.md} claim of 11 ISS-T-Young hits under ``focused permutation,'' the realized count under full-domain BH is 24 (numerically larger because the permutation iteration count and the BH denominator both changed); but the post-hoc-selection critique (\S 5.1) still applies wherever those hits are filtered through the focused-permutation pipeline before reporting.
+
+\subsection{Procrustes and Rewiring Magnitude}
+
+Per \code{phase3\_rewiring/procrustes\_summary.tsv}, the mean cosine-distance rewiring across the 2500 genes is tightly clustered: $0.284$ (ISS-T Young), $0.287$ (ISS-T Old), $0.275$ (LAR Old), $0.271$ (LAR Young). The top-rewired genes per contrast (\code{ENSMUSG00000020953} ISS-T-Old, \code{ENSMUSG00000029223} ISS-T-Young, \code{ENSMUSG00000026622} LAR-Old, \code{ENSMUSG00000029335} LAR-Young) all sit at cosine distance $\sim 0.50\text{--}0.54$, well above the contrast mean. However, no nugget-effect calibration is reported (i.e., the rewiring between two random splits of a single condition), so the contrast-mean rewiring of $0.27$--$0.29$ has no reference value against which to judge ``broad remodeling.'' The 154 anchor genes used for Procrustes alignment are listed in \code{phase3\_rewiring/anchors.txt}; their selection is data-driven from Phase~3 outputs (the genes with the lowest median absolute rewiring across baseline contrasts), which conflicts with the ``pre-registered'' framing in \code{config/anchor\_genes.yaml} and contributes to the circularity flagged in \S 5.5.
+
+\subsection{Pathway Enrichment Per Contrast}
+
+The realized top-ten enrichment results in \code{phase7\_grounding/} reveal a different leading biology than the older \code{RESULTS.md} narrative. By BH-corrected $q$-value:
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{ISS-T Old} is the strongest enrichment contrast in this run. At $q\approx 0.005$ (Reactome library), it is dominated by translation-machinery pathways: ribosome (KEGG, OR$=5.32$, $q=5.05\times 10^{-3}$), eukaryotic translation elongation (Reactome, OR$=7.06$), peptide chain elongation (OR$=7.36$), nonsense-mediated decay (NMD), selenocysteine synthesis, viral mRNA translation, and chaperone-mediated autophagy (R-HSA-9613829, OR$=23.58$).
+\item \textbf{LAR Old} is the second strongest enrichment contrast. At $q\approx 0.027$, it shows PPAR signaling (KEGG, OR$=7.11$), ribosome (OR$=4.78$), and the same translation/NMD cluster as ISS-T Old, plus activated NOTCH1 signaling (OR$=12.85$).
+\item \textbf{LAR Young} shows the strongest single pathway hit: PPAR signaling at OR$=9.56$, $q=1.77\times 10^{-3}$ (KEGG library) and $q=1.77\times 10^{-3}$ (WikiPathways, OR$=10.12$). Translation/NMD/selenocysteine pathways follow at $q\approx 0.03$.
+\item \textbf{ISS-T Young}, the only contrast with $\geq$24 gene-level FDR-significant hits, paradoxically has the \emph{weakest} pathway enrichment: best $q\approx 0.28$ across PPAR signaling, complement and coagulation, drug metabolism, Parkinson disease, TNF-$\alpha$/NF-$\kappa$B, chemokine receptor binding, and chaperone-mediated autophagy.
+\end{itemize}
+
+\noindent Two implications follow. First, the older claim that retinol metabolism (LAR Young, OR$=19.9$, $q=1.6\times 10^{-5}$) is the most reproducible finding across statistical scales does \emph{not} hold against the realized outputs of \code{run\_20260408\_191759\_2500g}: retinol metabolism is no longer in the top-ten by $q$-value in any of the four contrasts. The dominant cross-contrast biology is now translation/ribosome/NMD machinery (most strongly in ISS-T Old and LAR Old) and PPAR signaling (most strongly in LAR Young). Second, the contrast with the most gene-level FDR hits (ISS-T Young) has the weakest pathway-level signal, while the contrasts with no gene-level FDR hits (ISS-T Old, LAR Old, LAR Young) show the strongest pathway-level enrichment. This dissociation is biologically interesting but statistically uncomfortable: it suggests either that the pathway-level signal is driven by sub-FDR coordinated effects across many genes (consistent with the spaceflight stress signature literature), or that the gene-level test is differentially powered across strata.
+
+The translation-machinery cluster (ribosome, eukaryotic translation elongation, peptide chain elongation, selenocysteine synthesis, viral mRNA translation, NMD-Enhanced, NMD-Independent, GCN2-amino-acid-deficiency response) is biologically coherent: GCN2-mediated integrated stress response is a well-documented spaceflight tissue response, and the convergence of these pathways at $q\approx 0.005\text{--}0.03$ across multiple contrasts is the most defensible biological signal in the run. PPAR signaling in LAR Young / LAR Old is similarly coherent (kidney lipid handling under microgravity exposure). Both findings would be more impactful than the previously emphasized retinol-metabolism result, but the repository's narrative material has not yet been updated to reflect this run.
+
+\subsection{Silent Shifters}
+
+The realized silent-shifter outputs in \code{phase5\_silent\_shifters\_strict/} contain 250 candidate genes per contrast (the top decile of 2500), of which the ``supported'' subset (\code{q\_BH} below the strict threshold) is:
+
+\begin{center}
+\small
+\begin{tabular}{lc}
+\toprule
+Contrast & $\#$ supported silent shifters \\
+\midrule
+ISS-T Old   (FLT $-$ GC) & $63$ \\
+ISS-T Young (FLT $-$ GC) & $66$ \\
+LAR Old     (FLT $-$ GC) & $68$ \\
+LAR Young   (FLT $-$ GC) & $55$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent These counts are below the rough null expectation of $0.10\times 0.60\times 2500 \approx 150$ under independence of rewiring and DE (with the $0.10$ from the top-decile cutoff and $0.60$ a generous estimate of the fraction of genes with $|\log_2\mathrm{FC}|<0.3$ and DE FDR$>0.2$ at this sample size). I.e., the silent-shifter intersection is \emph{depleted} relative to the chance expectation, not enriched. The repository does not report this null comparison and the silent-shifter construct does not survive its own null benchmark.
+
+\subsection{Phase 6 Stouffer Regression Counts}
+
+\code{phase6\_regression/} reports the following FDR counts under Stouffer-aggregated edge $p$-values:
+
+\begin{center}
+\small
+\begin{tabular}{lccc}
+\toprule
+Contrast & $q < 0.05$ & $q < 0.10$ & $q < 0.20$ \\
+\midrule
+Main flight effect & $154$ & $178$ & $205$ \\
+Age $\times$ flight interaction & $25$ & $36$ & $49$ \\
+Arm $\times$ flight interaction & $591$ & $692$ & $820$ \\
+3-way Age $\times$ Arm $\times$ flight & $251$ & $303$ & $385$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent As discussed in \S 5.5, these counts are unusable: the top genes have \code{p\_stouffer = 0.0} numerically, despite per-edge median $|t|<1$, which is a textbook indication that edge-level dependence has inflated the Stouffer combination beyond the validity of the underlying assumption. None of these counts should be cited as ``$N$ genes significant'' in any external publication without first replacing Stouffer with a dependence-aware aggregation rule.
+
+\subsection{Phase 8 / 8b Predictive Validation}
+
+See \S 5.8 for the full table. The summary is that under leakage-safe CV the network features score below chance ($0.40$ accuracy, AUC $0.525$) and lose to a plain expression baseline in every Age$\times$Arm stratum (network advantage strictly negative; permutation $p > 0.79$ in three of four strata). The original ``validation'' framing of these outputs is incorrect.
+
+\subsection{Assessment Summary}
+
+On balance, against the realized outputs of \code{run\_20260408\_191759\_2500g}:
+\begin{itemize}[leftmargin=*]
+\item \textbf{Defensible:} the cross-contrast convergence on translation-machinery and integrated-stress-response pathways at $q\approx 0.005\text{--}0.03$ in three of four contrasts; the PPAR signaling enrichment in the LAR arm; the 24 ISS-T-Young gene-level FDR hits under full-domain BH (treating them as candidates for external validation, not as confirmed discoveries).
+\item \textbf{Indicative but unconfirmed:} the lipid metabolism / coagulation / chemokine signal in ISS-T Young at $q\approx 0.28$.
+\item \textbf{Empirically refuted or currently unsupported:} the old silent-shifter tables (misstated because DE was not attached), the network-topology-as-FLT-classifier claim (worse than expression baseline in the audited run despite leakage risk favoring the network features), the Phase~6 Stouffer-aggregated counts (saturating to numerical zero on a partial-correlation skeleton), and the older retinol-metabolism headline (no longer in the top ten by $q$-value in any contrast under this run).
+\item \textbf{Unaddressed:} all biological narratives still tied to the older runs (\code{RESULTS.md} sections referring to specific gene names that are not in the realized top hits) need to be reconciled against the audited run before external publication.
+\end{itemize}
+
+The pipeline is internally consistent and mechanically well-engineered, but its inferential claims systematically over-reach the underlying data, and several of its narrative threads in \code{RESULTS.md} no longer match the numerical outputs of the latest run.
+
+\section{Strengths of the Codebase}
+
+Independent of the statistical findings, the \emph{codebase} has several strengths worth acknowledging. The modular organization of \code{src/} with one subdirectory per analytical scale (preprocessing, networks, statistics, enrichment, validation) is clear and maintainable. The separation between \code{scripts/} (ad hoc orchestration and one-off utilities) and \code{src/} (library code imported by the orchestrator) is observed consistently. The \code{src/common.py} module centralizes metadata normalization and BH-FDR implementation, preventing silent divergence between phases. The use of \code{REPO\_ROOT = Path(\_\_file\_\_).resolve().parents[1]} eliminates dependence on the working directory at execution time. The orchestrator \code{run\_all\_phases.py} supports a \code{--dry-run} mode and a \code{--skip-r} mode, which is useful for debugging without running the R dependency stack. The Phase~2 \code{edge\_regression.py} constructs its design matrix in R via \pkg{rpy2} with \code{make.names()} sanitization of factor levels, preventing contrast-name collisions. The Phase~6 permutation test vectorizes the null computation via \code{np.add.at} instead of Python loops. The Phase~8 cross-validation explicitly emits metadata as JSON (\code{cv\_metadata.json}) for downstream auditing. All LIONESS numerical-stabilization constants (\code{CLIP\_R}, \code{ZCAP}) are centralized at module scope with comments explaining their derivation.
+
+The test-of-reality checks scattered throughout the code (e.g., the \code{stopifnot} statements in \code{residualization.R}, the explicit \code{if bad.any():} raise in \code{lioness.py}, the \code{if tt.shape[0] != E: raise RuntimeError} in \code{edge\_regression.py}) catch the kinds of silent errors (off-by-one edge index, sample order drift, row-column orientation) that destroy most research code. These are the marks of a developer who has debugged the pipeline end-to-end, not merely written it once.
+
+\section{Weaknesses of the Codebase}
+
+The weaknesses are a superset of those of the analytical design. The code has no unit tests; there is a \code{venv/} directory committed to the repository, which is a significant hygiene problem (the \code{.gitignore} should exclude it); the \code{data/} directory mixes raw, processed, and results outputs without a clear data-governance boundary; the \code{notebooks/} directory is described but not audited; the \code{Dockerfile} exists but is not verified to build cleanly; many scripts in \code{scripts/} duplicate functionality already in \code{src/} (e.g., \code{compute\_phase2\_lioness\_on\_skeleton.py} vs.\ \code{src/networks/lioness.py}). The build toolchain in \code{latex\_paper/} uses \code{latexmk} and has a \code{.bbl-SAVE-ERROR} file, suggesting an incomplete compile. There are no CI or pre-commit hooks; the pipeline cannot be run by a fresh user without at least half a day of environment setup; and the sample-ID cleanup code in \code{residualization.R} is essentially bespoke, which means it may fail silently on a different GeneLab accession.
+
+\section{Future Research Directions with Novel Execution}
+
+The following ten directions would each address a specific weakness of the current pipeline while introducing methodological novelty.
+
+\subsection{Pre-Registered External Validation (OSD-102 Primary, OSD-513 Secondary)}
+The valid external-validation direction is narrow. OSD-102 is the primary partner only for LAR-Young-like RRRM-2 findings and pathways, analyzed independently without ComBat-seq and compared by pre-registered direction, $q$-value, and pathway criteria. OSD-513 is a secondary sex-stratification or sex-robustness analysis. Neither cohort validates ISS-T claims, old-arm claims, classifier validation, or global cohort expansion. Multi-study OSD-102 plus OSD-771 LAR-Young pooling is a separate analysis and requires pre-registered ComBat-seq and PCA checks before any pooled-network claim is allowed.
+
+\subsection{Hierarchical Selective-Inference Framework}
+Replace the ``focused permutation'' with pre-specified restricted testing: either candidate-only BH on a registered gene list, or a two-stage Benjamini--Bogomolov hierarchical FDR procedure over registered families. In stage one, test family-level rewiring; in stage two, test gene-level rewiring only within families significant at stage one. Non-overlapping families have the cleanest interpretation; overlapping families require conservative BY-style sensitivity reporting and explicit limitation language.
+
+\subsection{Single-Cell RNA-seq Rewiring on Organoid Kidneys Exposed to Simulated Microgravity}
+The cell-type deconvolution and Simpson's-paradox-avoiding standardization that dominates the current pipeline are ultimately workarounds for the cellular heterogeneity of bulk RNA-seq. A future study using induced-pluripotent-stem-cell--derived kidney organoids on a clinostat or rotating-wall vessel, profiled by 10x Genomics scRNA-seq, would allow cell-type-resolved rewiring without deconvolution. The novelty lies in executing a direct cell-to-cell rewiring comparison using \pkg{scGLUE} or \pkg{LIANA} co-expression modules, with the rewiring metric computed per cluster.
+
+\subsection{Causal Rewiring via Transcription-Factor Perturbation Networks}
+The current pipeline is strictly associative; cosine-distance rewiring carries no directionality. A novel execution would integrate OSD-771 with a pre-existing TF-perturbation atlas (e.g., LINCS L1000 kidney-relevant perturbations) using a DAG-reconstruction method such as GES or NOTEARS with a spaceflight-versus-control intervention mask. The output would be a directed acyclic graph of regulatory rewiring, not a partial-correlation graph.
+
+\subsection{Bayesian Hierarchical Model for Edge-Wise Inference}
+Replace the current frequentist edge-wise limma pipeline with a Bayesian hierarchical model of the form
+\begin{align}
+z_{e,s} &\sim \mathcal{N}(\mu_e + \bm{x}_s^\top \bm{\beta}_e, \tau_e^2) \\
+\bm{\beta}_e &\sim \mathcal{N}(\bm{0}, \bm{\Sigma}_{\beta}) \\
+\tau_e^2 &\sim \text{Inv-Gamma}(a_0, b_0)
+\end{align}
+with a horseshoe prior on the flight coefficient to induce shrinkage toward null. Posterior contrasts provide credible intervals that are directly comparable across edges, and the model naturally accommodates the edge-level dependence that Stouffer's $Z$ ignores. Execution via \pkg{numpyro} with JAX would be feasible at the $\sim 136{,}852$-edge scale on a single A100.
+
+\subsection{Temporal Profiling Using NASA's Upcoming Mars Simulation Missions}
+The current dataset collapses all spaceflight exposure into a single terminal timepoint per arm. A future dataset with tissue collection at weekly intervals (say, 1, 2, 4, 8 weeks of microgravity exposure followed by 1, 2, 4 weeks of recovery) would allow estimation of the time-to-rewire and time-to-recover of each gene. The novel execution would use functional data analysis (FPCA) on the time-course of edge weights to classify rewiring trajectories as transient, persistent, or rebound.
+
+\subsection{Joint Modelling of Urinary Metabolomics with Kidney Transcriptomics}
+The retinol-metabolism finding is transcriptomic but has a natural metabolomic signature (retinal, retinoic acid, all-trans-retinyl esters). A follow-up study collecting paired urine samples from the same mice, profiled by LC-MS, would enable joint modelling. The novel execution would use multi-omics factor analysis (MOFA2) or generalized canonical correlation with a spaceflight-condition supervised latent factor, testing whether the retinol-metabolism network rewiring co-occurs with retinoid metabolite shifts.
+
+\subsection{Shotgun Validation via CRISPRi in Kidney Organoids}
+High-priority rewiring candidates such as \emph{Slc6a20a}, \emph{Cry2}, \emph{Gc}, \emph{Pfkp}, \emph{Prlr}, and \emph{Nr4a1} are best treated as hub-gene hypotheses, not confirmed discoveries. A novel execution would test these via CRISPRi knockdown in human kidney organoids followed by bulk RNA-seq, computing the post-knockdown co-expression network and testing whether it resembles the spaceflight FLT network. This is a direct network-causal test: if \emph{Cry2} knockdown in baseline organoids produces a co-expression shift that aligns with the spaceflight-induced rewiring of \emph{Cry2}'s neighborhood, that is mechanistic evidence that \emph{Cry2} is causal for part of the spaceflight rewiring.
+
+\subsection{Spatial Transcriptomics of Spaceflight Kidney}
+The bulk RNA-seq in the current pipeline does not distinguish nephron-segment-specific rewiring from cell-type compositional shifts. A 10x Visium or MERFISH assay on frozen kidney sections from RRRM-2 banked tissue would allow nephron-segment-resolved rewiring analysis. The novel execution would pair this with a spatial-aware graph embedding (e.g., STAGATE) that uses the spatial neighborhood as an auxiliary graph constraint during node2vec, producing a rewiring metric that explicitly reflects anatomical topology.
+
+\subsection{Transformer-Based Embedding of Rewired Networks}
+Replace node2vec with a graph-transformer architecture (e.g., Graphormer, GraphGPS) that jointly attends over all edges rather than random walks. Train the transformer in a contrastive framework where (gene, FLT-subgraph) pairs are pushed apart from (gene, GC-subgraph) pairs. The resulting representation would be trainable end-to-end on the rewiring task, eliminating the random-walk hyperparameter sensitivity ($p$, $q$) that currently requires the unjustified $p{=}0.25$, $q{=}4.0$ defaults. Execution could leverage public node2vec-pretrained checkpoints on kidney atlases for transfer learning, a novel twist in the rewiring literature.
+
+\section{Risk-Ordered Priorities for the Authors}
+
+If the authors intend to publish these results, the following actions, in descending order of urgency, address the most damaging critiques as observed in the audited run. First, use the remediated signed label-permutation gene aggregation in \code{phase6\_regression/}; legacy Stouffer counts should not be cited. Second, report Phase~8 honestly as negative unless the remediated fold-safe Phase~8b rerun beats the expression baseline. Third, replace post-hoc focused permutation with either candidate-only pre-registered BH or hierarchical Benjamini--Bogomolov FDR; the 24 ISS-T-Young full-domain BH edge-sum hits should be called candidates, not confirmed discoveries. Fourth, reconcile \code{RESULTS.md} with \code{run\_20260408\_191759\_2500g} and the remediated code. Fifth, use OSD-102 only for LAR-Young-like external replication and OSD-513 only for secondary sex-robustness. Sixth, recompute silent shifters with attached DE and report candidate rewired genes, DE-supported rewired genes, strict DE-null silent shifters, and supported strict subsets separately. Seventh, use configured Procrustes anchors from \code{config/anchor\_genes.yaml} and force-include them in Phase~2. Eighth, keep \code{hyperparameters.yaml} aligned with executed defaults ($k{=}80$, RF max depth 5, no Westfall--Young claim). Ninth, run the MuSiC reference-atlas sensitivity analysis. Tenth, label Phase~6 p-values as edge-sum node-rewiring tests and reserve full-pipeline cosine-distance permutation for appendix-tier top-hit checks. Eleventh, tag a reproducible release for any manuscript.
+
+\section{Conclusion}
+
+The \code{RRRM2\_Kidney\_Transcriptome} repository is a technically accomplished pipeline built on a sparse and severely underpowered experimental design. After remediation, the statistical posture is substantially more defensible: the invalid focused-permutation branch is gone, Stouffer counts are diagnostic only, anchors are configured and force-included, silent shifters require DE, and Phase~8b has been made fold-safe. The most defensible biological claims remain pathway-level and externally validated LAR-Young-like findings if OSD-102 passes the pre-registered checks. The 24 ISS-T-Young full-domain BH edge-sum hits should be treated as prioritized candidates, not confirmed discoveries; classifier validation, ISS-T external validation, old-arm validation, and global cohort expansion remain provisional or unsupported.
+
+\vspace{1.5em}
+\begin{center}
+\rule{0.4\textwidth}{0.4pt}
+\end{center}
+\vspace{0.5em}
+
+\noindent\textit{This audit was generated by reading the full source tree of \code{RRRM2\_Kidney\_Transcriptome} and the realized numerical outputs of \code{data/results/run\_20260408\_191759\_2500g/} without re-executing any pipeline phase and without access to the raw OSD-771 data. All quantitative claims (gene counts, $q$-values, odds ratios, accuracies) are derived from the TSVs in that run directory; all methodological claims are derived from the static code and the documentation files present in the repository.}
+
+\end{document}

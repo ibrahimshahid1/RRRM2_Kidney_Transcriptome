@@ -1,608 +1,496 @@
 # src/validation/enhanced_cv.py
 """
-Phase 8b: Enhanced Predictive Validation
+Phase 8b: leakage-safe enhanced predictive validation.
 
-Three key improvements over the original Phase 8:
-
-  1. STRATUM-SPECIFIC LOO-CV: Run classification within each Age×Arm stratum
-     (n=10: 5 FLT + 5 GC) using leave-one-out CV.  This avoids asking the
-     classifier to learn one decision boundary across biologically divergent
-     subgroups.
-
-  2. EXPRESSION BASELINE: Run the classifier on raw expression features
-     (top-variance genes) as a control.  If network features match or exceed
-     expression features, the network representation contains non-redundant
-     biological information.
-
-  3. PERMUTATION BASELINE: Shuffle FLT/GC labels 1,000 times and re-run the
-     full classification pipeline each time.  Report the permutation p-value
-     for each stratum's accuracy, not just the raw accuracy.
-
-Feature types compared:
-  A) Network topology: node strength (top-50 most variable) + PCA on edge weights
-  B) Raw expression: top-50 most variable genes' expression levels
-  C) Combined: A + B
-
-Outputs:
-  enhanced_cv_results.tsv      – per-fold, per-stratum, per-feature-type results
-  enhanced_cv_summary.tsv      – summary statistics
-  enhanced_cv_permutation.tsv  – permutation null distributions
-  enhanced_cv_metadata.json    – run configuration
-
-Usage:
-    python -m src.validation.enhanced_cv \\
-        --phase2_dir data/results/<run>/networks \\
-        --meta data/results/<run>/phase1_residuals/meta_phase1.tsv.gz \\
-        --rtech data/results/<run>/phase1_residuals/Rtech.tsv.gz \\
-        --outdir data/results/<run>/phase8_validation
+For every fold, this module computes the network pool, skeleton, LIONESS or
+alternative sample-specific weights, feature selection, scaling, PCA, and model
+fit inside the fold. It preserves expression-only baselines and evaluates
+multiple LIONESS pooling modes and feature sets.
 """
+
 from __future__ import annotations
 
 import argparse
 import json
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import LeaveOneOut, StratifiedKFold
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, roc_auc_score
-from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.model_selection import LeaveOneOut, StratifiedKFold
+from sklearn.preprocessing import StandardScaler
 
-from src.common import REPO_ROOT, find_sample_col, normalize_labels
+from src.common import REPO_ROOT, find_sample_col, id_map_lookup, normalize_labels
+from src.networks.alternative_methods import compute_alternative_network
+from src.validation.cross_validation import (
+    DEFAULT_RF_MAX_DEPTH,
+    DEFAULT_TOPK,
+    build_skeleton_on_fold,
+    lioness_on_fold,
+)
+from src.validation.sample_features import node_strength
+
+POOL_MODES = ["age_arm_envgroup", "arm", "age", "global"]
+NETWORK_FEATURE_SETS = [
+    "node_strength",
+    "pathway_strength",
+    "sparse_edges",
+    "edge_pca",
+    "network_combined",
+]
 
 
-# ---------------------------------------------------------------------------
-# Lightweight LIONESS for small strata (reuses skeleton from Phase 2)
-# ---------------------------------------------------------------------------
+def load_curated_pathway_masks(gene_set_yaml: Path, id_map: Path, genes: list[str]) -> dict[str, np.ndarray]:
+    try:
+        import yaml
+    except Exception:
+        return {}
+    if not gene_set_yaml.exists() or not id_map.exists():
+        return {}
+    _, symbol_to_ens = id_map_lookup(id_map)
+    cfg = yaml.safe_load(gene_set_yaml.read_text()) or {}
+    gene_universe = set(genes)
+    masks: dict[str, np.ndarray] = {}
+    for name, val in cfg.items():
+        if not isinstance(val, dict) or "genes" not in val:
+            continue
+        symbols = []
+        for item in val["genes"]:
+            if isinstance(item, str):
+                symbols.append(item)
+            elif isinstance(item, list):
+                symbols.extend(item)
+            elif isinstance(item, dict):
+                for sublist in item.values():
+                    if isinstance(sublist, list):
+                        symbols.extend(sublist)
+        matched = set()
+        for symbol in symbols:
+            matched |= (symbol_to_ens.get(str(symbol).lower(), set()) & gene_universe)
+        if len(matched) >= 3:
+            masks[name] = np.array([g in matched for g in genes], dtype=bool)
+    return masks
 
-def compute_lioness_for_stratum(
-    rtech_sub: np.ndarray,
+
+def run_classifier(X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray, classifier: str) -> tuple[int, float]:
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+    if classifier == "RandomForest":
+        model = RandomForestClassifier(
+            n_estimators=100,
+            max_depth=DEFAULT_RF_MAX_DEPTH,
+            min_samples_split=5,
+            min_samples_leaf=2,
+            random_state=42,
+        )
+    else:
+        model = LogisticRegression(max_iter=2000, C=0.1, penalty="l2", random_state=42)
+    model.fit(X_train, y_train)
+    pred = int(model.predict(X_test)[0])
+    try:
+        prob = float(model.predict_proba(X_test)[0, 1])
+    except Exception:
+        prob = 0.5
+    return pred, prob
+
+
+def pool_mask_for_mode(meta: pd.DataFrame, eval_indices: np.ndarray, train_indices: np.ndarray, mode: str) -> np.ndarray:
+    """Return training-only samples allowed to define the network pool."""
+    train_mask = np.zeros(len(meta), dtype=bool)
+    train_mask[train_indices] = True
+    if mode == "global":
+        return train_mask
+
+    eval_meta = meta.iloc[eval_indices]
+    if mode == "age_arm_envgroup":
+        keys = set(zip(eval_meta["Age"].astype(str), eval_meta["Arm"].astype(str)))
+        return train_mask & np.array([
+            (str(row.Age), str(row.Arm)) in keys for row in meta.itertuples()
+        ])
+    if mode == "arm":
+        arms = set(eval_meta["Arm"].astype(str))
+        return train_mask & meta["Arm"].astype(str).isin(arms).values
+    if mode == "age":
+        ages = set(eval_meta["Age"].astype(str))
+        return train_mask & meta["Age"].astype(str).isin(ages).values
+    raise ValueError(f"Unknown pooling mode: {mode}")
+
+
+def sample_specific_weights(
+    method: str,
+    X_expr: np.ndarray,
+    pool_mask: np.ndarray,
+    sample_indices: np.ndarray,
     edge_i: np.ndarray,
     edge_j: np.ndarray,
 ) -> np.ndarray:
-    """Compute LIONESS Fisher-z weights for a small stratum.
+    """Compute sample-specific edge weights relative to a training-only pool."""
+    pool_indices = np.where(pool_mask)[0]
+    if len(pool_indices) < 4:
+        raise ValueError("Network pool has fewer than 4 training samples")
 
-    Args:
-        rtech_sub: genes × samples expression matrix (already residualized)
-        edge_i, edge_j: shared skeleton edges
-    Returns:
-        lioness_z: samples × edges
-    """
-    CLIP_R = 0.9995
-    ZCAP = 20.0
-    G, N = rtech_sub.shape
-    E = len(edge_i)
-
-    # Pooled sums
-    Sx = rtech_sub.sum(axis=1)
-    Sxx = (rtech_sub ** 2).sum(axis=1)
-    Xi = rtech_sub[edge_i, :]
-    Xj = rtech_sub[edge_j, :]
-    Sxy = (Xi * Xj).sum(axis=1)
-
-    def pearson_from_sums(n, sx_i, sx_j, sxx_i, sxx_j, sxy_val, eps=1e-12):
-        num = n * sxy_val - sx_i * sx_j
-        denx = n * sxx_i - sx_i * sx_i
-        deny = n * sxx_j - sx_j * sx_j
-        den = np.sqrt(np.maximum(denx, 0.0) * np.maximum(deny, 0.0))
-        r = np.where(den > eps, num / den, 0.0)
-        return np.clip(r, -1.0, 1.0)
-
-    r_all = pearson_from_sums(N, Sx[edge_i], Sx[edge_j],
-                               Sxx[edge_i], Sxx[edge_j], Sxy)
-    z_all = np.arctanh(np.clip(r_all, -CLIP_R, CLIP_R))
-
-    out = np.empty((N, E), dtype=np.float32)
-    for s in range(N):
-        xs_i = rtech_sub[edge_i, s]
-        xs_j = rtech_sub[edge_j, s]
-
-        Sx_i_loo = Sx[edge_i] - xs_i
-        Sx_j_loo = Sx[edge_j] - xs_j
-        Sxx_i_loo = Sxx[edge_i] - xs_i ** 2
-        Sxx_j_loo = Sxx[edge_j] - xs_j ** 2
-        Sxy_loo = Sxy - xs_i * xs_j
-
-        r_loo = pearson_from_sums(N - 1, Sx_i_loo, Sx_j_loo,
-                                   Sxx_i_loo, Sxx_j_loo, Sxy_loo)
-        z_loo = np.arctanh(np.clip(r_loo, -CLIP_R, CLIP_R))
-
-        z_s = N * z_all - (N - 1) * z_loo
-        out[s, :] = np.clip(z_s, -ZCAP, ZCAP).astype(np.float32)
-
-    return out
+    rows = []
+    in_pool = {idx: pos for pos, idx in enumerate(pool_indices)}
+    pool_weights = None
+    for sample_idx in sample_indices:
+        if sample_idx in in_pool:
+            if pool_weights is None:
+                if method == "lioness":
+                    pool_weights = lioness_on_fold(X_expr, pool_mask, edge_i, edge_j)
+                else:
+                    pool_weights = compute_alternative_network(
+                        method, X_expr[:, pool_indices], edge_i, edge_j
+                    )
+            rows.append(pool_weights[in_pool[sample_idx]])
+        else:
+            aug_mask = pool_mask.copy()
+            aug_mask[sample_idx] = True
+            aug_indices = np.where(aug_mask)[0]
+            pos = int(np.where(aug_indices == sample_idx)[0][0])
+            if method == "lioness":
+                aug_weights = lioness_on_fold(X_expr, aug_mask, edge_i, edge_j)
+            else:
+                aug_weights = compute_alternative_network(method, X_expr[:, aug_indices], edge_i, edge_j)
+            rows.append(aug_weights[pos])
+    return np.vstack(rows).astype(np.float32)
 
 
-def extract_network_features(
-    lioness_z: np.ndarray,
+def pathway_strength_features(
+    weights: np.ndarray,
+    edge_i: np.ndarray,
+    edge_j: np.ndarray,
+    pathway_masks: dict[str, np.ndarray],
+) -> np.ndarray:
+    feats = []
+    for mask in pathway_masks.values():
+        edge_mask = mask[edge_i] | mask[edge_j]
+        if edge_mask.any():
+            feats.append(np.abs(weights[:, edge_mask]).mean(axis=1))
+    if not feats:
+        return np.empty((weights.shape[0], 0), dtype=float)
+    return np.vstack(feats).T
+
+
+def build_network_features_fold(
+    feature_set: str,
+    train_w: np.ndarray,
+    test_w: np.ndarray,
     edge_i: np.ndarray,
     edge_j: np.ndarray,
     n_genes: int,
-    n_strength: int = 50,
-    n_pcs: int = 10,
-) -> np.ndarray:
-    """Extract network topology features from LIONESS weights.
+    pathway_masks: dict[str, np.ndarray],
+) -> tuple[np.ndarray, np.ndarray]:
+    parts_train: list[np.ndarray] = []
+    parts_test: list[np.ndarray] = []
 
-    Features:
-      - Top-k node strengths (sum of incident edge weights)
-      - PCA on edge weights
-    """
-    n_samples = lioness_z.shape[0]
+    if feature_set in {"node_strength", "network_combined"}:
+        strength_train = node_strength(train_w, edge_i, edge_j, n_genes)
+        strength_test = node_strength(test_w, edge_i, edge_j, n_genes)
+        k = min(50, n_genes)
+        rank = strength_train.var(axis=0).argsort()[-k:]
+        parts_train.append(strength_train[:, rank])
+        parts_test.append(strength_test[:, rank])
 
-    # Node strength
-    strength = np.zeros((n_samples, n_genes), dtype=np.float32)
-    for s in range(n_samples):
-        w = lioness_z[s]
-        np.add.at(strength[s], edge_i, w)
-        np.add.at(strength[s], edge_j, w)
+    if feature_set in {"pathway_strength", "network_combined"}:
+        p_train = pathway_strength_features(train_w, edge_i, edge_j, pathway_masks)
+        p_test = pathway_strength_features(test_w, edge_i, edge_j, pathway_masks)
+        if p_train.shape[1] > 0:
+            parts_train.append(p_train)
+            parts_test.append(p_test)
 
-    # Top-k most variable nodes
-    k = min(n_strength, n_genes)
-    var_rank = strength.var(axis=0).argsort()[-k:]
-    feat_strength = strength[:, var_rank]
+    if feature_set in {"sparse_edges", "network_combined"}:
+        k = min(100, train_w.shape[1])
+        rank = train_w.var(axis=0).argsort()[-k:]
+        parts_train.append(train_w[:, rank])
+        parts_test.append(test_w[:, rank])
 
-    # PCA on edge weights
-    n_pc = min(n_pcs, min(lioness_z.shape) - 1, 10)
-    if n_pc > 0:
-        pca = PCA(n_components=n_pc)
-        pc = pca.fit_transform(lioness_z)
-        return np.hstack([feat_strength, pc])
-    return feat_strength
+    if feature_set in {"edge_pca", "network_combined"}:
+        n_pc = min(10, min(train_w.shape) - 1)
+        if n_pc > 0:
+            pca = PCA(n_components=n_pc)
+            parts_train.append(pca.fit_transform(train_w))
+            parts_test.append(pca.transform(test_w))
+
+    if not parts_train:
+        raise ValueError(f"Feature set {feature_set} produced no features")
+    return np.hstack(parts_train), np.hstack(parts_test)
 
 
-def run_classification(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_test: np.ndarray,
-    y_test: np.ndarray,
-    clf_name: str = "RandomForest",
-) -> dict:
-    """Run a single train/test classification and return metrics."""
-    # Scale
-    scaler = StandardScaler()
-    X_tr = scaler.fit_transform(X_train)
-    X_te = scaler.transform(X_test)
+def build_expression_features_fold(
+    X_expr: np.ndarray,
+    train_indices: np.ndarray,
+    test_indices: np.ndarray,
+    max_features: int = 100,
+) -> tuple[np.ndarray, np.ndarray]:
+    train_expr = X_expr[:, train_indices].T
+    test_expr = X_expr[:, test_indices].T
+    k = min(max_features, train_expr.shape[1])
+    rank = train_expr.var(axis=0).argsort()[-k:]
+    return train_expr[:, rank], test_expr[:, rank]
 
-    if clf_name == "RandomForest":
-        clf = RandomForestClassifier(
-            n_estimators=200, max_depth=3, min_samples_leaf=2,
-            random_state=42
-        )
-    else:
-        clf = LogisticRegression(
-            max_iter=2000, C=0.1, penalty='l2', random_state=42, solver='lbfgs'
-        )
 
-    clf.fit(X_tr, y_train)
-    y_pred = clf.predict(X_te)
-
-    try:
-        y_prob = clf.predict_proba(X_te)[:, 1]
-    except Exception:
-        y_prob = np.full(len(y_test), 0.5)
-
-    acc = accuracy_score(y_test, y_pred)
-    try:
-        auc = roc_auc_score(y_test, y_prob)
-    except ValueError:
-        auc = float("nan")
-
-    return {
-        "accuracy": float(acc),
-        "auc": float(auc),
-        "y_pred": int(y_pred[0]) if len(y_pred) == 1 else y_pred.tolist(),
-        "y_true": int(y_test[0]) if len(y_test) == 1 else y_test.tolist(),
+def evaluation_groups(meta: pd.DataFrame) -> dict[str, np.ndarray]:
+    groups = {
+        "ISS-T_Young": np.where((meta["Age"] == "YNG") & (meta["Arm"] == "ISS-T"))[0],
+        "ISS-T_Old": np.where((meta["Age"] == "OLD") & (meta["Arm"] == "ISS-T"))[0],
+        "LAR_Young": np.where((meta["Age"] == "YNG") & (meta["Arm"] == "LAR"))[0],
+        "LAR_Old": np.where((meta["Age"] == "OLD") & (meta["Arm"] == "LAR"))[0],
+        "POOLED": np.arange(len(meta)),
     }
+    return {k: v for k, v in groups.items() if len(v) >= 4}
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+def group_folds(group_indices: np.ndarray, y_all: np.ndarray, meta: pd.DataFrame, n_splits: int):
+    if len(group_indices) <= 12:
+        loo = LeaveOneOut()
+        for local_train, local_test in loo.split(group_indices):
+            yield group_indices[local_train], group_indices[local_test]
+    else:
+        strat = meta.iloc[group_indices]["Age"].astype(str) + "_" + meta.iloc[group_indices]["Arm"].astype(str)
+        skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+        for local_train, local_test in skf.split(np.zeros(len(group_indices)), strat):
+            yield group_indices[local_train], group_indices[local_test]
 
-def main():
-    ap = argparse.ArgumentParser(
-        description="Phase 8b: Enhanced Predictive Validation"
-    )
-    ap.add_argument("--phase2_dir",
-                    default=str(REPO_ROOT / "data/processed/networks/phase2"),
-                    help="Phase 2 directory (for gene list and edges)")
-    ap.add_argument("--rtech",
-                    default=str(REPO_ROOT / "data/processed/phase1_residuals/Rtech.tsv.gz"),
-                    help="Rtech expression matrix")
-    ap.add_argument("--meta",
-                    default=str(REPO_ROOT / "data/processed/phase1_residuals/meta_phase1.tsv.gz"),
-                    help="Metadata file")
-    ap.add_argument("--outdir",
-                    default=str(REPO_ROOT / "data/results/phase8_validation"),
-                    help="Output directory")
-    ap.add_argument("--topk", type=int, default=80, help="Top-k neighbors for skeleton")
-    ap.add_argument("--max_genes", type=int, default=2500, help="Max genes for network")
-    ap.add_argument("--n_perms", type=int, default=1000,
-                    help="Number of permutations for null distribution")
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Phase 8b: leakage-safe enhanced predictive validation")
+    ap.add_argument("--phase2_dir", default=str(REPO_ROOT / "data/processed/networks/phase2"))
+    ap.add_argument("--rtech", default=str(REPO_ROOT / "data/processed/phase1_residuals/Rtech.tsv.gz"))
+    ap.add_argument("--meta", default=str(REPO_ROOT / "data/processed/phase1_residuals/meta_phase1.tsv.gz"))
+    ap.add_argument("--outdir", default=str(REPO_ROOT / "data/results/phase8_validation"))
+    ap.add_argument("--topk", type=int, default=DEFAULT_TOPK)
+    ap.add_argument("--max_genes", type=int, default=2500)
+    ap.add_argument("--n_perms", type=int, default=1000)
+    ap.add_argument("--n_splits", type=int, default=5)
+    ap.add_argument("--pool_modes", default=",".join(POOL_MODES))
+    ap.add_argument("--network_methods", default="lioness")
+    ap.add_argument("--network_feature_sets", default=",".join(NETWORK_FEATURE_SETS))
+    ap.add_argument("--id_map", default=str(REPO_ROOT / "data/processed/resources/id_map.tsv"))
+    ap.add_argument("--gene_sets", default=str(REPO_ROOT / "config/gene_sets.yaml"))
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
     phase2_dir = Path(args.phase2_dir)
 
-    print("=" * 70)
-    print("Phase 8b: Enhanced Predictive Validation")
-    print("  - Stratum-specific LOO-CV")
-    print("  - Expression baseline comparison")
-    print("  - Permutation null distribution")
-    print("=" * 70)
-
-    # ── 1) Load data ─────────────────────────────────────────────────
-    print("\nLoading data...")
     rtech = pd.read_csv(args.rtech, sep="\t", compression="gzip", index_col=0)
     meta = pd.read_csv(args.meta, sep="\t", compression="gzip")
     sample_col = find_sample_col(meta)
-    meta = meta.set_index(sample_col, drop=False)
-    meta = normalize_labels(meta)
-
-    # Align
+    meta = normalize_labels(meta.set_index(sample_col, drop=False))
     common = [s for s in rtech.columns if s in meta.index]
     rtech = rtech[common]
     meta = meta.loc[common]
-
-    # Filter to FLT and GC only
-    mask_flt_gc = meta["EnvGroup"].isin(["FLT", "GC"])
-    meta = meta[mask_flt_gc].copy()
+    mask = meta["EnvGroup"].isin(["FLT", "GC"])
+    meta = meta[mask].copy()
     rtech = rtech[meta.index]
 
-    print(f"  Samples (FLT+GC): {len(meta)}")
-    print(f"  FLT: {(meta['EnvGroup'] == 'FLT').sum()}, "
-          f"GC: {(meta['EnvGroup'] == 'GC').sum()}")
-
-    # ── 2) Gene selection ────────────────────────────────────────────
     gene_var = rtech.var(axis=1).sort_values(ascending=False)
     keep_genes = gene_var.head(args.max_genes).index.tolist()
-
-    # Force-include Phase 2 genes if available
     p2_genes_path = phase2_dir / "phase2_genes.txt"
     if p2_genes_path.exists():
-        p2_genes = [g.strip() for g in p2_genes_path.read_text().splitlines() if g.strip()]
-        for g in p2_genes:
+        for g in [x.strip() for x in p2_genes_path.read_text().splitlines() if x.strip()]:
             if g in rtech.index and g not in keep_genes:
                 keep_genes.append(g)
-
     rtech = rtech.loc[keep_genes]
     genes = list(rtech.index)
-    G = len(genes)
-    X_expr_full = rtech.values.astype(np.float64)  # genes × samples
-    print(f"  Genes: {G}")
-
-    # ── 3) Load Phase 2 skeleton (if available) ──────────────────────
-    edge_i_path = phase2_dir / "edge_i.npy"
-    edge_j_path = phase2_dir / "edge_j.npy"
-    has_skeleton = edge_i_path.exists() and edge_j_path.exists()
-
-    if has_skeleton:
-        edge_i = np.load(edge_i_path)
-        edge_j = np.load(edge_j_path)
-        print(f"  Loaded skeleton: {len(edge_i)} edges")
-    else:
-        print("  WARNING: No Phase 2 skeleton found. Building from scratch.")
-        # Fall back to building from the full dataset
-        from src.validation.cross_validation import build_skeleton_on_fold
-        edge_i, edge_j = build_skeleton_on_fold(
-            X_expr_full, meta, genes, topk=args.topk
-        )
-        print(f"  Built skeleton: {len(edge_i)} edges")
-
-    # ── 4) Define strata ─────────────────────────────────────────────
-    strata = {
-        "ISS-T_Young": {"Age": "YNG", "Arm": "ISS-T"},
-        "ISS-T_Old": {"Age": "OLD", "Arm": "ISS-T"},
-        "LAR_Young": {"Age": "YNG", "Arm": "LAR"},
-        "LAR_Old": {"Age": "OLD", "Arm": "LAR"},
-    }
-
+    X_expr = rtech.values.astype(np.float64)
     y_all = (meta["EnvGroup"] == "FLT").astype(int).values
-    all_results = []
-    perm_results = []
 
-    # ── 5) Run stratum-specific LOO-CV ───────────────────────────────
-    for stratum_name, filt in strata.items():
-        mask = (meta["Age"] == filt["Age"]) & (meta["Arm"] == filt["Arm"])
-        sub_idx = np.where(mask.values)[0]
+    pool_modes = [m.strip() for m in args.pool_modes.split(",") if m.strip()]
+    network_methods = [m.strip() for m in args.network_methods.split(",") if m.strip()]
+    feature_sets = [m.strip() for m in args.network_feature_sets.split(",") if m.strip()]
+    pathway_masks = load_curated_pathway_masks(Path(args.gene_sets), Path(args.id_map), genes)
 
-        if len(sub_idx) < 4:
-            print(f"\n  [SKIP] {stratum_name}: only {len(sub_idx)} samples")
-            continue
+    results = []
+    rng = np.random.default_rng(42)
+    groups = evaluation_groups(meta)
 
-        sub_meta = meta.iloc[sub_idx]
-        sub_y = y_all[sub_idx]
-        sub_expr = X_expr_full[:, sub_idx]  # genes × stratum_samples
-        n_sub = len(sub_idx)
-        n_flt = sub_y.sum()
-        n_gc = n_sub - n_flt
+    for pool_mode in pool_modes:
+        for method in network_methods:
+            for group_name, group_idx in groups.items():
+                if len(set(y_all[group_idx])) < 2:
+                    continue
+                print(f"\n[{pool_mode} | {method}] {group_name}: n={len(group_idx)}")
 
-        print(f"\n{'━' * 60}")
-        print(f"Stratum: {stratum_name} (n={n_sub}: {n_flt} FLT, {n_gc} GC)")
-        print(f"{'━' * 60}")
+                fold_predictions: dict[tuple[str, str], list[int]] = {}
+                fold_probabilities: dict[tuple[str, str], list[float]] = {}
+                fold_truth: list[int] = []
+                fold_feature_counts: dict[tuple[str, str], list[int]] = {}
 
-        # ── 5a) Compute LIONESS for this stratum ─────────────────
-        print("  Computing LIONESS for stratum...")
-        lioness_z = compute_lioness_for_stratum(sub_expr, edge_i, edge_j)
-        print(f"  LIONESS shape: {lioness_z.shape}")
+                for train_idx, test_idx in group_folds(group_idx, y_all, meta, args.n_splits):
+                    y_train = y_all[train_idx]
+                    y_test = y_all[test_idx]
+                    if len(set(y_train)) < 2:
+                        continue
 
-        # ── 5b) Extract features ─────────────────────────────────
-        # Network topology features
-        net_features = extract_network_features(
-            lioness_z, edge_i, edge_j, G,
-            n_strength=50, n_pcs=min(10, n_sub - 2)
-        )
-
-        # Expression features (top 50 most variable within stratum)
-        expr_var = sub_expr.var(axis=1)
-        top_expr_idx = expr_var.argsort()[-50:]
-        expr_features = sub_expr[top_expr_idx, :].T  # samples × 50
-
-        # Combined features
-        combined_features = np.hstack([net_features, expr_features])
-
-        feature_sets = {
-            "network_topology": net_features,
-            "expression_baseline": expr_features,
-            "combined": combined_features,
-        }
-
-        # ── 5c) LOO-CV for each feature set and classifier ───────
-        for feat_name, feat_matrix in feature_sets.items():
-            for clf_name in ["RandomForest", "LogisticRegression"]:
-                loo = LeaveOneOut()
-                fold_preds = []
-                fold_trues = []
-
-                for train_idx_loo, test_idx_loo in loo.split(feat_matrix):
-                    X_train = feat_matrix[train_idx_loo]
-                    y_train = sub_y[train_idx_loo]
-                    X_test = feat_matrix[test_idx_loo]
-                    y_test = sub_y[test_idx_loo]
-
-                    result = run_classification(
-                        X_train, y_train, X_test, y_test, clf_name
+                    pool_mask = pool_mask_for_mode(meta, group_idx, train_idx, pool_mode)
+                    pool_indices = np.where(pool_mask)[0]
+                    if len(pool_indices) < 4:
+                        continue
+                    edge_i, edge_j = build_skeleton_on_fold(
+                        X_expr[:, pool_indices],
+                        meta.iloc[pool_indices],
+                        genes,
+                        topk=args.topk,
                     )
-                    fold_preds.append(result["y_pred"])
-                    fold_trues.append(result["y_true"])
 
-                # Aggregate LOO results
-                all_preds = np.array(fold_preds)
-                all_trues = np.array(fold_trues)
-                loo_acc = accuracy_score(all_trues, all_preds)
+                    try:
+                        train_w = sample_specific_weights(method, X_expr, pool_mask, train_idx, edge_i, edge_j)
+                        test_w = sample_specific_weights(method, X_expr, pool_mask, test_idx, edge_i, edge_j)
+                    except Exception as exc:
+                        results.append({
+                            "pool_mode": pool_mode,
+                            "network_method": method,
+                            "stratum": group_name,
+                            "feature_type": "network_unavailable",
+                            "classifier": "",
+                            "loo_accuracy": np.nan,
+                            "loo_auc": np.nan,
+                            "status": f"unavailable: {exc}",
+                        })
+                        break
 
-                try:
-                    loo_auc = roc_auc_score(all_trues, all_preds)
-                except ValueError:
-                    loo_auc = float("nan")
+                    feature_mats: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+                    for feature_set in feature_sets:
+                        if feature_set == "expression_baseline":
+                            continue
+                        feature_mats[feature_set] = build_network_features_fold(
+                            feature_set,
+                            train_w,
+                            test_w,
+                            edge_i,
+                            edge_j,
+                            len(genes),
+                            pathway_masks,
+                        )
+                    expr_train, expr_test = build_expression_features_fold(X_expr, train_idx, test_idx)
+                    feature_mats["expression_baseline"] = (expr_train, expr_test)
+                    if "combined" in feature_sets:
+                        net_train, net_test = feature_mats.get("network_combined") or build_network_features_fold(
+                            "network_combined", train_w, test_w, edge_i, edge_j, len(genes), pathway_masks
+                        )
+                        feature_mats["combined"] = (np.hstack([net_train, expr_train]), np.hstack([net_test, expr_test]))
 
-                print(f"  {feat_name:25s} | {clf_name:20s} | "
-                      f"LOO acc={loo_acc:.3f} | AUC={loo_auc:.3f}")
+                    for feature_name, (X_train, X_test) in feature_mats.items():
+                        for classifier in ["RandomForest", "LogisticRegression"]:
+                            key = (feature_name, classifier)
+                            pred, prob = run_classifier(X_train, y_train, X_test, classifier)
+                            fold_predictions.setdefault(key, []).append(pred)
+                            fold_probabilities.setdefault(key, []).append(prob)
+                            fold_feature_counts.setdefault(key, []).append(X_train.shape[1])
+                    fold_truth.extend(y_test.tolist())
 
-                all_results.append({
-                    "stratum": stratum_name,
-                    "feature_type": feat_name,
-                    "classifier": clf_name,
-                    "n_samples": n_sub,
-                    "n_flt": int(n_flt),
-                    "n_gc": int(n_gc),
-                    "n_features": feat_matrix.shape[1],
-                    "loo_accuracy": float(loo_acc),
-                    "loo_auc": float(loo_auc),
-                    "n_correct": int((all_preds == all_trues).sum()),
-                })
+                truth = np.array(fold_truth)
+                for key, preds in fold_predictions.items():
+                    feature_name, classifier = key
+                    pred_arr = np.array(preds)
+                    prob_arr = np.array(fold_probabilities[key])
+                    acc = accuracy_score(truth, pred_arr) if len(truth) else np.nan
+                    try:
+                        auc = roc_auc_score(truth, prob_arr)
+                    except ValueError:
+                        auc = np.nan
+                    results.append({
+                        "pool_mode": pool_mode,
+                        "network_method": method,
+                        "stratum": group_name,
+                        "feature_type": feature_name,
+                        "classifier": classifier,
+                        "n_samples": int(len(truth)),
+                        "n_flt": int(truth.sum()) if len(truth) else 0,
+                        "n_gc": int((1 - truth).sum()) if len(truth) else 0,
+                        "n_features": int(np.median(fold_feature_counts[key])),
+                        "loo_accuracy": float(acc),
+                        "loo_auc": float(auc),
+                        "status": "ok",
+                    })
 
-        # ── 5d) Permutation null (network features + RF only) ────
-        print(f"\n  Running {args.n_perms} permutations (network + RF)...")
-        rng = np.random.default_rng(42)
-        perm_accs = []
+                # Conditional permutation null for network_combined + RF.
+                if args.n_perms > 0 and len(truth) and ("network_combined", "RandomForest") in fold_predictions:
+                    obs = accuracy_score(truth, np.array(fold_predictions[("network_combined", "RandomForest")]))
+                    null_acc = []
+                    pred_fixed = np.array(fold_predictions[("network_combined", "RandomForest")])
+                    for _ in range(args.n_perms):
+                        perm_truth = truth.copy()
+                        rng.shuffle(perm_truth)
+                        null_acc.append(accuracy_score(perm_truth, pred_fixed))
+                    perm_p = (1 + np.sum(np.array(null_acc) >= obs)) / (args.n_perms + 1)
+                    results.append({
+                        "pool_mode": pool_mode,
+                        "network_method": method,
+                        "stratum": group_name,
+                        "feature_type": "network_combined_permutation_null",
+                        "classifier": "RandomForest",
+                        "n_samples": int(len(truth)),
+                        "n_features": 0,
+                        "loo_accuracy": float(obs),
+                        "loo_auc": np.nan,
+                        "permutation_p_value": float(perm_p),
+                        "status": "conditional_label_shuffle",
+                    })
 
-        for p_idx in range(args.n_perms):
-            # Shuffle labels
-            perm_y = sub_y.copy()
-            rng.shuffle(perm_y)
-
-            # LOO-CV with shuffled labels
-            loo = LeaveOneOut()
-            p_preds = []
-            p_trues = []
-
-            for train_idx_loo, test_idx_loo in loo.split(net_features):
-                X_train = net_features[train_idx_loo]
-                y_train = perm_y[train_idx_loo]
-                X_test = net_features[test_idx_loo]
-                y_test = perm_y[test_idx_loo]
-
-                res = run_classification(X_train, y_train, X_test, y_test, "RandomForest")
-                p_preds.append(res["y_pred"])
-                p_trues.append(res["y_true"])
-
-            perm_acc = accuracy_score(np.array(p_trues), np.array(p_preds))
-            perm_accs.append(perm_acc)
-
-            if (p_idx + 1) % 200 == 0:
-                print(f"    Permutation {p_idx + 1}/{args.n_perms}...")
-
-        perm_accs = np.array(perm_accs)
-
-        # Get observed accuracy for network + RF
-        obs_acc = None
-        for r in all_results:
-            if (r["stratum"] == stratum_name and
-                r["feature_type"] == "network_topology" and
-                r["classifier"] == "RandomForest"):
-                obs_acc = r["loo_accuracy"]
-                break
-
-        if obs_acc is not None:
-            perm_p = (1 + (perm_accs >= obs_acc).sum()) / (args.n_perms + 1)
-        else:
-            perm_p = 1.0
-
-        perm_results.append({
-            "stratum": stratum_name,
-            "observed_accuracy": float(obs_acc) if obs_acc else float("nan"),
-            "perm_mean_accuracy": float(perm_accs.mean()),
-            "perm_std_accuracy": float(perm_accs.std()),
-            "perm_p_value": float(perm_p),
-            "perm_95th": float(np.quantile(perm_accs, 0.95)),
-            "n_perms": args.n_perms,
-        })
-
-        print(f"  Permutation null: mean={perm_accs.mean():.3f} ± {perm_accs.std():.3f}")
-        print(f"  Observed accuracy: {obs_acc:.3f}")
-        print(f"  Permutation p-value: {perm_p:.4f}")
-
-    # ── 6) Also run pooled analysis (all strata combined) ────────────
-    print(f"\n{'━' * 60}")
-    print(f"Pooled Analysis (all strata, 5-fold stratified CV)")
-    print(f"{'━' * 60}")
-
-    strat_labels = meta["Age"].astype(str) + "_" + meta["Arm"].astype(str)
-    n_total = len(y_all)
-
-    # Compute LIONESS on full FLT+GC set
-    print("  Computing LIONESS for full dataset...")
-    lioness_full = compute_lioness_for_stratum(X_expr_full, edge_i, edge_j)
-
-    net_features_full = extract_network_features(
-        lioness_full, edge_i, edge_j, G,
-        n_strength=50, n_pcs=min(20, n_total - 2)
-    )
-
-    # Expression baseline
-    expr_var_full = X_expr_full.var(axis=1)
-    top_expr_idx_full = expr_var_full.argsort()[-50:]
-    expr_features_full = X_expr_full[top_expr_idx_full, :].T
-
-    combined_full = np.hstack([net_features_full, expr_features_full])
-
-    feature_sets_full = {
-        "network_topology": net_features_full,
-        "expression_baseline": expr_features_full,
-        "combined": combined_full,
-    }
-
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-
-    for feat_name, feat_matrix in feature_sets_full.items():
-        for clf_name in ["RandomForest", "LogisticRegression"]:
-            fold_accs = []
-            fold_aucs = []
-
-            for train_idx, test_idx in skf.split(feat_matrix, strat_labels):
-                result = run_classification(
-                    feat_matrix[train_idx], y_all[train_idx],
-                    feat_matrix[test_idx], y_all[test_idx],
-                    clf_name
-                )
-                fold_accs.append(result["accuracy"])
-                fold_aucs.append(result["auc"])
-
-            mean_acc = np.mean(fold_accs)
-            mean_auc = np.nanmean(fold_aucs)
-
-            print(f"  {feat_name:25s} | {clf_name:20s} | "
-                  f"acc={mean_acc:.3f}±{np.std(fold_accs):.3f} | "
-                  f"AUC={mean_auc:.3f}±{np.nanstd(fold_aucs):.3f}")
-
-            all_results.append({
-                "stratum": "POOLED",
-                "feature_type": feat_name,
-                "classifier": clf_name,
-                "n_samples": n_total,
-                "n_flt": int(y_all.sum()),
-                "n_gc": int((1 - y_all).sum()),
-                "n_features": feat_matrix.shape[1],
-                "loo_accuracy": float(mean_acc),
-                "loo_auc": float(mean_auc),
-                "n_correct": -1,  # Not applicable for 5-fold
-            })
-
-    # ── 7) Save results ──────────────────────────────────────────────
-    results_df = pd.DataFrame(all_results)
+    results_df = pd.DataFrame(results)
     results_path = outdir / "enhanced_cv_results.tsv"
     results_df.to_csv(results_path, sep="\t", index=False)
 
-    perm_df = pd.DataFrame(perm_results)
-    perm_path = outdir / "enhanced_cv_permutation.tsv"
-    perm_df.to_csv(perm_path, sep="\t", index=False)
-
-    # Summary: best configuration per stratum
-    print(f"\n{'=' * 70}")
-    print("ENHANCED VALIDATION SUMMARY")
-    print(f"{'=' * 70}")
-
     summary_rows = []
-    for stratum in results_df["stratum"].unique():
-        sub = results_df[results_df["stratum"] == stratum]
+    ok = results_df[results_df["status"] == "ok"].copy()
+    for (pool_mode, method, stratum), sub in ok.groupby(["pool_mode", "network_method", "stratum"]):
         best = sub.loc[sub["loo_accuracy"].idxmax()]
-
-        # Find permutation p-value if available
-        perm_row = perm_df[perm_df["stratum"] == stratum] if stratum != "POOLED" else pd.DataFrame()
-        perm_p = float(perm_row["perm_p_value"].iloc[0]) if len(perm_row) > 0 else float("nan")
-
-        # Compare network vs expression
-        net_acc = sub[(sub["feature_type"] == "network_topology") &
-                      (sub["classifier"] == "RandomForest")]["loo_accuracy"].values
-        expr_acc = sub[(sub["feature_type"] == "expression_baseline") &
-                       (sub["classifier"] == "RandomForest")]["loo_accuracy"].values
-
-        net_acc = float(net_acc[0]) if len(net_acc) > 0 else float("nan")
-        expr_acc = float(expr_acc[0]) if len(expr_acc) > 0 else float("nan")
-
-        row = {
+        net = sub[
+            (sub["feature_type"] == "network_combined") &
+            (sub["classifier"] == "RandomForest")
+        ]["loo_accuracy"]
+        expr = sub[
+            (sub["feature_type"] == "expression_baseline") &
+            (sub["classifier"] == "RandomForest")
+        ]["loo_accuracy"]
+        net_acc = float(net.iloc[0]) if len(net) else np.nan
+        expr_acc = float(expr.iloc[0]) if len(expr) else np.nan
+        summary_rows.append({
+            "pool_mode": pool_mode,
+            "network_method": method,
             "stratum": stratum,
             "best_feature_type": best["feature_type"],
             "best_classifier": best["classifier"],
             "best_accuracy": float(best["loo_accuracy"]),
             "network_rf_accuracy": net_acc,
             "expression_rf_accuracy": expr_acc,
-            "network_advantage": net_acc - expr_acc if not (np.isnan(net_acc) or np.isnan(expr_acc)) else float("nan"),
-            "permutation_p_value": perm_p,
-        }
-        summary_rows.append(row)
-
-        print(f"\n  {stratum}:")
-        print(f"    Best: {best['feature_type']} + {best['classifier']} = {best['loo_accuracy']:.3f}")
-        print(f"    Network (RF): {net_acc:.3f}  |  Expression (RF): {expr_acc:.3f}")
-        if not np.isnan(perm_p):
-            sig = "***" if perm_p < 0.001 else "**" if perm_p < 0.01 else "*" if perm_p < 0.05 else "n.s."
-            print(f"    Permutation p-value: {perm_p:.4f} {sig}")
-
+            "network_advantage": net_acc - expr_acc if not (np.isnan(net_acc) or np.isnan(expr_acc)) else np.nan,
+        })
     summary_df = pd.DataFrame(summary_rows)
     summary_path = outdir / "enhanced_cv_summary.tsv"
     summary_df.to_csv(summary_path, sep="\t", index=False)
 
-    # Save metadata
-    cv_meta = {
-        "analysis": "Enhanced Predictive Validation (Phase 8b)",
-        "improvements": [
-            "Stratum-specific LOO-CV (n=10 per stratum)",
-            "Expression baseline comparison",
-            "Permutation null distribution (n_perms={})".format(args.n_perms),
+    metadata = {
+        "analysis": "Phase 8b leakage-safe enhanced CV",
+        "fold_safe_transforms": [
+            "network pool",
+            "skeleton",
+            "sample-specific network weights",
+            "feature selection",
+            "PCA",
+            "scaling",
+            "classifier fit",
         ],
-        "n_samples_total": int(len(y_all)),
-        "n_flt": int(y_all.sum()),
-        "n_gc": int((1 - y_all).sum()),
-        "n_genes": G,
+        "pool_modes": pool_modes,
+        "network_methods": network_methods,
+        "network_feature_sets": feature_sets,
+        "expression_baseline_preserved": True,
+        "rf_max_depth": DEFAULT_RF_MAX_DEPTH,
         "topk": args.topk,
-        "strata": list(strata.keys()),
-        "feature_types": ["network_topology", "expression_baseline", "combined"],
-        "classifiers": ["RandomForest", "LogisticRegression"],
         "n_permutations": args.n_perms,
     }
-    with open(outdir / "enhanced_cv_metadata.json", "w") as f:
-        json.dump(cv_meta, f, indent=2)
+    (outdir / "enhanced_cv_metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
 
-    print(f"\n[OK] Enhanced validation results saved to: {outdir}")
+    print(f"\n[OK] Enhanced leakage-safe CV outputs written to {outdir}")
     print(f"  - {results_path.name}")
-    print(f"  - {perm_path.name}")
     print(f"  - {summary_path.name}")
-    print(f"  - enhanced_cv_metadata.json")
+    print("  - enhanced_cv_metadata.json")
 
 
 if __name__ == "__main__":

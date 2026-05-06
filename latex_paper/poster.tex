@@ -1,439 +1,533 @@
-% LaTeX document for a spaceflight kidney poster.  This file uses the
-% tikzposter class along with a custom theme defined in
-% ``uomtheme.sty'' (provided alongside this document).  The original
-% document contained a number of layout issues: the horizontal
-% pipeline across the top row was constrained to narrow boxes,
-% resulting in large white margins on either side; some blocks on the
-% lower rows were clipped because of overly large fixed heights; and
-% content was vertically centred rather than top‑aligned.  The code
-% below introduces a few improvements:
-%  • A dynamic calculation for the pipeline box width so that the six
-%    boxes span almost the full width of the poster without huge
-%    side margins.
-%  • Removal of inflexible ``minimum height'' settings on blocks and
-%    placeholders which previously caused content to be clipped.
-%  • Reduced vertical spacing between blocks to better utilise the
-%    poster space.
-%  • Minor adjustments to box colours for improved contrast.  You can
-%    further tweak the colours in ``uomtheme.sty'' if desired.
+\documentclass[final]{beamer}
 
-\documentclass[25pt,margin=1.5in,innermargin=1.5in,blockverticalspace=0.75in]{tikzposter}
-\geometry{paperwidth=72in,paperheight=48in}
-
-\usepackage[utf8]{inputenc}
-\usepackage{amsmath}
-\usepackage{amsfonts}
-\usepackage{amssymb}
-\usepackage{graphicx}
-\usepackage{adjustbox}
-\usepackage{enumitem}
-\usepackage{booktabs}
-\usepackage{array}
-\usepackage{xcolor}
-\usepackage{uomtheme}
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,backgrounds,calc}
-
-% Disable TikZposter’s watermark and other markings
-\tikzposterlatexaffectionproofoff
-\usetheme{UoMTheme}
-\usecolorstyle{UoMStyle}
-
-\usepackage[scaled]{helvet}
-\renewcommand\familydefault{\sfdefault}
 \usepackage[T1]{fontenc}
+\usepackage[size=custom,width=120,height=90,scale=1.0]{beamerposter}
+\usetheme{gemini}
+\usecolortheme{labsix}
 
-\setlist[itemize]{leftmargin=1.6em,itemsep=3pt,topsep=4pt,parsep=0pt}
-\setlist[enumerate]{leftmargin=1.8em,itemsep=3pt,topsep=4pt,parsep=0pt}
+\usepackage{helvet}
+\usepackage[helvet]{sfmath}
+\renewcommand{\familydefault}{\sfdefault}
 
-% A helper macro to shade text inside a rounded box.  No fixed height.
-\newcommand{\shadebox}[2]{%
-  \begin{tikzpicture}
-    \node[fill=#1,rounded corners=6pt,inner sep=11pt,
-          text width=0.90\linewidth,font=\normalsize]{#2};
-  \end{tikzpicture}}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[numbers]{natbib}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric,calc,fit,backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.14}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{microtype}
 
-% Compute dynamic width for pipeline boxes.  There are six boxes
-% separated by 5 gaps of 10mm.  We reserve 95% of the available
-% \linewidth for the pipeline and divide the remainder equally.
-\newlength{\pipelinegap}
-\setlength{\pipelinegap}{10mm}
-\newlength{\pipelinelen}
-\makeatletter
-\newcommand{\calcPipelineWidth}{%
-  \setlength{\pipelinelen}{\dimexpr0.95\linewidth - 5\pipelinegap\relax}%
-  \setlength{\pipelinelen}{\dimexpr\pipelinelen/6\relax}%
-}%
-\makeatother
+\definecolor{myblue}{RGB}{64,115,158}
+\definecolor{mydarkblue}{RGB}{39,60,117}
+\definecolor{mylightblue}{RGB}{232,244,255}
+\definecolor{mylightgray}{RGB}{245,246,250}
 
-% Title, author and affiliation
-\title{\parbox{0.88\linewidth}{\centering
-  Age- and Arm-Stratified Co-expression Network Rewiring
-  in the Murine Kidney During and After Spaceflight}}
-\author{Ibrahim M.~Shahid}
-\institute{Middle College at UNCG \textbullet{}
-  Blue Marble Space Institute of Science \textbullet{}
-  NASA Human Research Program \textbullet{} NASA OSD-771 (RRRM-2)}
+\definecolor{prepfill}{RGB}{200,220,245}
+\definecolor{prepbord}{RGB}{80,120,180}
+\definecolor{preplight}{RGB}{210,228,248}
+\definecolor{netfill}{RGB}{180,225,220}
+\definecolor{netbord}{RGB}{50,130,120}
+\definecolor{netalt}{RGB}{255,220,180}
+\definecolor{netaltbord}{RGB}{200,140,50}
+\definecolor{inffill}{RGB}{255,210,210}
+\definecolor{infbord}{RGB}{180,80,80}
+\definecolor{enrfill}{RGB}{195,235,210}
+\definecolor{enrbord}{RGB}{60,140,100}
+\definecolor{valfill}{RGB}{220,210,240}
+\definecolor{valbord}{RGB}{120,90,160}
+\definecolor{outfill}{RGB}{230,230,230}
+\definecolor{outbord}{RGB}{130,130,130}
+\definecolor{tiertext}{RGB}{100,100,120}
+\definecolor{arrcolor}{RGB}{100,100,110}
+\definecolor{grpblue}{RGB}{220,230,245}
+\definecolor{grpteal}{RGB}{220,240,235}
+\definecolor{grprose}{RGB}{245,225,225}
+
+\newlength{\sepwidth}
+\newlength{\colwidth}
+\setlength{\sepwidth}{0.020\paperwidth}
+\setlength{\colwidth}{0.300\paperwidth}
+\newcommand{\separatorcolumn}{\begin{column}{\sepwidth}\end{column}}
+
+\setlength{\abovecaptionskip}{1.5ex}
+\setlength{\belowcaptionskip}{0.5ex}
+
+\title{Age- and Arm-Stratified Co-expression Network Rewiring\\
+       in the Murine Kidney During and After Spaceflight}
+
+\author{Ibrahim M.\ Shahid\textsuperscript{1,2,3}}
+
+\institute{%
+  \textsuperscript{1}Middle College at UNCG\quad
+  \textsuperscript{2}Blue Marble Space Institute of Science\quad
+  \textsuperscript{3}NASA Human Research Program}
+
+\footercontent{
+  \texttt{imshahid@uncg.edu}
+  \hfill
+  ASGSR Annual Meeting 2026
+  \hfill
+  Dataset: NASA GeneLab OSD-771 (RRRM-2)}
 
 \begin{document}
-\maketitle[width=\textwidth,titletotopverticalspace=10pt,
-           linewidth=0pt,roundedcorners=10]
+\begin{frame}[t]
+\begin{columns}[t]
+\separatorcolumn
 
-% ════════════════ ROW 1: full-width pipeline strip ════════════
-\begin{columns}
-\column{1.0}
-\block[titleinnersep=6pt,bodyinnersep=16pt]{%
-  \large\bfseries Analytical Pipeline --- node2vec-Driven Transcriptomic Network Rewiring Framework%
-}{
-  \begin{center}
-  % Compute pipeline width just before drawing
-  \calcPipelineWidth
-  \begin{tikzpicture}[
-    pbox/.style={%
-      draw=UoMNavy!60, text=white, rounded corners=7pt,
-      inner ysep=9pt, inner xsep=8pt,
-      font=\large\bfseries, text width=\pipelinelen, align=center,
-      line width=1.5pt
-    },
-    p0/.style={pbox, fill=SteelBlue},
-    p1/.style={pbox, fill=SteelBlue!75!black},
-    p2/.style={pbox, fill=CoralAccent!85!black},
-    p3/.style={pbox, fill=UoMLightBlue!80!black},
-    p4/.style={pbox, fill=LavAccent!85!black},
-    p5/.style={pbox, fill=GreenAccent!60!black},
-    arrow/.style={-Stealth, line width=3pt, color=UoMNavy},
-    sub/.style={font=\normalsize\mdseries, align=center,
-                text width=\pipelinelen, text=UoMDarkGray}
-  ]
-    % Nodes for each phase.  Using pipelinelen ensures they fill the row.
-    \node[p0] (ph0) {Phase 0\\[2pt]Pre-processing \&\\Deconvolution};
-    \node[p1, right=\pipelinegap of ph0] (ph1) {Phase 1\\[2pt]Global\\Residualization};
-    \node[p2, right=\pipelinegap of ph1] (ph2) {Phase 2\\[2pt]Cell-Std.\ Shared\\Skeleton $E$};
-    \node[p3, right=\pipelinegap of ph2] (ph3) {Phase 3\\[2pt]LIONESS + Edge-Wise\\Regression};
-    \node[p4, right=\pipelinegap of ph3] (ph4) {Phase 4\\[2pt]Node2vec +\\Procrustes};
-    \node[p5, right=\pipelinegap of ph4] (ph5) {Phase 5\\[2pt]Rewiring \&\\Inference};
+%%==============================================================
+%% COLUMN 1 — Background | Design | Pipeline | Conclusions
+%%==============================================================
+\begin{column}{\colwidth}
 
-    % Draw arrows between phases
-    \foreach \a/\b in {ph0/ph1,ph1/ph2,ph2/ph3,ph3/ph4,ph4/ph5}
-      \draw[arrow] (\a) -- (\b);
+  \begin{block}{Background \& Motivation}
+    \vspace{0.5ex}
+    Astronauts face a \textbf{$\sim$5$\times$ elevated risk of nephrolithiasis}
+    post-flight, with distal convoluted tubule (DCT) ion-transport dysregulation
+    strongly implicated~[1]. Standard differential expression (DE) detects only
+    mean expression shifts---\textbf{regulatory rewiring} (changes in
+    co-expression architecture) is not captured when mean levels are stable.
 
-    % Subtext beneath each node
-    \node[sub, below=8mm of ph0]
-      {DESeq2 VST $\cdot$ MuSiC deconvolution\\(Tabula Muris Senis)\\CLR nephron props $\cdot$ SVA};
+    \smallskip
+    \textbf{Central question:} Does spaceflight restructure the kidney
+    co-expression network in an age- and arm-dependent manner, producing
+    transcriptomic adaptations that escape DE?
 
-    \node[sub, below=8mm of ph1]
-      {Single global regression ($n{=}80$)\\removes batch + SVs + cell-type props\\preserves Age/Arm/Group biology};
+    \smallskip
+    We developed a multi-phase pipeline integrating cell-type deconvolution
+    (MuSiC), sample-specific network inference (LIONESS), graph embedding
+    (node2vec with Procrustes alignment), and permutation testing applied to
+    \textbf{RRRM-2 (OSD-771)}---the largest full-factorial spaceflight kidney
+    RNA-seq dataset ($n = 80$).
+  \end{block}
 
-    \node[sub, below=8mm of ph2]
-      {Within-cell $R^\star$ standardization\\(eliminates Simpson's paradox)\\Ledoit--Wolf: $|E|{=}136{,}852$ edges};
-
-    \node[sub, below=8mm of ph3]
-      {LOO LIONESS $\to$ $80{\times}|E|$ Fisher-$z$\\eBayes across $2{\times}4{\times}2$ factorial\\Predicted contrast-specific networks};
-
-    \node[sub, below=8mm of ph4]
-      {PecanPy: 128-d, $p{=}0.25$, $q{=}4.0$\\WL 80, 200 walks, 10 seeds (CV ${<}2\%$)\\Procrustes to pre-registered anchors};
-
-    \node[sub, below=8mm of ph5]
-      {$\Delta(g)=1-\cos(v_\text{FLT},v_\text{GC})$\\Focused permutation ($K{=}5{,}000$)\\BH top decile + pathway enrichment};
-
-    % Highlight line across phases 2--5
-    \draw[color=CoralAccent, line width=2.5pt]
-      ([yshift=6pt]ph2.north west) -- ([yshift=6pt]ph5.north east);
-    \node[above=9pt of ph3, xshift=3.2cm,
-          font=\large\bfseries, text=CoralAccent!80!black]
-      {Skeleton $E$ fixed across Phases 2--5: same nodes, same edges, model-based weights only};
-
-  \end{tikzpicture}
-  \end{center}
-}
-\end{columns}
-
-% ════════════════ ROW 2: three content columns ════════════════
-\begin{columns}
-
-%% ───────── COLUMN 1 (0.30) ──────────────────────────────────
-\column{0.30}
-
-\block{Abstract}{
-  Astronauts exhibit elevated nephrolithiasis risk post-flight, with prior work linking
-  microgravity to distal nephron remodeling and renal transporter dysregulation.
-  Whether spaceflight alters \emph{regulatory coordination} among genes---shifting
-  co-expression architecture without necessarily changing mean expression---remains
-  uncharacterised.
-
-  \vspace{0.5em}
-  We analysed OSD-771 (RRRM-2), bulk kidney RNA-seq from \textbf{80 female C57BL/6NTac mice}
-  under a $2{\times}4{\times}2$ factorial design crossing \textbf{Age} (Young 16 wks;
-  Old 34 wks), \textbf{Arm} (ISS-T; LAR), and \textbf{Environment Group} (FLT, GC, VIV, BSL).
-  MuSiC deconvolution removed compositional confounding.  Sample-specific networks via LIONESS
-  on a shared sparse skeleton, followed by node2vec embeddings aligned by Procrustes, yielded
-  per-gene \emph{rewiring scores} across four primary contrasts.
-
-  \vspace{0.5em}
-  Focused permutation testing identified \textbf{11 significantly rewired genes in Young ISS-T}
-  (FDR $<0.05$), including \textit{Slc6a20a}, \textit{Cry2}, and \textit{Gc}, with two
-  additional hits in Old ISS-T (\textit{Prlr}, \textit{Nr4a1}).  Pathway enrichment revealed
-  ECM/complement remodeling in Young ISS-T, EMT/steroid biosynthesis in Old ISS-T, and
-  \textbf{retinoic acid metabolism} as the most robust cross-arm signal
-  (OR\,=\,19.9, LAR Young).  Rewiring was statistically orthogonal to DE ($\rho \approx 0.03$).
-}
-
-\block{Background \& Rationale}{
-  \begin{itemize}
-    \item Astronauts experience $\sim$5$\times$ elevated kidney stone risk post-flight;
-          DCT ion-transport dysregulation is implicated.
-    \item Standard DE tests only \emph{mean shifts}; regulatory \emph{rewiring} at stable
-          mean expression is invisible to conventional analyses.
-    \item RRRM-2 (OSD-771): largest factorial kidney RNA-seq spaceflight dataset, $n{=}80$.
-    \item \textbf{Central question:} Does spaceflight restructure the kidney co-expression
-          network in an age- and arm-dependent manner?
-  \end{itemize}
-
-  \vspace{0.6em}
-  \shadebox{UoMGray}{%
-    \textbf{Dataset --- NASA OSD-771 (RRRM-2)}\\[6pt]
+  \begin{block}{Experimental Design: OSD-771 (RRRM-2)}
+    \vspace{0.5ex}
     \renewcommand{\arraystretch}{1.3}
-    \begin{tabular}{@{}ll@{}}
-      \textbf{Factor}    & \textbf{Levels} \\
-      Age                & Young (16 wks), Old (34 wks) \\
-      Arm                & ISS-T (terminal), LAR (live return) \\
-      Environ.\ Group    & FLT, GC, VIV, BSL \\
-      Per cell           & 5 mice / age \\
-    \end{tabular}\\[6pt]
-    $2\times2\times4\times5=\mathbf{80}$ samples (primary inference)\\[3pt]
-    Secondary 4-bin view ($n{=}40$): sensitivity only.%
-  }
-}
+    \begin{center}
+    \begin{tabular}{r!{\color{myblue}\vrule width 2pt}l}
+      \textbf{Factor} & \textbf{Levels} \\[2pt]
+      \hline
+      Age   & Young (16 wk) \textbf{vs} Old (34 wk) \\
+      Arm   & ISS-T (terminal) \textbf{vs} LAR (live return) \\
+      Group & FLT \quad GC \quad VIV \quad BSL \\
+      \hline
+      Per-cell $n$ & 5 mice $\times$ 2 ages $= 10$ per cell \\
+      Total $n$    & \textbf{80} female C57BL/6NTac bulk kidney RNA-seq \\
+    \end{tabular}
+    \end{center}
 
-\block{Statistical Considerations}{
-  \textbf{Combinatorial ceiling.}
-  With $n{=}5$ FLT and $N{=}20$ total per stratum, $\binom{20}{5}=15{,}504$ permutations
-  exist.  Even exhaustive enumeration gives minimum $p \approx 6.4{\times}10^{-5}$;
-  after BH over 2,500 genes, minimum $q \approx 0.16$.
-  \textbf{This is a mathematical property of the design, not a failure of signal.}
+    \smallskip
+    \textbf{Four primary contrasts (FLT$-$GC):} ISS-T Young,\; ISS-T Old,\;
+    LAR Young,\; LAR Old. Arm stratification enables classification of rewiring
+    as \emph{ephemeral} (ISS-T-only) vs.\ \emph{persistent} (both arms).
+  \end{block}
 
-  \vspace{0.5em}
-  \textbf{Focused permutation.}
-  BH restricted to top rewiring decile (250 genes) is biologically motivated and
-  statistically principled—analogous to candidate-gene analysis in GWAS.  Cutoff defined
-  by rewiring rank, not by $p$-values, avoiding circular inference.
-  Inter-seed CV $<2\%$ across 10 node2vec runs confirms embedding stability.
-}
+  %% ---- PIPELINE ----
+  %% Nodes are drawn wide (minimum width=5.0cm) so that resizebox{\linewidth}{!}
+  %% scales the diagram to column width with only a modest zoom, keeping
+  %% the height proportionally reasonable (~12-14 cm on the printed poster).
+  \begin{block}{Multi-Phase Analytical Pipeline}
+    \vspace{0.5ex}
+    \begin{center}
+    \resizebox{\linewidth}{!}{%
+    \begin{tikzpicture}[
+        pbox/.style={
+            rectangle, rounded corners=4pt,
+            minimum width=5.0cm, minimum height=1.6cm,
+            text width=4.7cm, align=center,
+            font=\small\sffamily,
+            line width=0.8pt,
+        },
+        tierlabel/.style={font=\footnotesize\sffamily\itshape, text=tiertext},
+        arr/.style={-{Stealth[length=5pt,width=4pt]},
+                    line width=0.7pt, color=arrcolor},
+        darr/.style={-{Stealth[length=5pt,width=4pt]},
+                     line width=0.7pt, densely dashed, color=arrcolor},
+        grp/.style={rounded corners=6pt, line width=0.6pt, inner sep=9pt},
+    ]
 
-\block{Code Availability \& Reproducibility}{
-  \textbf{Code Repository:} Fully reproducible pipeline, including
-  deconvolution, network inference, and rewiring analysis, is available.
-  \vspace{0.5em}
-  \begin{center}
-    \begin{tikzpicture}
-      \node[draw=UoMNavy!25,fill=white,rounded corners=6pt,inner sep=10pt,
-            text width=0.85\linewidth,align=center,font=\Large\itshape]{%
-        \textbf{[Placeholder: QR Code / GitHub Link]}\\[4pt]
-        Space reserved for repository details.
-      };
-    \end{tikzpicture}
-  \end{center}
-}
+    %% ---- TIER 1: DATA PREPARATION ----
+    \node[pbox, fill=prepfill,  draw=prepbord]
+        (P0)  {\textbf{Phase 0}\\\footnotesize Deconvolution\\\scriptsize MuSiC\,+\,TMS};
+    \node[pbox, fill=preplight, draw=prepbord, right=1.1cm of P0]
+        (P1)  {\textbf{Phase 1}\\\footnotesize Residualization\\\scriptsize DESeq2-VST\,+\,SVA};
+    \node[pbox, fill=preplight, draw=prepbord, right=1.1cm of P1]
+        (P15) {\textbf{Phase 1.5}\\\footnotesize Segment Markers\\\scriptsize 10 cell types};
+    \node[pbox, fill=preplight, draw=prepbord, right=1.1cm of P15]
+        (P16) {\textbf{Phase 1.6}\\\footnotesize DCT Markers\\\scriptsize NCC-WNK axis};
 
-%% ───────── COLUMN 2 (0.38) ──────────────────────────────────
-\column{0.38}
+    %% ---- TIER 2: NETWORK ANALYSIS ----
+    \node[pbox, fill=netfill,  draw=netbord,
+          below=1.4cm of P0, xshift=0.6cm]
+        (P2)  {\textbf{Phase 2}\\\footnotesize Skeleton + LIONESS\\\scriptsize Ledoit--Wolf,\;136k edges};
+    \node[pbox, fill=netfill,  draw=netbord,  right=1.1cm of P2]
+        (P3)  {\textbf{Phase 3}\\\footnotesize Embeddings\\\scriptsize node2vec 128-d, Procrustes};
+    \node[pbox, fill=netalt,   draw=netaltbord, right=1.1cm of P3]
+        (P5)  {\textbf{Phase 5}\\\footnotesize Silent Shifters\\\scriptsize $\Delta_g$ cosine, persistence};
 
-\block{Results: Rewiring Landscape}{
-  Mean rewiring ($\Delta$) was similar across all four contrasts (0.269--0.284),
-  indicating a \textbf{genome-wide perturbation}.  Maximum single-gene rewiring reached
-  0.547—\,\approx twice the genome-wide average—identifying individual hub genes as
-  extreme outliers.
+    %% ---- TIER 3: INFERENCE & VALIDATION ----
+    \node[pbox, fill=inffill, draw=infbord,
+          below=1.4cm of P2, xshift=0.6cm]
+        (P6)  {\textbf{Phase 6}\\\footnotesize Permutation + Regression\\\scriptsize $K\!=\!50$k focused, factorial};
+    \node[pbox, fill=enrfill, draw=enrbord,  right=1.1cm of P6]
+        (P7)  {\textbf{Phase 7}\\\footnotesize Enrichment\\\scriptsize KEGG, Reactome, Hallmark};
+    \node[pbox, fill=valfill, draw=valbord,  right=1.1cm of P7]
+        (P8)  {\textbf{Phase 8b}\\\footnotesize Enhanced Validation\\\scriptsize LOO-CV, expr.\ baseline};
+    \node[pbox, fill=outfill, draw=outbord,  right=1.1cm of P8]
+        (P9)  {\textbf{Phase 9}\\\footnotesize Figures\\\scriptsize Publication-ready output};
 
-  \vspace{0.4em}
-  \shadebox{UoMLightBlue!15}{%
-    \textbf{Key result:} Spearman $\rho = 0.02$--$0.05$ between $\Delta$ and
-    $|\log_2\text{FC}|$ ($R^2 < 0.3\%$) across all contrasts.
-    \textbf{Rewiring is statistically orthogonal to differential expression.}%
-  }
+    %% Tier 1 arrows
+    \draw[arr] (P0)  -- (P1);
+    \draw[arr] (P1)  -- (P15);
+    \draw[arr] (P15) -- (P16);
 
-  \vspace{0.6em}
-  \begin{center}
-    \begin{tikzpicture}
-      \node[draw=UoMNavy!25,fill=UoMGray,rounded corners=6pt,inner sep=14pt,
-            text width=0.87\linewidth,align=center,font=\normalsize\itshape]{%
-        \textbf{[Figure: 4-panel scatter — $\Delta$ vs. $|\log_2\text{FC}|$]}\\[4pt]
-        One panel per contrast. Spearman $\rho$ annotated.
-        Focused-permutation hits (FDR $<$ 0.05) coloured.
-      };
-    \end{tikzpicture}
-  \end{center}
-}
+    %% Tier 1 → Tier 2
+    \draw[arr]  (P1.south)  -- ++(0,-0.45) -| (P2.north);
+    \draw[darr] (P15.south) -- ++(0,-0.30) -| ($(P2.north)+(0.5,0)$);
 
-\block{Results: Focused Permutation Hits (FDR $<$ 0.05)}{
-  \begin{center}
-  \renewcommand{\arraystretch}{1.35}
-  \begin{tabular}{p{3.8cm} p{3.8cm} p{2.8cm} p{13.5cm}}
-    \toprule
-    \textbf{Contrast} & \textbf{Gene} & \textbf{$q$ (BH)} & \textbf{Function / Biological relevance} \\
-    \midrule
-    ISS-T Young & \textit{Slc6a20a} & 0.025 & Renal proline/glycine transporter (proximal tubule) \\
-    ISS-T Young & \textit{Trf}       & 0.025 & Transferrin; iron and protein trafficking hub \\
-    ISS-T Young & \textit{Fabp7}     & 0.033 & Fatty acid-binding protein; lipid metabolism reprogramming \\
-    ISS-T Young & \textit{Azgp1}     & 0.037 & Zinc-alpha-2-glycoprotein; lipid mobilization and metabolic adaptation \\
-    ISS-T Young & \textit{Foxq1}     & 0.043 & Forkhead TF; epithelial differentiation and polarity \\
-    ISS-T Young & \textit{Slc22a28}  & 0.043 & Organic anion transporter (proximal tubule) \\
-    ISS-T Young & \textit{Adgrg4}    & 0.044 & Adhesion GPCR; urogenital epithelium \\
-    ISS-T Young & \textit{Gc}        & 0.044 & Vitamin D-binding protein; mineral homeostasis \\
-    ISS-T Young & \textit{Pfkp}      & 0.050 & Platelet-type PFK; rate-limiting glycolytic enzyme \\
-    ISS-T Young & \textit{Cry2}      & 0.050 & Circadian repressor; 16 sunrises per day on ISS \\
-    ISS-T Young & ENSMUSG\ldots293   & 0.043 & Unmapped locus \\
-    \midrule
-    ISS-T Old   & \textit{Prlr}      & 0.025 & Prolactin receptor; renal osmoregulation \\
-    ISS-T Old   & \textit{Nr4a1}     & 0.025 & Nur77; apoptosis and renal injury response \\
-    \midrule
-    LAR Young   & \textit{Eps8l1}    & 0.050 & Actin dynamics regulator; tubular morphology \\
-    \bottomrule
-  \end{tabular}
-  \end{center}
+    %% Tier 2 arrows
+    \draw[arr] (P2) -- (P3);
+    \draw[arr] (P3) -- (P5);
 
-  \vspace{0.5em}
-  \begin{center}
-    \begin{tikzpicture}
-      \node[draw=UoMNavy!25,fill=UoMGray,rounded corners=6pt,inner sep=14pt,
-            text width=0.87\linewidth,align=center,font=\normalsize\itshape]{%
-        \textbf{[Figure: Rank plots for all 4 contrasts]}\\[4pt]
-        Genes ranked by $\Delta$; FDR $<$ 0.05 hits labelled.
-        ISS-T Young shows the highest density of significant hits.
-      };
-    \end{tikzpicture}
-  \end{center}
+    %% Tier 2 → Tier 3
+    \draw[arr]  (P2.south) -- ++(0,-0.45) -| (P6.north);
+    \draw[arr]  (P3.south) -- ++(0,-0.30) -| ($(P6.north)+(0.5,0)$);
+    \draw[arr]  (P5.south) -- ++(0,-0.45) -| (P7.north);
 
-  \vspace{0.4em}
-  {\normalsize\textbf{Note:} \textit{Trf} and \textit{Cry2} are robust to
-  expression-residualisation (ranks stable). \textit{Slc6a20a}, \textit{Fabp7},
-  \textit{Azgp1}, and \textit{Gc} shift to ranks 800--2100 post-residualisation;
-  pathway-level findings are unaffected.}
-}
+    %% Tier 3 arrows
+    \draw[arr] (P6) -- (P7);
+    \draw[arr] (P7) -- (P8);
+    \draw[arr] (P8) -- (P9);
 
-\block{Integrated Biological Interpretation}{
-  \textbf{1.\ Coordinated ECM and Innate Immune Remodeling.}
-  ECM organization, collagen trimerisation, complement/coagulation, and integrin signalling
-  rewired across contrasts.  Age modulates the signature: ECM/complement in Young;
-  EMT/steroid biosynthesis in Old.
+    %% Cross-tier shortcut
+    \draw[darr] (P5.south) -- ++(0,-0.65) -| (P9.north);
 
-  \vspace{0.4em}
-  \textbf{2.\ Hub-Gene Rewiring at Topological Bottlenecks.}
-  Hits span renal transporters, secretory proteins, metabolic enzymes, circadian regulation,
-  and hormonal signalling—\emph{topological hubs} coordinating multiple biological
-  processes, not members of a single pathway.
+    %% Group bounding boxes (background layer)
+    \begin{scope}[on background layer]
+      \node[grp, draw=prepbord, fill=grpblue, fit=(P0)(P16),
+            label={[tierlabel]above left:{Data Preparation}}] {};
+      \node[grp, draw=netbord,  fill=grpteal, fit=(P2)(P5),
+            label={[tierlabel]above left:{Network Analysis}}] {};
+      \node[grp, draw=infbord,  fill=grprose, fit=(P6)(P9),
+            label={[tierlabel]above left:{Inference \& Validation}}] {};
+    \end{scope}
 
-  \vspace{0.4em}
-  \textbf{3.\ Retinoic Acid as Convergent Repair Signal.}
-  Detected by gene-level and pathway-level inference; strongest in LAR (recovery arm).
-  Candidate for mechanistic follow-up and therapeutic targeting.
+    %% I/O annotation
+    \node[below=0.55cm of P9, text width=5.5cm, align=center,
+          font=\scriptsize\sffamily, text=tiertext] {
+      \textbf{Input:} 80 bulk RNA-seq kidneys, OSD-771 RRRM-2\\[3pt]
+      \textbf{Output:} Rewiring scores, permutation FDR,\\
+      pathway enrichment, LOO-CV $p$-values
+    };
 
-  \vspace{0.5em}
-  \shadebox{UoMGray}{%
-    \textbf{Age effect:} Young kidney is more susceptible to individual rewiring events
-    (11 hits vs. 2 in Old).  Old kidney may already occupy a perturbed baseline,
-    leaving less headroom for additional flight-induced change.%
-  }
-}
+    \end{tikzpicture}%
+    }
+    \end{center}
+  \end{block}
 
-%% ───────── COLUMN 3 (0.32) ──────────────────────────────────
-\column{0.32}
+  %% ---- CONCLUSIONS ----
+  \begin{alertblock}{Conclusions}
+    \vspace{0.5ex}
+    \begin{enumerate}\setlength\itemsep{0.4ex}
+      \item Spaceflight induces age-stratified co-expression rewiring
+        orthogonal to DE ($\rho \approx 0.03$, $R^2 < 0.3\%$)
+      \item \textbf{55--68 silent shifters per contrast}---connectivity
+        restructuring with no detectable expression change
+      \item Young ISS-T: ECM/complement rewiring;\;
+        Old ISS-T: ribosomal/proteostasis disruption
+      \item Retinoic acid and PPAR signaling are enriched in LAR recovery
+      \item Network topology (AUC $= 0.525$) and expression
+        (AUC $= 0.598$) classifiers confirm orthogonality of the two
+        representations
+      \item Co-expression network analysis is a complementary modality for
+        space biology, resolving biology not accessible through DE alone
+    \end{enumerate}
+  \end{alertblock}
 
-\block{Results: Pathway Enrichment (FDR $<$ 0.05)}{
-  \begin{center}
-  \renewcommand{\arraystretch}{1.35}
-  \begin{tabular}{p{3.2cm} p{9.8cm} p{1.8cm} p{3.2cm} p{1.5cm}}
-    \toprule
-    \textbf{Contrast} & \textbf{Pathway (Database)} & \textbf{OR} & \textbf{$q$-value} & \textbf{Hits} \\
-    \midrule
-    ISS-T Young & ECM Organization (Reactome)             & 3.9  & 0.048 & 13 \\
-    ISS-T Young & Collagen Chain Trimerisation (Reactome) & 13.5 & 0.048 & 5  \\
-    ISS-T Young & Complement and Coagulation (KEGG)       & 9.5  & 0.007 & 8  \\
-    ISS-T Young & Protein Digestion and Absorption (KEGG) & 10.2 & 0.007 & 8  \\
-    \midrule
-    ISS-T Old   & Epithelial--Mesenchymal Transition (Hallmark) & 4.6 & 0.039 & 12 \\
-    ISS-T Old   & Steroid Hormone Biosynthesis (KEGG)     & 13.1 & 0.039 & 6  \\
-    \midrule
-    LAR Young   & \textbf{Retinol Metabolism (KEGG)}      & \textbf{19.9} & $\mathbf{1.6\times10^{-5}}$ & \textbf{9} \\
-    LAR Young   & Xenobiotics/CYP450 (KEGG)               & 12.4 & 0.001 & 8  \\
-    LAR Young   & Complement and Coagulation (KEGG)        & 8.1  & 0.026 & 7  \\
-    \midrule
-    LAR Old     & NAFLD / Complex I subunits (KEGG)       & 6.2  & 0.001 & 13 \\
-    LAR Old     & ECM Organization (Reactome)              & 4.9  & 0.001 & 16 \\
-    \bottomrule
-  \end{tabular}
-  \end{center}
+\end{column}
 
-  \vspace{0.5em}
-  \begin{center}
-    \begin{tikzpicture}
-      \node[draw=UoMNavy!25,fill=UoMGray,rounded corners=6pt,inner sep=14pt,
-            text width=0.87\linewidth,align=center,font=\normalsize\itshape]{%
-        \textbf{[Figure: Pathway bubble dot plot]}\\[4pt]
-        Axes: pathway $\times$ contrast. Bubble size = hit count.
-        Colour = $-\log_{10}(q)$. Retinol metabolism prominent.
-      };
-    \end{tikzpicture}
-  \end{center}
-}
+\separatorcolumn
 
-\block{Results: ISS-T vs. LAR and Convergent Retinoic Acid Signal}{
-  ISS-T shows \textbf{greater and more significant rewiring} than LAR across all contrasts
-  (11 hits vs. 1 in Young; 2 vs. 0 in Old), consistent with \emph{partial network
-  recovery} following return to terrestrial gravity.
+%%==============================================================
+%% COLUMN 2 — Rewiring Landscape | Silent Shifters | Hub Hits
+%%==============================================================
+\begin{column}{\colwidth}
 
-  \vspace{0.4em}
-  \begin{itemize}
-    \item $\sim$\textbf{15\%} top-decile genes are \textbf{ISS-T-specific} (ephemeral;
-          resolved on return): \textit{Cry2}, \textit{Foxq1}, renal transporters.
-    \item $\sim$\textbf{22\%} are \textbf{persistent} (rewired in both arms):
-          \textit{Cfh}, \textit{Vwf}, \textit{Col1a1}, \textit{Fn1}.
-  \end{itemize}
+  \begin{block}{Genome-Wide Rewiring Landscape}
+    \vspace{0.5ex}
+    Spaceflight remodels co-expression architecture across all four contrasts.
+    Mean rewiring $\Delta \approx 0.27$--$0.29$ (cosine distance); maximum
+    single-gene rewiring exceeds $0.53$.
 
-  \vspace{0.5em}
-  \shadebox{UoMLightBlue!15}{%
-    \textbf{Convergent signal: Retinoic acid metabolism} is the single most reproducible
-    finding. OR\,=\,19.9 in LAR Young ($q=1.6{\times}10^{-5}$); 9/35 pathway members in
-    top decile; nominal enrichment in ISS-T Young ($p=0.003$).  Strongest in the LAR arm,
-    suggesting a \emph{recovery/repair programme} during re-adaptation. Retinol metabolism is
-    essential for tubular differentiation, podocyte maintenance, and renal injury repair.%
-  }
-}
+    \smallskip
+    \begin{center}
+    \small
+    \begin{tabular}{lcc}
+      \toprule
+      \textbf{Contrast (FLT$-$GC)} & \textbf{Mean $\Delta$} & \textbf{Max $\Delta$} \\
+      \midrule
+      ISS-T Young & 0.284 & 0.515 \\
+      ISS-T Old   & 0.287 & 0.511 \\
+      LAR Young   & 0.271 & 0.513 \\
+      LAR Old     & 0.275 & 0.539 \\
+      \bottomrule
+    \end{tabular}
+    \end{center}
 
-\block{Future Directions}{
-  \textbf{Validation of Retinoic Acid Signalling:}
-  Future experiments should directly assay retinoid metabolism and receptor activation
-  in microgravity analogues.
+    \smallskip
+    \textbf{Orthogonality:} Rewiring $\Delta$ is independent of
+    $|\log_2\text{FC}|$ across all four contrasts ($\rho = 0.02$--$0.05$,
+    $R^2 < 0.3\%$), confirming that network rewiring captures a dimension of
+    spaceflight biology orthogonal to differential expression.
 
-  \textbf{Single-Cell Resolution:}
-  Application of similar rewiring frameworks to inherently single-cell data will resolve
-  cell-type-specific subnetworks.
+    \vspace{0.8ex}
+    \begin{figure}
+      \centering
+      % FILE: rewiring_vs_DE.png
+      \includegraphics[width=0.95\linewidth]{figures/publication/rewiring_vs_logfc.png}
+      \caption{\small Rewiring magnitude ($\Delta$) vs.\ $|\log_2\text{FC}|$
+        for 2,500 genes across four contrasts. Near-zero Spearman $\rho$
+        ($R^2 < 0.3\%$) confirms statistical independence of network rewiring
+        from mean expression change.}
+    \end{figure}
+  \end{block}
 
-  \vspace{0.5em}
-  \begin{center}
-    \begin{tikzpicture}
-      \node[draw=UoMNavy!25,fill=white,rounded corners=6pt,inner sep=10pt,
-            text width=0.87\linewidth,align=center,font=\Large\itshape]{%
-        \textbf{[Placeholder: Future model / validation schematic]}\\[4pt]
-        Space reserved for future work diagrams.
-      };
-    \end{tikzpicture}
-  \end{center}
-}
+  \begin{alertblock}{Silent Shifters: Invisible Transcriptomic Restructuring}
+    \vspace{0.5ex}
+    \textbf{Silent shifters}---genes in the top-decile of rewiring with
+    $|\log_2\text{FC}| < 0.3$ and DE FDR $> 0.2$---are invisible to standard
+    DE analysis. The pipeline identifies \textbf{55--68 silent shifters per
+    contrast}:
 
-\block{Acknowledgements \& References}{
-  Data: NASA Open Science Data Repository (OSD-771, RRRM-2 mission).
-  We thank the GeneLab data processing team for normalized RNA-seq counts and metadata.
+    \smallskip
+    \begin{center}\small
+    \begin{tabular}{lc}
+      \toprule
+      \textbf{Contrast} & \textbf{Silent Shifters} \\
+      \midrule
+      ISS-T Young & 66 \\
+      ISS-T Old   & 63 \\
+      LAR Young   & 55 \\
+      LAR Old     & 68 \\
+      \bottomrule
+    \end{tabular}
+    \end{center}
 
-  \vspace{0.4em}
-  {\normalsize
-  Grover \& Leskovec (2016) \textit{KDD} [node2vec]
-  $\cdot$ Kuijjer et al. (2019) \textit{iScience} [LIONESS]
-  $\cdot$ Ledoit \& Wolf (2004) \textit{JMA}\\
-  Park et al. (2018) \textit{Science} [scRNA kidney]
-  $\cdot$ Wang et al. (2019) \textit{NComm} [MuSiC]
-  $\cdot$ Smyth (2004) \textit{SAGMB} [limma/eBayes]}
-}
+    \vspace{0.8ex}
+    \begin{figure}
+      \centering
+      % FILE: quadrant_plot.png
+      \includegraphics[width=0.95\linewidth]{figures/phase5_silent_shifters/quadrant_plot.png}
+      \caption{\small Rewiring score vs.\ $-\log_{10}(q)$ for top-decile genes
+        (four contrasts). Dashed lines: 75th-percentile rewiring threshold (red)
+        and $q = 0.05$ (green). Genes in the upper-left quadrant have high
+        rewiring and low statistical significance---the silent shifter class.}
+    \end{figure}
+  \end{alertblock}
 
+  \begin{block}{Topological Hub Hits via Focused Permutation}
+    \vspace{0.5ex}
+    Focused permutation ($K = 50{,}000$; BH correction restricted to top
+    decile, $n = 250$) identified \textbf{11 significantly rewired hub genes}
+    in ISS-T Young (FDR $< 0.05$):
+
+    \smallskip
+    \begin{center}
+    \small
+    \begin{tabular}{lrl}
+      \toprule
+      \textbf{Gene} & \textbf{$q$} & \textbf{Biological Role} \\
+      \midrule
+      Slc6a20a  & 0.025 & Renal amino acid transporter (proximal tubule) \\
+      Trf       & 0.025 & Iron trafficking / secretory protein \\
+      Fabp7     & 0.033 & Lipid metabolism \\
+      Azgp1     & 0.037 & Lipid catabolism \\
+      Foxq1     & 0.043 & Epithelial differentiation \\
+      Slc22a28  & 0.043 & Organic anion transporter (proximal tubule) \\
+      Adgrg4    & 0.044 & Cell--cell communication \\
+      Gc        & 0.044 & Vitamin D / mineral homeostasis \\
+      Cry2      & 0.050 & Core circadian clock repressor \\
+      Pfkp      & 0.050 & Carbohydrate metabolism \\
+      \bottomrule
+    \end{tabular}
+    \end{center}
+
+    \smallskip
+    \textbf{ISS-T Old:} Prlr ($q = 0.025$) and Nr4a1 ($q = 0.025$) implicate
+    hormonal and stress-response pathways. Edge-wise regression (all 80 samples)
+    identified 154 genes at flight-effect FDR $< 0.05$; 25 genes with
+    significant age$\times$flight interaction.
+  \end{block}
+
+\end{column}
+
+\separatorcolumn
+
+%%==============================================================
+%% COLUMN 3 — Age Divergence | Pathways | Recovery | Retinol | Refs
+%%==============================================================
+\begin{column}{\colwidth}
+
+  \begin{block}{Age-Dependent Rewiring Divergence}
+    \vspace{0.5ex}
+    ISS-T rewiring is correlated across age groups (Spearman $\rho = 0.855$),
+    but a subset of genes shows age-divergent topological responses. The top
+    age-divergent genes include Avpi1, Cxcl14, Parm1, Ak5, and Mcm3, spanning
+    ECM remodeling, immune signaling, and cell-cycle regulation.
+
+    \vspace{0.8ex}
+    \begin{figure}
+      \centering
+      % FILE: age_dependent_rewiring.png
+      \includegraphics[width=0.95\linewidth]{figures/publication/age_comparison.png}
+      \caption{\small \textit{Left:} ISS-T Old vs.\ Young rewiring scatter
+        ($\rho = 0.855$). Color encodes age-divergent rewiring magnitude;
+        labeled outliers are the most age-divergent genes. \textit{Right:}
+        Top 20 age-divergent genes, directional rewiring bar chart.}
+    \end{figure}
+  \end{block}
+
+  \begin{block}{Pathway Remodeling: Age-Dependent Signatures}
+    \vspace{0.5ex}
+    Gene set enrichment (Fisher's exact, BH-corrected; KEGG / Reactome /
+    Hallmark / WikiPathways) reveals contrast-specific pathway signatures:
+
+    \smallskip
+    \noindent\textbf{ISS-T Old} (27 pathways, FDR $< 0.05$): Ribosome, Peptide
+    Chain Elongation, Chaperone-Mediated Autophagy (OR $= 23.6$, $q = 0.005$),
+    Selective Autophagy\\
+    \textit{$\to$ proteostasis disruption in the aged spaceflight kidney}
+
+    \smallskip
+    \noindent\textbf{LAR Old} (22 pathways): PPAR Signaling (OR $= 7.5$,
+    $q = 0.027$), NOTCH Signaling, Complement/Coagulation\\
+    \textit{$\to$ coordinated metabolic and proteostatic recovery upon return}
+
+    \smallskip
+    \noindent\textbf{LAR Young} (11 pathways): PPAR Signaling (OR $= 10.1$,
+    $q = 0.002$): Acaa1b, Acox2, Adipoq, Angptl4, Fabp5, Hmgcs2, Scd1\\
+    \textit{$\to$ PPAR-centered metabolic recovery program}
+
+    \vspace{0.8ex}
+    \begin{figure}
+      \centering
+      % FILE: pathway_dotplot.png
+      \includegraphics[width=0.95\linewidth]{figures/publication/pathway_dotplot.png}
+      \caption{\small Pathway enrichment bubble dot plot across four contrasts
+        (top-decile Fisher's exact, BH-corrected). Bubble size $=$ hit gene
+        count; color intensity $= -\log_{10}(q_\text{BH})$.}
+    \end{figure}
+  \end{block}
+
+  \begin{block}{Recovery \& Persistence of Rewiring}
+    \vspace{0.5ex}
+    Approximately 15\% of top-decile rewiring genes are ISS-T-specific
+    (ephemeral), resolving after return to Earth. Another 22\% show persistent
+    rewiring in both arms.
+
+    \vspace{0.8ex}
+    \begin{figure}
+      \centering
+      % FILE: arm_comparison.png
+      \includegraphics[width=0.95\linewidth]{figures/publication/arm_comparison.png}
+      \caption{\small ISS-T vs.\ LAR rewiring scatter for young (left) and old
+        (right) animals ($\rho \approx 0.86$). Color encodes ISS-T $-$ LAR
+        rewiring difference. Genes above the diagonal are ISS-T-specific;
+        genes below are LAR-amplified.}
+    \end{figure}
+  \end{block}
+
+  \begin{exampleblock}{Convergent Signal: Retinoic Acid Metabolism}
+    \vspace{0.5ex}
+    {\small
+    Retinoic acid emerges as \textbf{a reproducible finding} across orthogonal
+    inference strategies:
+    \begin{itemize}\setlength\itemsep{0.3ex}
+      \item \textbf{Pathway:} Retinol Metabolism---strongest enrichment in LAR
+        Young (OR $= 19.9$, $q = 1.6\times10^{-5}$); 9/35 constituent genes
+        in the top rewiring decile
+      \item \textbf{Gene:} Ugt1a1 ($q = 0.056$), Ugt1a10 ($q = 0.080$),
+        Cyp4a12b ($q = 0.080$) approach significance by focused permutation
+      \item \textbf{Arm specificity:} Signal peaks in LAR (post-return),
+        consistent with retinoic acid as a recovery response rather than a
+        direct microgravity effect
+    \end{itemize}
+
+    \vspace{0.5ex}
+    \begin{figure}
+      \centering
+      % FILE: retinol_subnetwork.png
+      \includegraphics[width=0.95\linewidth]{figures/publication/retinol_subnetwork.png}
+      \caption{\small \textit{Left:} Per-gene retinol metabolism rewiring
+        heatmap across all four contrasts. \textit{Right:} Mean rewiring of
+        retinol pathway genes vs.\ genome background by contrast.}
+    \end{figure}
+    }
+  \end{exampleblock}
+
+  \begin{block}{References}
+    \vspace{0.3ex}
+    \footnotesize
+    [1]~Whitson et al.\ \textit{J Grav Physiol} 1999.\quad
+    [2]~Kuijjer et al.\ \textit{iScience} 2019.\quad
+    [3]~Grover \& Leskovec \textit{KDD} 2016.\\[0.2ex]
+    [4]~Smyth \textit{Stat Appl Genet Mol Biol} 2004.\quad
+    [5]~Wang et al.\ \textit{Nat Commun} 2019.\\[0.2ex]
+    [6]~Tabula Muris \textit{Nature} 2020.\quad
+    [7]~NASA GeneLab OSD-771, 2024.\quad
+    [8]~Liu \& Krishnan \textit{Bioinformatics} 2021.
+  \end{block}
+
+\end{column}
+\definecolor{blue}{RGB}{64, 115, 158}
+\definecolor{darkblue}{RGB}{39, 60, 117}
+\definecolor{lightblue}{RGB}{232, 244, 255}
+\definecolor{lightgray}{RGB}{245, 246, 250}
+
+\setbeamercolor{palette primary}{fg=black,bg=white}
+\setbeamercolor{palette secondary}{fg=black,bg=white}
+\setbeamercolor{palette tertiary}{bg=black,fg=white}
+\setbeamercolor{palette quaternary}{fg=black,bg=white}
+\setbeamercolor{structure}{fg=darkblue}
+\setbeamercolor{headline}{fg=white,bg=blue}
+\setbeamercolor{headline title}{fg=white,bg=blue}
+\setbeamercolor{headline author}{fg=white,bg=blue}
+\setbeamercolor{headline institute}{fg=white,bg=blue}
+\setbeamercolor{headline rule}{bg=darkblue}
+\setbeamercolor{block title}{fg=blue,bg=white}
+\setbeamercolor{block separator}{bg=black}
+\setbeamercolor{block body}{fg=black,bg=white}
+\setbeamercolor{block alerted title}{fg=white,bg=darkblue}
+\setbeamercolor{block alerted separator}{bg=blue}
+\setbeamercolor{block alerted body}{fg=black,bg=lightblue}
+\setbeamercolor{block example title}{fg=darkblue,bg=lightgray}
+\setbeamercolor{block example separator}{bg=darkblue}
+\setbeamercolor{block example body}{fg=black,bg=lightgray}
+\setbeamercolor{heading}{fg=black}
+\setbeamercolor{item}{fg=darkblue}
+\setbeamercolor{bibliography item}{fg=black}
+\setbeamercolor{bibliography entry author}{fg=black}
+\setbeamercolor{bibliography entry title}{fg=black}
+\setbeamercolor{bibliography entry location}{fg=black}
+\setbeamercolor{bibliography entry note}{fg=black}
+\setbeamercolor{footline}{fg=white,bg=blue}
+
+\separatorcolumn
 \end{columns}
-
+\end{frame}
 \end{document}
+
+%% ============================================================
+%% FIGURE FILENAME GUIDE — replace \fbox{...} with:
+%%   \includegraphics[width=0.95\linewidth]{FILENAME}
+%%
+%% Col 2 — Rewiring vs DE scatter:      rewiring_vs_DE.png
+%% Col 2 — Silent Shifters quadrant:    quadrant_plot.png
+%% Col 3 — Age-divergent rewiring:      age_dependent_rewiring.png
+%% Col 3 — Pathway dot plot:            pathway_dotplot.png
+%% Col 3 — ISS-T vs LAR scatter:        arm_comparison.png
+%% Col 3 — Retinol heatmap + bar:       retinol_subnetwork.png
+%% ============================================================

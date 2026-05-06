@@ -1,142 +1,70 @@
-# Results: Age-Dependent Network Rewiring in the Spaceflight Kidney Transcriptome
+# Results Status After Rigor Remediation
 
-**Dataset**: NASA GeneLab OSD-771, Rodent Research Reference Mission 2 (RRRM-2)
-**Pipeline Run**: `run_20260312_203319_2500g` (git `dd03b55`)
-**Date**: March 2026
+This document reflects the remediated code path. It intentionally narrows claims where the available evidence is weak.
 
----
+## Current Audited Run
 
-## 1. Network Construction and Embedding Stability
+Latest audited run used here: `data/results/run_20260408_191759_2500g`.
 
-Gene co-expression networks were constructed from 80 bulk RNA-seq kidney samples drawn from a full factorial design crossing Age (Young, 16 weeks; Old, 34 weeks), Arm (ISS-T, terminally sacrificed aboard the International Space Station; LAR, live animal return), and Environment Group (FLT, flight; GC, hardware ground control; VIV, vivarium; BSL, basal), with five mice per cell. Following DESeq2 variance-stabilizing transformation, MuSiC cell-type deconvolution with the Tabula Muris Senis kidney reference, and global residualization of batch, lane, surrogate variables, and centered log-ratio cell-type proportions, a panel of 2,500 genes was selected for network analysis. The shared-topology skeleton, computed via Ledoit-Wolf shrinkage followed by partial-correlation thresholding at top-k = 80 neighbors per gene, comprised 136,852 undirected edges. LIONESS leave-one-out deconvolution produced 80 sample-specific weighted networks on this fixed skeleton. Edge-wise regression incorporating the full factorial design with empirical Bayes variance moderation then yielded predicted contrast-specific networks for each of the four primary flight-effect contrasts: ISS-T Young FLT − GC, ISS-T Old FLT − GC, LAR Young FLT − GC, and LAR Old FLT − GC.
+Phase 6 full-domain edge-sum node-rewiring permutation results from that run:
 
-PecanPy node2vec embeddings (128 dimensions, p = 0.25, q = 4.0, walk length = 80, 200 walks per node) were computed from each predicted contrast network across 10 independent random seeds. Procrustes alignment to a common reference using pre-registered anchor genes was performed seed-wise, and a consensus embedding was obtained by averaging across all aligned seeds. Embedding stability was high: the mean standard deviation of per-node embedding norms across seeds ranged from 2.636 to 2.666 across all eight condition networks (FLT and GC for each Age × Arm cell), and no edges were dropped during graph construction from the predicted weights. This tight inter-seed agreement (coefficient of variation < 2%) indicates that the downstream rewiring metric — cosine distance between matched FLT and GC embeddings — is robust to the stochastic component of the node2vec random walk procedure.
+| Contrast | Full-domain BH q < 0.05 | Minimum q |
+|---|---:|---:|
+| ISS-T Young FLT minus GC | 24 | 0.0208 |
+| ISS-T Old FLT minus GC | 0 | 0.0833 |
+| LAR Young FLT minus GC | 0 | 0.0833 |
+| LAR Old FLT minus GC | 0 | 0.1250 |
 
-## 2. Rewiring Quantification Across Contrasts
+These 24 ISS-T Young genes are **edge-sum node-rewiring candidates**, not confirmed per-gene discoveries. Phase 6 p-values test summed incident LIONESS edge changes. They are not direct p-values for the Phase 3 node2vec/Procrustes cosine-distance statistic.
 
-Rewiring was quantified as the cosine distance between each gene's consensus embedding in the FLT condition and the corresponding GC condition, separately within each Age × Arm stratum. Mean rewiring across all 2,500 genes was similar in magnitude across the four contrasts (ISS-T Young: 0.281; ISS-T Old: 0.284; LAR Young: 0.269; LAR Old: 0.279), consistent with a genome-wide perturbation rather than a sparse effect. Maximum single-gene rewiring ranged from 0.528 (ISS-T Young) to 0.547 (ISS-T Old), indicating that individual genes can experience up to twice the genome-wide average shift in their local connectivity neighborhoods. The top-ranked gene in the ISS-T Young contrast was *Tnn* (ENSMUSG00000003949, rewiring = 0.528); in ISS-T Old, *Myo1e* (ENSMUSG00000006542, rewiring = 0.547); in LAR Young, *Tmem255b* (ENSMUSG00000046818, rewiring = 0.534); and in LAR Old, *Nrep* (ENSMUSG00000024856, rewiring = 0.544). The absence of dramatic differences in global rewiring magnitude across contrasts suggests that the spaceflight perturbation broadly remodels co-expression architecture rather than selectively affecting a narrow set of genes, and that age- or arm-dependent differences manifest primarily in the identities and biological functions of the most-rewired genes rather than in the overall scale of perturbation.
+The old focused-permutation narrative has been removed. Restricting BH to the observed top decile does not provide strict FDR control. Valid restricted modes are now limited to pre-registered `--candidate-genes` or `--hierarchical-fdr` over pre-specified gene sets.
 
-## 3. Permutation-Based Statistical Inference
+## Gene Aggregation
 
-### 3.1 Standard Permutation Testing
+`src/statistics/full_regression.py` no longer uses unsigned Stouffer aggregation as primary inference. Gene-level regression evidence is now a signed incident-edge t-statistic calibrated by within-Age by Arm label permutation. Legacy Stouffer output is available only as an explicitly named diagnostic.
 
-The standard permutation test assessed significance of each gene's observed rewiring magnitude by permuting sample labels between the FLT group (n = 5) and the pooled GC, VIV, and BSL control groups (n = 15) K = 2,000 times, re-deriving the full pipeline (edge regression → node2vec → Procrustes → cosine distance) for each permutation. Under this procedure, the minimum achievable permutation p-value is 1/(K+1) ≈ 0.0005. With 2,500 genes undergoing Benjamini-Hochberg (BH) correction, the most liberal rejection threshold becomes approximately 0.05 × 1/2500 = 0.00002 for the top-ranked gene — an order of magnitude smaller than the minimum achievable p-value. Accordingly, no gene in any contrast achieved FDR < 0.05 under standard BH correction. The best-performing contrast, ISS-T Young, produced 15 genes at the floor p-value of 0.0005 with a minimum q-value of 0.052, narrowly missing the conventional significance threshold.
+## Silent Shifters
 
-This outcome reflects a structural limitation inherent to permutation testing with small group sizes. With n = 5 FLT mice drawn from N = 20 total mice per stratum, there are C(20, 5) = 15,504 unique sample-label permutations. Even with exhaustive enumeration, the minimum achievable p-value would be 1/15,504 ≈ 6.4 × 10⁻⁵, which after BH correction across 2,500 genes yields a minimum q-value of approximately 0.16 — still above 0.05. This mathematical ceiling is a property of the combinatorial design, not a failure of the biological signal.
+The previous strict silent-shifter files contained 250 genes per contrast because DE was not attached and all genes were treated as DE-null. In the audited run those files had blank DE columns; the 55-68 values were support counts inside those rewiring-only files, not true silent-shifter counts.
 
-### 3.2 Focused Permutation Testing
+The remediated generator requires contrast-matched gene-level DE and writes separate outputs for candidate rewired genes, DE-supported rewired genes, strict DE-null silent shifters, supported strict silent shifters, and observed-vs-null calibration.
 
-To address the multiple-testing bottleneck while maintaining rigorous permutation-based inference, we implemented a focused permutation procedure that restricts the BH correction domain to the top decile of genes ranked by observed rewiring magnitude. The rationale is that the top 10% of genes (250 out of 2,500) are the biologically motivated hypothesis set: genes with the most extreme observed connectivity change are the only plausible candidates for significant rewiring, and applying genome-wide correction to genes with modest rewiring wastes statistical power on tests that are unwinnable by design. This procedure increases the permutation budget to K = 5,000 (minimum achievable p ≈ 0.0002) and applies BH correction only across the 250 tested genes, yielding a rejection threshold of approximately 0.05 × 1/250 = 0.0002 for the top-ranked gene — now exactly at the resolution limit of the permutation null.
+A smoke-test rerun for `ISS_T_YNG_FLT_minus_GC` with the available DE table produced 250 high-rewiring candidates, 208 strict DE-null silent shifters, 36 DE-supported high-rewiring genes, and 3 supported strict silent shifters. Full contrast-level counts require rerunning Phase 5 on the remediated code.
 
-The focused permutation procedure identified statistically significant rewiring in three of the four contrasts. In the ISS-T Young contrast, 11 genes achieved FDR < 0.05: *Slc6a20a* (q = 0.025), *Trf* (q = 0.025), *Fabp7* (q = 0.033), *Azgp1* (q = 0.037), *Foxq1* (q = 0.043), *Slc22a28* (q = 0.043), *Adgrg4* (q = 0.044), *Gc* (q = 0.044), *Pfkp* (q = 0.050), and *Cry2* (q = 0.050), plus one gene without a mapped symbol (ENSMUSG00000105293, q = 0.043). An additional 93 genes achieved FDR < 0.10 in this contrast, representing a substantial set of near-significant candidates. In the ISS-T Old contrast, two genes achieved FDR < 0.05: *Prlr* (prolactin receptor, q = 0.025) and *Nr4a1* (q = 0.025). In the LAR Young contrast, one gene achieved FDR < 0.05: *Eps8l1* (q = 0.050). The LAR Old contrast produced no genes at FDR < 0.05, with the closest candidate, *Frzb* (ENSMUSG00000027004), reaching q = 0.10.
+## Phase 8
 
-The asymmetry in discovery rates across contrasts is biologically interpretable. The ISS-T arm represents terminal sacrifice aboard the ISS, where animals experienced the full cumulative spaceflight exposure at the time of tissue collection. The LAR arm represents live animal return, where tissues were collected after a period of re-adaptation to terrestrial gravity. The substantially greater number of significant genes in ISS-T versus LAR contrasts (11 vs. 1 in young; 2 vs. 0 in old) is consistent with partial recovery of network architecture following return to Earth. Similarly, the greater signal in young animals (11 genes) compared to old animals (2 genes) suggests that the young kidney may be more susceptible to spaceflight-induced network perturbation, or alternatively that the aged kidney's co-expression structure is already closer to a perturbed baseline, leaving less room for additional flight-induced change.
+The classifier result is negative in the audited run:
 
-**Sensitivity analysis — expression magnitude confound.** A known limitation of cosine-distance-based rewiring metrics is that genes with higher baseline expression variance may exhibit greater embedding displacement independent of genuine connectivity change. To assess this, we examined whether the focused permutation hits were disproportionately high-variance genes by computing Spearman correlation between rewiring magnitude and absolute log2 fold change across all 2,500 genes. The correlation was near zero in all four contrasts (ρ = 0.02–0.05, R² < 0.3%), confirming that rewiring magnitude is statistically independent of differential expression at the genome level. Further, we computed rank-stability coefficients between raw rewiring rank and expression-residualized rewiring rank for the top-250 gene set: Jaccard index = 0.79–0.87, indicating that approximately 80% of the top-decile gene set is robust to expression-magnitude adjustment. However, at the level of individual focused-permutation significant genes, this residualization has heterogeneous impact: *Trf* (raw rank 18 → residualized rank 190) and *Cry2* (raw rank 21 → residualized rank 218) retain significance in the top 10% after residualization, while other hits (*Slc6a20a*, *Fabp7*, *Azgp1*, *Gc*) fall to ranks 800–2100, suggesting their extreme raw-rewiring positions are partially driven by high expression variance. This expression-magnitude confound should be considered when interpreting the biological significance of individual focused-permutation hits, though the pathway-level findings (Section 4) are unaffected, as they derive from aggregate enrichment across moderate-rewiring genes. Full results tables are provided in Table 1 (below) and in `figures/publication/table1_significant_genes.tsv`.
+| Model | Accuracy | AUC |
+|---|---:|---:|
+| Random Forest | 0.400 | 0.525 |
+| Logistic Regression | 0.375 | 0.359 |
 
-**Table 1. Genes achieving FDR < 0.05 by focused permutation.** (Complete table auto-generated to `figures/publication/table1_significant_genes.tsv` on each pipeline run.)
+Enhanced Phase 8b network advantage was negative in every stratum: -0.8, -0.8, -0.4, -0.3, and -0.1 pooled. The old Phase 8b implementation computed LIONESS/features/PCA before LOO splitting, so it was not fully leakage-safe. The remediated implementation computes network pools, skeletons, LIONESS/SSN weights, feature selection, scaling, PCA, and classifiers inside folds. Until a remediated rerun changes the numbers, classifier validation remains unsupported.
 
-| Contrast | Gene | Rewiring | Rank | p (perm) | q (BH focused) | log₂FC | DE FDR |
-|---|---|---|---|---|---|---|---|
-| ISS-T Young | *Slc6a20a* | top decile | — | ≤ 0.0002 | 0.025 | — | — |
-| ISS-T Young | *Trf* | top decile | — | ≤ 0.0002 | 0.025 | — | — |
-| ISS-T Young | *Cry2* | top decile | — | ≤ 0.0002 | 0.050 | — | — |
-| ISS-T Old | *Prlr* | top decile | — | ≤ 0.0002 | 0.025 | — | — |
-| ISS-T Old | *Nr4a1* | top decile | — | ≤ 0.0002 | 0.025 | — | — |
-| LAR Young | *Eps8l1* | top decile | — | ≤ 0.0002 | 0.050 | — | — |
+## External Validation Scope
 
-*Full table with all 11 ISS-T Young hits and expression-residualized ranks is in `figures/publication/table1_significant_genes.tsv`.*
+Independent external replication is protocol-gated in `src/validation/external_replication.py` and `docs/external_replication_protocol/`.
 
-### 3.3 Biological Identities of Focused Permutation Hits
+OSD-102 is the primary partner only for LAR-Young-like findings and pathways. OSD-513 is secondary and limited to sex-stratification or sex-robustness checks. Neither validates ISS-T claims, old-arm claims, classifier validation, or global cohort expansion.
 
-The 11 genes achieving FDR < 0.05 in the ISS-T Young contrast encompass several functional categories relevant to kidney physiology and the known effects of spaceflight. *Slc6a20a* encodes a proline transporter expressed in the proximal tubule and is implicated in renal amino acid reabsorption. *Slc22a28* belongs to the organic anion transporter family, members of which are critical for proximal tubular solute secretion. *Trf* (transferrin) and *Gc* (vitamin D-binding protein/group-specific component) are major hepatic and renal secretory proteins whose network rewiring may reflect altered protein trafficking or systemic metabolic signaling under microgravity. *Fabp7* (fatty acid-binding protein 7, brain) is normally expressed at low levels in kidney but has been implicated in lipid metabolism reprogramming under cellular stress. *Azgp1* (alpha-2-glycoprotein 1, zinc-binding) is a lipid-mobilizing glycoprotein associated with cachexia and metabolic adaptation — both features of prolonged spaceflight. *Pfkp* (phosphofructokinase, platelet) catalyzes a rate-limiting step in glycolysis, consistent with the metabolic rewiring previously reported in spaceflight tissues. *Cry2* (cryptochrome circadian regulator 2) is a core component of the mammalian circadian clock, and its significant network rewiring aligns with the well-documented disruption of circadian rhythms aboard the ISS, where animals experience approximately 16 sunrise/sunset cycles per 24-hour period. *Foxq1* (forkhead box Q1) regulates epithelial differentiation and has been linked to cell polarity and mucosal defense. *Adgrg4* (adhesion G protein-coupled receptor G4) is expressed in the gastrointestinal and urogenital epithelium and may reflect altered cell-cell communication under microgravity conditions.
+Multi-study OSD-102 plus OSD-771 LAR-Young pooling is a separate mode in `src/validation/multi_study_pool.py`; it requires ComBat-seq and PCA gates before any pooled-network claim is allowed.
 
-In the ISS-T Old contrast, *Prlr* (prolactin receptor) and *Nr4a1* (nuclear receptor subfamily 4, group A, member 1; also known as Nur77) both achieved the minimum permutation p-value (p = 0.0002). Prolactin receptor signaling has been implicated in renal osmoregulation and electrolyte balance, processes known to be disrupted in spaceflight. Nr4a1 is an immediate-early gene and orphan nuclear receptor involved in apoptosis, inflammation, and metabolic regulation; its activation has been linked to kidney injury responses. The fact that these two genes emerge specifically in the old-animal contrast may indicate age-dependent vulnerability in hormonal and stress-response signaling pathways.
+OSDR source references: [NASA OSDR](https://www.nasa.gov/osdr/) and [OSDR Developer API](https://www.nasa.gov/reference/osdr-developer-api/).
 
-## 4. Pathway-Level Enrichment of Rewired Genes
+## Defensible Claims
 
-Gene set enrichment analysis was performed on the top decile of rewired genes (250 genes per contrast) against curated libraries including KEGG 2019 Mouse, Reactome 2022, MSigDB Hallmark 2020, and WikiPathways 2024 Mouse. Fisher's exact test with BH correction identified significant enrichment (FDR < 0.05) across all four contrasts, revealing coordinated pathway-level rewiring that complements the individual gene-level findings from focused permutation.
+Defensible now:
 
-In the ISS-T Young contrast, four pathways achieved significance: Protein Digestion and Absorption (KEGG; OR = 10.2, q = 0.007; 8 hits including *Col12a1*, *Col1a1*, *Col6a1*, *Col6a5*, *Cpb2*, *Mep1a*, *Mep1b*, *Slc7a7*), Complement and Coagulation Cascades (KEGG; OR = 9.5, q = 0.007; 8 hits including *C3ar1*, *Cd55*, *Cfh*, *Fga*, *Vwf*), Collagen Chain Trimerization (Reactome; OR = 13.5, q = 0.048; 5 hits), and Extracellular Matrix Organization (Reactome; OR = 3.9, q = 0.048; 13 hits including *Adamts9*, *Bgn*, *Fbln5*, *Hspg2*, *Lama5*, *Ltbp1*). Together these pathways indicate large-scale remodeling of the extracellular matrix and innate immune/coagulation interface in the young kidney during spaceflight. Retinol metabolism was nominally enriched in this contrast (p = 0.003) with 4 hit genes (*Aldh1a7*, *Cyp4a12b*, *Ugt1a1*, *Ugt1a10*) but did not survive FDR correction (q = 0.40).
+- Pathway-level replication, if a remediated external run validates it.
+- LAR-Young external validation using OSD-102, if the pre-registered checks pass.
+- Sex-robustness checks using OSD-513, clearly marked as secondary.
+- ISS-T Young full-domain edge-sum hits as prioritized candidates only.
 
-In the ISS-T Old contrast, two pathways achieved significance: Steroid Hormone Biosynthesis (KEGG; OR = 13.1, q = 0.039; 6 hits including *Akr1d1*, *Hsd17b2*, *Hsd3b2*, *Cyp1b1*, *Cyp2e1*, *Ugt1a1*) and Epithelial-Mesenchymal Transition (MSigDB Hallmark; OR = 4.6, q = 0.039; 12 hits including *Acta2*, *Col4a2*, *Fbln1*, *Fn1*, *Igfbp3*, *Mmp2*). The shift from ECM/complement enrichment in young animals to steroid biosynthesis and EMT in old animals suggests an age-dependent transition in the nature of spaceflight-induced network remodeling: younger kidneys exhibit structural matrix reorganization and innate immune activation, while older kidneys exhibit hormonal and fibrotic reprogramming.
+Provisional or unsupported:
 
-In the LAR Young contrast, nine pathways achieved significance, dominated by Retinol Metabolism (KEGG; OR = 19.9, q = 1.6 × 10⁻⁵; 9 hits including *Cyp26b1*, *Cyp2a5*, *Cyp4a12b*, *Cyp4a31*, *Retsat*, *Ugt1a10*, *Ugt1a2*, *Ugt1a7c*), Metabolism of Xenobiotics by Cytochrome P450 (KEGG; OR = 12.4, q = 0.001; 8 hits), Complement and Coagulation Cascades (KEGG; OR = 8.1, q = 0.026; 7 hits), Integrin Signaling (Reactome; OR = 13.5, q = 0.027; 5 hits), and Coagulation (MSigDB Hallmark; OR = 5.4, q = 0.027; 9 hits). The striking enrichment of retinol metabolism — the single strongest pathway result in the entire analysis — occurs specifically in the live-animal-return arm, suggesting that retinoic acid signaling is reactivated or reorganized during the re-adaptation period following return to terrestrial gravity. Retinol (vitamin A) metabolism is critical for renal tubular differentiation and repair, and its disproportionate rewiring in the recovery arm may reflect an active regenerative response.
-
-In the LAR Old contrast, four pathways achieved significance: Non-Alcoholic Fatty Liver Disease (KEGG; OR = 6.2, q = 0.001; 13 hits dominated by mitochondrial Complex I subunits *Ndufa4*, *Ndufa6*, *Ndufa13*, *Ndufb8*, *Ndufb11*, *Ndufs6* and ubiquinol-cytochrome c reductase *Uqcr10*), Extracellular Matrix Organization (Reactome; OR = 4.9, q = 0.001; 16 hits including *Fbn1*, *Fn1*, *Itga2*, *Itga4*, *Itgb8*), Integrin Cell Surface Interactions (Reactome; OR = 10.4, q = 0.003; 8 hits), and Translation/ribosomal (Reactome; OR = 10.8, q = 0.006; 7 ribosomal protein genes). The emergence of mitochondrial/metabolic rewiring specifically in old LAR animals suggests that aged kidneys recovering from spaceflight experience oxidative phosphorylation network disruption, consistent with age-dependent mitochondrial vulnerability.
-
-**Table 2. Significantly enriched pathways across all contrasts (FDR < 0.05).** (Auto-generated to `figures/publication/table2_significant_pathways.tsv`.)
-
-| Contrast | Pathway | Library | OR | q | n Hits | Key Genes |
-|---|---|---|---|---|---|---|
-| ISS-T Young | Protein Digestion & Absorption | KEGG | 10.2 | 0.007 | 8 | Col12a1, Col1a1, Mep1a, Slc7a7 |
-| ISS-T Young | Complement & Coagulation | KEGG | 9.5 | 0.007 | 8 | C3ar1, Cfh, Fga, Vwf |
-| ISS-T Young | Collagen Chain Trimerization | Reactome | 13.5 | 0.048 | 5 | Col1a1, Col6a1, Col6a5 |
-| ISS-T Young | ECM Organization | Reactome | 3.9 | 0.048 | 13 | Bgn, Fbln5, Hspg2, Lama5 |
-| ISS-T Old | Steroid Hormone Biosynthesis | KEGG | 13.1 | 0.039 | 6 | Akr1d1, Hsd17b2, Cyp1b1 |
-| ISS-T Old | Epithelial-Mesenchymal Transition | MSigDB | 4.6 | 0.039 | 12 | Acta2, Fn1, Mmp2 |
-| LAR Young | Retinol Metabolism | KEGG | 19.9 | 1.6×10⁻⁵ | 9 | Cyp26b1, Cyp2a5, Retsat |
-| LAR Young | Metabolism of Xenobiotics | KEGG | 12.4 | 0.001 | 8 | Cyp2a5, Ugt1a10, Ugt1a2 |
-| LAR Old | NAFLD | KEGG | 6.2 | 0.001 | 13 | Ndufa4, Ndufb8, Uqcr10 |
-| LAR Old | ECM Organization | Reactome | 4.9 | 0.001 | 16 | Fbn1, Fn1, Itga2 |
-
-*Complete table including all contrasts and all significant pathways is in `figures/publication/table2_significant_pathways.tsv`.*
-
-## 5. Cross-Referencing Pathway Enrichment with Focused Permutation
-
-A critical question is how the pathway-level enrichment results (Section 4) relate to the individual gene-level significance from focused permutation (Section 3.2). Direct cross-referencing reveals that these two statistical procedures identify largely non-overlapping gene sets, consistent with their complementary analytical roles.
-
-In the ISS-T Young contrast, the 27 unique genes driving the four significant enrichment pathways (ECM, complement, collagen, protein digestion) were examined against the focused permutation results. Of these 27 genes, only 5 appeared in the top decile (the restricted testing universe for focused permutation), and none achieved focused FDR < 0.05. Four enrichment pathway genes reached near-significance by focused permutation (FDR < 0.10): *Serpina1b* from the complement cascade (p = 0.021, q = 0.080) and three retinol-metabolism genes — *Ugt1a1* (p = 0.004, q = 0.056), *Ugt1a10* (p = 0.010, q = 0.080), and *Cyp4a12b* (p = 0.021, q = 0.080). Conversely, all 11 genes achieving focused-permutation FDR < 0.05 (*Slc6a20a*, *Trf*, *Fabp7*, *Azgp1*, *Foxq1*, *Slc22a28*, *Adgrg4*, *Gc*, *Pfkp*, *Cry2*, ENSMUSG00000105293) were absent from every significant enrichment pathway, indicating that they represent individual hub-gene rewiring events not captured by curated pathway annotations.
-
-This separation arises from the fundamentally different statistical questions posed by each method. Pathway enrichment asks whether a pre-defined gene set is over-represented among the top-rewired genes, and achieves significance when many pathway members each undergo moderate rewiring collectively. Focused permutation asks whether an individual gene's rewiring exceeds the null distribution derived from label shuffling, and achieves significance for extreme individual outliers regardless of their pathway membership. The ECM and complement pathway genes (e.g., *Col1a1*, *Col6a1*, *Cfh*, *Fga*, *Vwf*) are moderately rewired and numerous — sufficient to trigger Fisher's exact test significance — but no single member is extreme enough to survive individual permutation testing. The focused-permutation winners (*Slc6a20a*, *Trf*, *Cry2*, etc.) are individually extreme but functionally diverse, lacking the co-membership in curated gene sets that enrichment analysis requires.
-
-The one biological system bridging both layers of evidence is retinol metabolism. In the ISS-T Young contrast, retinol metabolism genes (*Ugt1a1*, *Ugt1a10*, *Cyp4a12b*) reach near-significance by focused permutation while also contributing to nominal pathway enrichment (p = 0.003). In the LAR Young contrast, retinol metabolism is the single most significant pathway in the entire analysis (OR = 19.9, q = 1.6 × 10⁻⁵), with 9 of 35 pathway members concentrated in the top rewiring decile. This convergence — retinol metabolism detected by both gene-level permutation (approaching significance) and pathway-level enrichment (highly significant) — establishes retinoic acid signaling as the most statistically robust biological finding across the two orthogonal inference strategies.
-
-## 6. Integrated Biological Interpretation
-
-Taken together, the multi-scale analysis reveals three distinct modes of spaceflight-induced network disruption in the murine kidney:
-
-**First, coordinated extracellular matrix and innate immune remodeling.** Pathway enrichment identifies ECM organization, collagen trimerization, complement/coagulation cascades, and integrin signaling as significantly rewired in multiple contrasts (ISS-T Young, LAR Old, LAR Young). These pathways share overlapping gene members (e.g., *Fga*, *Col6a1*, *Fbln5*, *Hspg2*, *Fn1*) and represent the structural and hemostatic machinery of the renal interstitium. Their coordinated rewiring is consistent with the tissue remodeling, fluid redistribution, and hemodynamic changes that are hallmarks of the spaceflight physiological response. The age dependence of the specific pathway signature — ECM/complement in young, EMT/steroid biosynthesis in old — suggests that the molecular nature of this remodeling shifts with biological aging.
-
-**Second, individual hub-gene rewiring at network bottlenecks.** Focused permutation identifies a small number of genes whose connectivity changes are extreme outliers: renal transporters (*Slc6a20a*, *Slc22a28*), secretory/binding proteins (*Trf*, *Gc*, *Azgp1*), metabolic enzymes (*Pfkp*, *Fabp7*), a circadian regulator (*Cry2*), epithelial transcription factors (*Foxq1*), and signaling receptors (*Adgrg4*, *Prlr*, *Nr4a1*). These genes are not members of a single curated pathway, but their functional diversity is coherent: they represent nodes through which multiple biological processes are coordinated — nutrient transport, protein trafficking, energy metabolism, circadian timing, and hormonal signaling. Their extreme rewiring implies that spaceflight does not merely perturb individual pathways but reorganizes the hub architecture through which pathways communicate.
-
-**Third, retinol metabolism as a convergent, multi-scale signal.** Retinoic acid signaling occupies a unique position in the results, emerging at both the pathway level (OR = 19.9 in LAR Young, nominal enrichment in ISS-T Young and ISS-T Old) and approaching gene-level permutation significance (*Ugt1a1* q = 0.056, *Ugt1a10* q = 0.080, *Cyp4a12b* q = 0.080 in ISS-T Young). Retinol metabolism is essential for renal tubular differentiation, podocyte maintenance, and injury repair. Its most dramatic rewiring occurs in the LAR (live animal return) arm, where tissues were collected following re-adaptation to terrestrial gravity. This arm-specific enrichment suggests that retinoic acid pathway reactivation may represent an active regenerative or repair program engaged during the recovery phase, rather than a direct response to microgravity itself. The recurrence of retinol-related genes (*Ugt1a1*, *Cyp4a12b*, *Aldh1a7*) across multiple contrasts and statistical tests positions this pathway as the single most reproducible biological finding from the network rewiring analysis.
-
-## 7. Methodological Considerations and Statistical Power
-
-Several design features of this analysis merit explicit discussion regarding statistical power and the interpretation of null results. The permutation-based inference framework, while non-parametric and assumption-free, is fundamentally constrained by the combinatorial structure of the experimental design. With n = 5 FLT and n = 15 control mice per stratum, there are C(20, 5) = 15,504 unique permutations, setting a hard floor on achievable p-values. Even under exhaustive permutation (K = 15,504), the minimum p-value of approximately 6.4 × 10⁻⁵ cannot survive BH correction across 2,500 genes (where the top gene's threshold is 0.05/2500 = 2 × 10⁻⁵). This is a mathematical property of the design, not a reflection of biological effect size.
-
-The focused permutation procedure addresses this ceiling by restricting the correction domain to the top 250 genes (top decile). This choice is justified on two grounds. First, it is biologically motivated: genes outside the top decile of observed rewiring have, by definition, modest connectivity changes that are unlikely to be biologically meaningful even if they were statistically significant. Second, it is statistically principled: restricting the hypothesis set is analogous to candidate-gene analysis in GWAS, where the reduced correction burden reflects genuine prior knowledge rather than data-derived selection. Crucially, the top-decile cutoff is defined by rank order of the observed rewiring, not by the permutation p-values themselves, avoiding circular inference.
-
-The pathway-level permutation procedure provides a third analytical scale. By computing the mean rewiring across all members of each curated gene set and comparing against a permutation null, this test aggregates information across multiple genes, achieving greater effective sample size at the cost of pathway-resolution granularity. The top pathway hits (e.g., Retinol Metabolism at p = 0.001, Complement/Coagulation at p = 0.002) approach but do not cross FDR < 0.05 when correcting across approximately 330 tested pathways. This intermediate result — highly suggestive but not formally significant — is expected given the modest combinatorial resolution and underscores the value of the convergent evidence from the hypergeometric enrichment analysis in Phase 7, which operates on a different statistical framework (Fisher's exact test on overlap counts rather than permutation of rewiring magnitudes).
-
-Bootstrap confidence intervals (B = 50 resamples) provide complementary uncertainty quantification. The 95% confidence interval for the top-rewired gene in ISS-T Young spans 159–1,031 (in summed absolute cosine distance units), confirming that while individual gene ranks are variable, the distinction between the most-rewired and the genome average is robust to resampling variability.
-
-## 8. Rewiring Persistence and Recovery Across Arms
-
-The factorial design with both ISS-T (terminal sacrifice) and LAR (live animal return) arms allows classification of each rewiring event by its persistence relative to the recovery period. Specifically, for each gene we define an ISS-T-specific rewiring event as one with high rewiring in the ISS-T FLT−GC contrast but low rewiring in the LAR FLT−GC contrast (indicating that the connectivity change resolved after return to Earth), and a persistent rewiring event as one with high rewiring in both arms (indicating that the connectivity change persists even after return). Ephemeral changes — present during flight but absent on return — are the most direct evidence of microgravity-induced network reorganization, while persistent changes may reflect adaptive or maladaptive remodeling that is not reversed by re-exposure to gravity.
-
-Persistence analysis using the ISS-minus-LAR delta metric (Phase 5 output) reveals that approximately 15% of the top-decile rewiring genes are ISS-T-specific (ISS-minus-LAR delta > 0.1 in the Young stratum), including *Cry2*, *Foxq1*, and several renal transporter genes. Approximately 22% are persistent (rewiring in both ISS-T and LAR), including the complement cascade and ECM genes (*Cfh*, *Vwf*, *Col1a1*, *Fn1*) that also drive pathway enrichment. The remaining genes show variable or low rewiring in both arms, suggesting either measurement noise or genuine absence of flight effect. The age comparison (young vs. old) within each arm is visualized in `figures/publication/age_comparison.png`; the ISS-T vs. LAR arm comparison, with ISS-T-specific events annotated, is in `figures/publication/arm_comparison.png`.
-
-## 9. Generated Figures Index
-
-All publication figures are automatically regenerated at the end of each pipeline run and saved to `figures/publication/` within the run directory. The following figures are produced:
-
-| File | Description |
-|---|---|
-| `rewiring_vs_logfc.png` | 4-panel scatter: rewiring magnitude vs. \|log2FC\|, showing near-zero correlation |
-| `focused_perm_rank.png` | Rank plots for all 4 contrasts; FDR < 0.05 genes labeled in color |
-| `pathway_dotplot.png` | Bubble dot plot: pathway × contrast, size = hits, color = −log₁₀(q) |
-| `pathway_barplot.png` | Horizontal bar chart: log₂(OR) for all significant enriched pathways |
-| `age_comparison.png` | ISS-T Young vs. ISS-T Old rewiring scatter, age-divergent genes annotated |
-| `arm_comparison.png` | ISS-T vs. LAR rewiring scatter, ISS-T-specific (ephemeral) events annotated |
-| `retinol_subnetwork.png` | Heatmap + grouped bars for retinol metabolism gene rewiring |
-| `pipeline_schematic.png` | Pipeline overview diagram (Phases 0 → 9) |
-| `table1_significant_genes.tsv` | All focused-perm FDR < 0.05 genes with ranks, q-values, \|FC\|, and DE FDR |
-| `table2_significant_pathways.tsv` | All enrichment FDR < 0.05 pathways with OR, q, hit counts, and gene lists |
-
----
-
-**Document Version**: 1.1
-**Generated**: March 2026
-**Pipeline**: `run_20260312_203319_2500g` | Focused permutation: K = 5,000, top-decile (q = 0.90) | Pathway permutation: K = 5,000, KEGG + Hallmark
+- Broad per-gene discoveries.
+- ISS-T external validation.
+- Old-arm external validation.
+- Classifier validation.
+- Global cohort expansion.

@@ -32,6 +32,9 @@ from sklearn.preprocessing import StandardScaler
 
 from src.common import REPO_ROOT, find_sample_col, normalize_labels
 
+DEFAULT_TOPK = 80
+DEFAULT_RF_MAX_DEPTH = 5
+
 
 # ---------------------------------------------------------------------------
 # Fold-wise skeleton + LIONESS (leakage-safe)
@@ -41,7 +44,7 @@ def build_skeleton_on_fold(
     rtech_train: np.ndarray,
     meta_train: pd.DataFrame,
     genes: list[str],
-    topk: int = 80,
+    topk: int = DEFAULT_TOPK,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Build skeleton E using only training-fold data.
 
@@ -185,7 +188,7 @@ def main():
                     default=str(REPO_ROOT / "data/results/phase8_validation"),
                     help="Output directory")
     ap.add_argument("--n_folds", type=int, default=5, help="Number of CV folds")
-    ap.add_argument("--topk", type=int, default=80, help="Top-k neighbors for skeleton")
+    ap.add_argument("--topk", type=int, default=DEFAULT_TOPK, help="Top-k neighbors for skeleton")
     ap.add_argument("--max_genes", type=int, default=2500, help="Max genes for network")
     args = ap.parse_args()
 
@@ -324,7 +327,7 @@ def main():
                 max_iter=1000, C=1.0, random_state=42
             ),
             "RandomForest": RandomForestClassifier(
-                n_estimators=100, max_depth=5, random_state=42
+                n_estimators=100, max_depth=DEFAULT_RF_MAX_DEPTH, random_state=42
             ),
         }
 

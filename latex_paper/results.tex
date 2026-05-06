@@ -145,7 +145,7 @@ The pipeline integrates advanced network medicine paradigms to resolve context-s
 \node[pbox, fill=netalt, draw=netaltbord, right=0.7cm of P3]  (P5)  {\textbf{Phase 5}\\\footnotesize Silent Shifters\\\scriptsize $\Delta_g$ cosine,\\persistence};
 
 % ======== TIER 3: INFERENCE & VALIDATION ========
-\node[pbox, fill=inffill, draw=infbord, below=1.3cm of P2, xshift=0.35cm]  (P6)  {\textbf{Phase 6}\\\footnotesize Permutation +\\ Regression\\\scriptsize $K\!=\!50$k focused,\\factorial};
+\node[pbox, fill=inffill, draw=infbord, below=1.3cm of P2, xshift=0.35cm]  (P6)  {\textbf{Phase 6}\\\footnotesize Permutation +\\ Regression\\\scriptsize edge-sum,\\signed empirical};
 \node[pbox, fill=enrfill, draw=enrbord, right=0.7cm of P6]  (P7)  {\textbf{Phase 7}\\\footnotesize Enrichment\\\scriptsize KEGG, Reactome,\\Hallmark};
 \node[pbox, fill=valfill, draw=valbord, right=0.7cm of P7]  (P8)  {\textbf{Phase 8b}\\\footnotesize Enhanced\\Validation\\\scriptsize LOO-CV,\\expr.\ baseline};
 \node[pbox, fill=outfill, draw=outbord, right=0.7cm of P8]  (P9)  {\textbf{Phase 9}\\\footnotesize Figures\\\scriptsize Publication-\\ready output};
@@ -207,7 +207,7 @@ The pipeline integrates advanced network medicine paradigms to resolve context-s
     \item \textbf{Phase 3 (LIONESS + Edge Regression):} Leave-one-out LIONESS deconvolution produced 80 sample-specific weighted networks. Edge-wise regression incorporating the full factorial design with empirical Bayes variance moderation yielded predicted contrast-specific networks.
     \item \textbf{Phase 4 (Node2vec Embeddings):} PecanPy embeddings (128-d, $p=0.25$, $q=4.0$, walk length = 80, 200 walks/node) were computed across 10 random seeds and orthogonally Procrustes-aligned to pre-registered anchor genes. Inter-seed coefficient of variation $< 2\%$ confirmed extreme embedding stability.
     \item \textbf{Phase 5 (Silent Shifters \& Persistence):} Per-gene rewiring was quantified via cosine distance $\Delta_g = 1 - \cos(\mathbf{v}_\text{FLT}, \mathbf{v}_\text{GC})$. ``Silent shifters'' were identified as genes with high rewiring (top 10\%) but low DE ($|\log_2\text{FC}| < 0.3$, DE FDR $> 0.2$). Persistence was assessed via ISS-minus-LAR delta metric.
-    \item \textbf{Phase 6 (Uncertainty Estimation):} Standard permutation ($K = 2{,}000$), focused permutation ($K = 50{,}000$, top decile), and bootstrap ($B = 50$) procedures provided complementary uncertainty quantification. Edge-wise regression with Stouffer-combined $p$-values assessed flight effects and age$\times$flight interactions.
+    \item \textbf{Phase 6 (Uncertainty Estimation):} Stratified edge-sum node-rewiring permutation ($K = 5{,}000$), candidate-only or hierarchical FDR for pre-registered restricted tests, and bootstrap ($B = 2{,}000$) procedures provided uncertainty quantification. Full-factorial edge regression was aggregated to genes with a signed incident-edge statistic calibrated by within-stratum label permutation.
     \item \textbf{Phase 7 (Biological Grounding):} Gene set enrichment via Fisher's exact test against KEGG 2019 Mouse, Reactome 2022, MSigDB Hallmark 2020, and WikiPathways 2024 Mouse, with BH correction.
     \item \textbf{Phase 8b (Enhanced Validation):} Stratum-specific leave-one-out cross-validation (LOO-CV) comparing network topology features vs.\ raw expression features for FLT/GC classification, with 1,000-permutation null distributions to derive formal $p$-values.
 \end{itemize}
@@ -322,54 +322,42 @@ The identification of 55--68 silent shifters per contrast in the April run repre
 \end{figure}
 
 
-\subsection{Topological Hub Hits via Focused Permutation}
+\subsection{Topological Hub Candidates via Calibrated Edge-Sum Permutation}
 
-The standard permutation test ($K = 2{,}000$) is fundamentally constrained by the combinatorial structure of the design: with $n = 5$ FLT mice and $N = 20$ total per stratum, $\binom{20}{5} = 15{,}504$ unique permutations yield a minimum achievable $p \approx 6.4 \times 10^{-5}$, which cannot survive BH correction across 2,500 genes (minimum $q \approx 0.16$).
+The old focused-permutation procedure has been removed because it selected the BH correction domain from the observed top-decile rewiring statistic. The remediated inference separates exploratory ranking from strict FDR control: full-domain BH is applied to all 2,500 edge-sum node-rewiring tests, while restricted testing is allowed only for pre-registered candidate genes or hierarchical gene families.
 
-The focused permutation procedure addresses this by restricting BH correction to the top decile (250 genes, $K = 5{,}000$). This biologically motivated restriction---analogous to candidate-gene analysis in GWAS---achieved successful discovery (Figure~\ref{fig:focused_ranks}):
+In the audited April 2026 run, the full-domain edge-sum permutation identified 24 ISS-T Young candidates at BH FDR $<0.05$. These candidates should be interpreted as prioritized edge-sum network-rewiring hits, not as direct p-values for the Phase~3 node2vec/Procrustes cosine-distance statistic. Appendix-tier full-pipeline cosine-distance permutation is reserved for pre-selected top hits.
 
 \begin{figure*}[!t]
 \centering
 \includegraphics[width=0.9\textwidth]{figures/publication/focused_perm_rank.png}
-\caption{Rank plots of gene regulatory rewiring across all four contrasts. Red nodes indicate genes achieving focused permutation FDR $< 0.05$. The ISS-T Young contrast exhibits the highest concentration of significantly rewired regulatory loci, consistent with acute spaceflight sensitivity in young kidneys.}
+\caption{Rank plots of edge-sum node rewiring across all four contrasts. Highlighted genes indicate full-domain or pre-registered restricted-test candidates, depending on the remediated Phase~6 output available for the run.}
 \label{fig:focused_ranks}
 \end{figure*}
 
-In the ISS-T Young contrast, 11 individual hub genes achieved FDR $< 0.05$:
-
-\begin{itemize}[nosep]
-    \item \textbf{Slc6a20a} ($q = 0.025$) and \textbf{Slc22a28} ($q = 0.043$): renal amino acid and organic anion transporters in the proximal tubule, critical for solute reabsorption.
-    \item \textbf{Trf} ($q = 0.025$) and \textbf{Gc} ($q = 0.044$): major secretory proteins tied to iron trafficking and vitamin D/mineral homeostasis.
-    \item \textbf{Cry2} ($q = 0.050$): core circadian clock repressor; its rewiring aligns with the 16-sunrise/day photoperiod aboard the ISS.
-    \item \textbf{Fabp7} ($q = 0.033$), \textbf{Azgp1} ($q = 0.037$), and \textbf{Pfkp} ($q = 0.050$): lipid and carbohydrate metabolic regulators, consistent with metabolic adaptation under microgravity.
-    \item \textbf{Foxq1} ($q = 0.043$) and \textbf{Adgrg4} ($q = 0.044$): epithelial differentiation and cell-cell communication regulators.
-\end{itemize}
-
-In older animals (ISS-T Old), only two genes met strict significance: \textbf{Prlr} (prolactin receptor, $q = 0.025$) and \textbf{Nr4a1} (Nur77, $q = 0.025$), implicating hormonal and stress-response pathways in age-dependent vulnerability.
-
-In the LAR Young contrast, one gene achieved FDR $< 0.05$: \textbf{Eps8l1} ($q = 0.050$). The LAR Old contrast produced no individually significant genes.
+The older focused-permutation gene list is retained only as an audit example of invalid selective testing and should not be used for strict discovery claims.
 
 
 \subsection{Edge-Wise Regression: Flight Effects and Age Interactions}
 
-Edge-wise regression across all 80 samples with Stouffer-combined $p$-values identified substantial numbers of genes with significant flight effects (Table~\ref{tab:regression}).
+Edge-wise regression across all 80 samples is now summarized with signed incident-edge statistics calibrated by within-Age$\times$Arm label permutation. The older Stouffer-combined gene counts are no longer primary evidence because they were anti-conservative under edge dependence (Table~\ref{tab:regression}).
 
 \begin{table}[!h]
 \centering
-\caption{Edge-wise regression results. Genes significant at various FDR thresholds for flight effect and age$\times$flight interaction.}
+\caption{Remediated edge-wise regression reporting status. Signed empirical gene-level results must be regenerated before strict gene-count claims are made.}
 \label{tab:regression}
 \renewcommand{\arraystretch}{1.3}
 \begin{tabular}{lccc}
 \toprule
 \textbf{Effect} & $q < 0.05$ & $q < 0.01$ & $q < 0.001$ \\
 \midrule
-Flight effect & 154 & 112 & 81 \\
-Age $\times$ flight & 25 & 18 & 14 \\
+Flight effect & pending rerun & pending rerun & pending rerun \\
+Age $\times$ flight & pending rerun & pending rerun & pending rerun \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The 154 genes with significant flight effects at $q < 0.05$ and 25 with age$\times$flight interactions at the same threshold provide strong evidence for pervasive spaceflight-induced network remodeling, with a meaningful subset showing differential age sensitivity.
+Until the remediated signed-empirical regression is rerun, the old Stouffer-derived counts should be treated as provisional and excluded from headline claims.
 
 \begin{figure}[!h]
 \centering
@@ -438,14 +426,14 @@ Persistence analysis reveals that approximately 15\% of top-decile rewiring gene
 
 \subsection{Cross-Referencing Pathway Enrichment with Individual Gene Significance}
 
-The pathway-level enrichment and individual gene-level focused permutation results identify largely non-overlapping gene sets. In the ISS-T Young contrast, all 11 focused-permutation hub genes were absent from every significantly enriched pathway. This separation is fundamental: pathway enrichment detects coordinated moderate rewiring across many genes (collective signal), while focused permutation detects extreme individual outliers (hub restructuring). Both scales of evidence are necessary.
+The pathway-level enrichment and individual edge-sum candidate lists identify partly distinct gene sets. This separation is expected: pathway enrichment detects coordinated moderate rewiring across many genes, while gene-level permutation prioritizes individual network hubs. The restricted gene-level claims now require either full-domain BH, pre-registered candidate-only BH, or hierarchical FDR support.
 
 The one biological system bridging both layers is \textit{retinol metabolism}, detected by both gene-level permutation (approaching significance) and pathway enrichment (highly significant in prior analyses). This convergence establishes retinoic acid signaling as the single most reproducible finding across orthogonal inference strategies.
 
 
 \subsection{Convergent Signal: Retinoic Acid Metabolism}
 
-Retinoic acid pathways occupy a unique position in the results, emerging at both individual gene and pathway scales (Figure~\ref{fig:retinol}). In previous enrichment analyses, Retinol Metabolism was the single strongest pathway result (OR = 19.9, $q = 1.6 \times 10^{-5}$ in LAR Young), with 9 of 35 constituent genes in the top rewiring decile. At the gene level, \textit{Ugt1a1} ($q = 0.056$), \textit{Ugt1a10} ($q = 0.080$), and \textit{Cyp4a12b} ($q = 0.080$) approached significance by focused permutation.
+Retinoic acid pathways were prominent in earlier exploratory analyses (Figure~\ref{fig:retinol}), but the remediated results shift the strict pathway-level emphasis toward translation/proteostasis and PPAR signaling. Retinoic-acid signals should therefore be presented as exploratory unless they survive the remediated enrichment and external-replication protocol.
 
 \begin{figure}[!h]
 \centering
@@ -574,7 +562,7 @@ MuSiC deconvolution against the Tabula Muris Senis kidney reference successfully
 \begin{figure}[!h]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/phase3_rewiring/rewiring_distribution.png}
-\caption{Rewiring magnitude distribution (histogram) across genes for each contrast. The approximately normal central distribution with an extended right tail supports the focused permutation strategy targeting the top decile.}
+\caption{Rewiring magnitude distribution (histogram) across genes for each contrast. The right tail is useful for exploratory prioritization, but strict inference is now limited to full-domain BH, pre-registered candidate testing, or hierarchical FDR.}
 \label{fig:dist}
 \end{figure}
 

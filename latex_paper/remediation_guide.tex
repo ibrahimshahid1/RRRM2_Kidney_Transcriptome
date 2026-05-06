@@ -1,0 +1,1525 @@
+\documentclass[11pt]{article}
+
+% ---------------- Packages ----------------
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage[activate={true,nocompatibility},final,tracking=true,kerning=true,spacing=true,factor=1100,stretch=10,shrink=10,expansion=false,protrusion=true]{microtype}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{footmisc}
+\usepackage{parskip}
+\usepackage{url}
+\usepackage{listings}
+\usepackage{xspace}
+
+% ---------------- Listings setup ----------------
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codegreen}{rgb}{0,0.5,0}
+\definecolor{codeblue}{rgb}{0.13,0.13,0.6}
+\definecolor{codebg}{rgb}{0.97,0.97,0.97}
+\definecolor{codekey}{rgb}{0.55,0.0,0.55}
+
+\lstdefinestyle{pythonstyle}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codekey}\bfseries,
+  commentstyle=\color{codegray}\itshape,
+  stringstyle=\color{codegreen},
+  numberstyle=\tiny\color{codegray},
+  numbers=left,
+  numbersep=8pt,
+  frame=single,
+  rulecolor=\color{codegray},
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  language=Python,
+  captionpos=b,
+  xleftmargin=10pt,
+  xrightmargin=5pt,
+  framesep=4pt
+}
+
+\lstdefinestyle{rstyle}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codekey}\bfseries,
+  commentstyle=\color{codegray}\itshape,
+  stringstyle=\color{codegreen},
+  numberstyle=\tiny\color{codegray},
+  numbers=left,
+  numbersep=8pt,
+  frame=single,
+  rulecolor=\color{codegray},
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  language=R,
+  captionpos=b,
+  xleftmargin=10pt,
+  xrightmargin=5pt,
+  framesep=4pt
+}
+
+\lstdefinestyle{yamlstyle}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  commentstyle=\color{codegray}\itshape,
+  stringstyle=\color{codegreen},
+  numberstyle=\tiny\color{codegray},
+  numbers=left,
+  numbersep=8pt,
+  frame=single,
+  rulecolor=\color{codegray},
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=2,
+  captionpos=b,
+  xleftmargin=10pt,
+  xrightmargin=5pt,
+  framesep=4pt
+}
+
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\itshape}{\thesubsubsection}{0.6em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small RRRM-2 Kidney Transcriptome: Remediation Guide}
+\fancyhead[R]{\small \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\pkg}[1]{\textsf{#1}}
+\newcommand{\fixbox}[2]{%
+  \par\noindent\fbox{\parbox{0.97\textwidth}{\textbf{#1.}~#2}}\par\medskip%
+}
+
+\title{\textbf{A Remediation Guide for the \\
+\emph{RRRM-2 Kidney Transcriptome} Pipeline} \\[0.5em]
+\large Concrete Fixes, Code Sketches, and Validation Plans for the \\
+Inferential and Phase 8 Issues Identified in the Audit}
+\author{Automated Remediation Plan \\
+\small Companion document to \code{critique\_report.tex} \\
+\small Audited run: \code{run\_20260408\_191759\_2500g} (Git \code{90ee5bf})}
+\date{April 26, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This document is a companion to the audit \code{critique\_report.tex} and translates each identified weakness into a concrete remediation. Fourteen fixes are documented across two tiers. Tier~1 (Fixes 1--9) addresses the inferential layer: the broken Stouffer aggregation in Phase~6, the post-hoc focused-permutation FDR, the silent-shifter DE-attachment and null-calibration failure, the anchor-gene pre-registration mismatch, the documentation drift between \code{config/hyperparameters.yaml} and the executed code, the MuSiC reference-atlas sensitivity gap, the metric mismatch between Phase~3's cosine-distance statistic and Phase~6's edge-sum permutation null, and the absent external validation. The repository now implements the code/config/documentation side of these remediations; full numerical claims still require rerunning the affected phases on the remediated pipeline. Tier~2 (Fixes 10--14) addresses the structural cause of the Phase~8 negative result: at $n{=}5$ biological replicates per Age$\times$Arm$\times$EnvGroup cell, leave-one-out LIONESS weights inherit excessive sampling variance, and per-sample network features did not beat a simple expression baseline in the audited run. The five Tier~2 interventions (LIONESS pooling across cells, alternative sample-specific-network methods, alternative feature engineering, continuous targets, and multi-study cohort pooling for the LAR-Young cell with OSD-102) each target this noise floor directly. External replication and pooling use \textbf{OSD-102} (RR-1 NASA Validation Flight, female C57BL/6J kidney, $n{=}6{+}6$, 16 weeks, 37-day flight) as the primary partner and \textbf{OSD-513} (RR-23, male C57BL/6J kidney, $n{=}9{+}9{+}9$, 16--17 weeks, 38-day flight) as the sex-stratification secondary; OSD-568 is \emph{not} compatible with OSD-771 (BALB/cAnNTac vs C57BL/6NTac) and is removed. For every fix the guide specifies the affected files, the historical behavior, the implemented replacement or guarded module, validation procedures, dependencies, and remaining limits.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+% ====================================================
+\section{How to Use This Guide}
+% ====================================================
+
+This guide is structured for a single-engineer remediation campaign. Read \S\ref{sec:roadmap} first for the dependency graph and recommended ordering. For each fix, the layout is:
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Problem.} A one-paragraph statement of what goes wrong, sourced from the audit and grounded in the realized outputs of \code{run\_20260408\_191759\_2500g}.
+\item \textbf{Affected files and lines.} The module(s) and approximate line range to edit.
+\item \textbf{Current behavior.} A code excerpt showing what the pipeline does today.
+\item \textbf{Proposed behavior.} A code sketch showing the replacement, written to be drop-in where possible.
+\item \textbf{Validation.} A test or sanity check that confirms the fix landed correctly.
+\item \textbf{Effort.} An honest estimate in person-days.
+\item \textbf{Dependencies.} Other fixes or external artifacts that must precede this one.
+\end{itemize}
+
+Code sketches are deliberately incomplete in places that depend on details of the existing module (variable names, helper functions, data-loader signatures). Treat them as scaffolds, not as drop-in replacements; the scaffold should let an engineer working with the existing repository land the fix in one sitting.
+
+% ====================================================
+\section{Triage Summary}
+% ====================================================
+
+\begin{center}
+\small
+\begin{longtable}{p{0.06\textwidth}p{0.32\textwidth}p{0.32\textwidth}p{0.07\textwidth}p{0.10\textwidth}}
+\toprule
+\textbf{\#} & \textbf{Fix} & \textbf{Primary file} & \textbf{Effort} & \textbf{Tier} \\
+\midrule
+\endhead
+
+1  & Signed empirical label-permutation gene aggregation           & \code{src/statistics/full\_regression.py}    & 1 d & 1 \\
+2  & Hierarchical Benjamini--Bogomolov FDR                        & \code{src/statistics/permutation\_bootstrap.py} & 1 d   & 1 \\
+3  & RESULTS.md reconciliation with latest run                    & \code{RESULTS.md}                            & 1 h   & 1 \\
+4  & External validation on OSD-102 (primary) and OSD-513 (sex-stratification) & \code{src/validation/external\_replication.py} (new) & 2 d   & 1 \\
+5  & Silent-shifter null calibration                              & \code{src/statistics/silent\_shifters.py}    & 0.5 d & 1 \\
+6  & Anchor pre-registration enforcement                          & \code{src/networks/procrustes.py}            & 1 h   & 1 \\
+7  & Config-code drift removal                                    & \code{config/hyperparameters.yaml}, \code{tests/} (new) & 1 h   & 1 \\
+8  & MuSiC reference-atlas sensitivity analysis                   & \code{src/preprocessing/deconvolution\_sensitivity.R} (new) & 1 d   & 1 \\
+9  & Permutation-statistic rename and full-pipeline appendix run  & \code{src/statistics/permutation\_bootstrap.py}, new module & 1 d $+$ cluster time & 1 \\
+\midrule
+10 & LIONESS pooling across Age$\times$Arm$\times$EnvGroup cells  & \code{src/networks/lioness.py}, \code{src/validation/cross\_validation.py} & 1 d & 2 \\
+11 & Alternative sample-specific-network methods (SSN, CSN, scLink) & \code{src/networks/alternative\_methods.py} (new) & 3 d & 2 \\
+12 & Alternative feature engineering for Phase~8                  & \code{src/validation/cross\_validation.py}   & 1.5 d & 2 \\
+13 & Continuous classification targets (KIM-1, NGAL, HAVCR1)      & \code{src/validation/continuous\_target.py} (new) & 2 d   & 2 \\
+14 & Multi-study cohort pooling for LAR-Young (OSD-102 $+$ OSD-771) & \code{src/validation/multi\_study\_pool.py} (new) & 4 d   & 2 \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\noindent Tier~1 fixes are necessary for publication. Tier~2 fixes are the only interventions that have a realistic chance of moving Phase~8 from a negative result to a positive one; they are scientific design changes, not analysis cleanups, and may be appropriate for a follow-up study rather than the current manuscript.
+
+\clearpage
+
+% ====================================================
+\part*{Tier 1 — Inferential Layer Fixes}
+\addcontentsline{toc}{section}{Tier 1 — Inferential Layer Fixes}
+% ====================================================
+
+% ----------------------------------------------------
+\section{Fix 1 --- Replace Stouffer Aggregation with Signed Empirical Aggregation}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+\code{src/statistics/full\_regression.py} fits a per-edge OLS model and combines per-edge two-tailed $p$-values into per-gene $p$-values via Stouffer's $Z$. Stouffer assumes the per-edge $p$-values are mutually independent. On a fixed shared-topology skeleton built from a partial-correlation graph, this assumption is violated: edges sharing a common endpoint are correlated through the precision-matrix structure, and edges within densely connected subgraphs (e.g., gene neighborhoods enriched in a pathway) are even more correlated. The realized outputs in \code{phase6\_regression/} show the symptom directly: top genes have \code{p\_stouffer = 0.0} numerically, despite per-edge median $|t|<1$ for the same genes. With $\sim 80$--$440$ edges incident per gene and per-edge $|t|<1$, Stouffer's $Z = \sum_e t_e / \sqrt{n_e}$ should fall in the moderate-evidence range, not in the tail of the standard normal beyond machine epsilon. The saturation at $p=0$ is anti-conservative inflation driven by edge-level dependence.
+
+The numerical impact is large. The current run reports 154 genes at $q<0.05$ for the main flight effect, 251 for the three-way interaction, 591 for the arm--flight interaction, and 25 for the age--flight interaction. None of these counts is interpretable as a frequentist FDR-controlled discovery rate.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item \code{src/statistics/full\_regression.py} --- \code{stouffer\_combine} function and the per-gene aggregation loop.
+\item Optional: a new module \code{src/statistics/dependent\_combine.py} that encapsulates Brown's method and Lancaster's method.
+\end{itemize}
+
+\subsection{Current Behavior}
+
+\begin{lstlisting}[style=pythonstyle,caption={Current Stouffer aggregation (representative excerpt).}]
+def stouffer_combine(p_values, weights=None):
+    """Combine p-values via Stouffer's Z. Assumes independence."""
+    p = np.clip(p_values, 1e-300, 1.0)
+    z = norm.isf(p)  # one-sided z for each edge
+    if weights is None:
+        z_combined = z.sum() / np.sqrt(len(z))
+    else:
+        z_combined = (weights * z).sum() / np.sqrt((weights**2).sum())
+    return float(norm.sf(z_combined))
+
+# Per-gene loop (representative)
+for gene in genes:
+    edges_g = edges_incident(gene)            # ~80-440 edges
+    pvals_g = edge_pvals[edges_g]             # from per-edge OLS
+    p_gene = stouffer_combine(pvals_g)        # SATURATES TO 0
+    out.append((gene, p_gene))
+\end{lstlisting}
+
+\subsection{Proposed Behavior}
+
+The implemented replacement is a signed incident-edge $t$ statistic calibrated by within-Age$\times$Arm label permutation. This fixes both failures at once: edge evidence keeps direction, and the gene-level null is empirical rather than assuming independent incident edges. Brown's method remains an acceptable diagnostic or partial dependence correction, but it is not the primary inferential aggregate in the remediated repository. Two implementation paths are appropriate:
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Empirical Brown.} Estimate the covariance of the per-edge $t$-statistics across the 80 samples directly from the residualized expression matrix; this requires no extra fits.
+\item \textbf{Label-permutation aggregation.} Generate $K$ label-permutations within each Age$\times$Arm stratum, recompute the per-gene aggregate $t^2$ statistic on each, and report the empirical $p$-value. This is the slower but exact alternative; it is also the same null already used in Phase~6's rewiring permutation, ensuring methodological coherence.
+\end{itemize}
+
+\subsubsection{Empirical Brown Implementation}
+
+\begin{lstlisting}[style=pythonstyle,caption={Empirical Brown's method for per-gene aggregation.}]
+import numpy as np
+from scipy.stats import chi2
+
+def empirical_brown_combine(p_values, edge_t_matrix):
+    """
+    Combine per-edge p-values via Brown's empirical method.
+
+    Parameters
+    ----------
+    p_values : (E,) array of per-edge p-values
+    edge_t_matrix : (E, N) array of per-edge t-statistics across N samples
+                    (used to estimate the empirical correlation among edges)
+
+    Returns
+    -------
+    p_brown : float, dependence-corrected combined p-value
+    """
+    p = np.clip(p_values, 1e-300, 1.0)
+    chi2_stat = -2.0 * np.log(p).sum()           # Fisher chi^2 statistic
+
+    # Estimate correlation matrix of edge t-statistics (E x E)
+    # Use vectorized standardization for efficiency
+    T = edge_t_matrix - edge_t_matrix.mean(axis=1, keepdims=True)
+    T = T / (T.std(axis=1, keepdims=True) + 1e-12)
+    # Pairwise correlations: only upper triangle is needed
+    k = T.shape[0]
+    cov_pairs = (T @ T.T) / T.shape[1]
+    np.fill_diagonal(cov_pairs, 0.0)
+    sum_cov = cov_pairs[np.triu_indices(k, k=1)].sum()
+
+    # Brown (1975) variance correction:
+    # Var(chi2_stat) = 4k + 2 * sum_{i<j} f(rho_ij)
+    # Empirical Brown uses an empirical f(rho) = 3.263 * rho + 0.710 * rho^2
+    # (Poole et al. 2016) which is more accurate than Brown's original formula.
+    rho = cov_pairs[np.triu_indices(k, k=1)]
+    f_rho = 3.263 * rho + 0.710 * rho**2
+    variance_correction = 4.0 * k + 2.0 * f_rho.sum()
+
+    # Rescale chi^2 to a chi^2(df) reference
+    expected = 2.0 * k
+    c = variance_correction / (2.0 * expected)
+    df = (2.0 * expected**2) / variance_correction
+    p_brown = chi2.sf(chi2_stat / c, df=df)
+    return float(p_brown)
+\end{lstlisting}
+
+\subsubsection{Label-Permutation Implementation}
+
+\begin{lstlisting}[style=pythonstyle,caption={Label-permutation aggregation, vectorized over genes.}]
+def label_perm_aggregate(z_edges, ii, jj, labels, K=5000, seed=0):
+    """
+    For each gene g, compute observed sum-|t| over edges incident on g,
+    then build a null by permuting labels within each stratum K times
+    and recomputing the same gene-level statistic.
+
+    Parameters
+    ----------
+    z_edges : (N, E) LIONESS Fisher-z weights (samples x edges)
+    ii, jj : (E,) edge endpoint indices into the gene array
+    labels : (N,) condition labels (FLT vs GC), already restricted to a stratum
+    K : permutation count
+
+    Returns
+    -------
+    p_perm : (G,) per-gene empirical p-value
+    """
+    rng = np.random.default_rng(seed)
+    G = max(ii.max(), jj.max()) + 1
+
+    def gene_aggregate(t_per_edge):
+        # Sum |t| over edges incident on each gene
+        out = np.zeros(G)
+        np.add.at(out, ii, np.abs(t_per_edge))
+        np.add.at(out, jj, np.abs(t_per_edge))
+        return out
+
+    # Observed per-edge t (two-sample t between labels)
+    t_obs = welch_t(z_edges, labels)              # (E,)
+    obs_gene = gene_aggregate(t_obs)              # (G,)
+
+    # Null distribution
+    counter = np.zeros(G, dtype=np.int64)
+    for k in range(K):
+        perm_labels = rng.permutation(labels)
+        t_k = welch_t(z_edges, perm_labels)
+        null_gene = gene_aggregate(t_k)
+        counter += (null_gene >= obs_gene)
+    p_perm = (counter + 1) / (K + 1)
+    return p_perm
+\end{lstlisting}
+
+\subsection{Validation}
+
+Three sanity checks should be added as unit tests in \code{tests/test\_dependent\_combine.py}:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Identity check.} If the input edge $p$-values are mutually independent (e.g., generated as \code{p = np.random.uniform(0, 1, size=k)} from a uniform null), the empirical-Brown $p$-value should match Stouffer's $p$-value to within Monte Carlo error. If it doesn't, the empirical correction is over-correcting.
+\item \textbf{Saturation check.} For a gene with per-edge median $|t|<1$, the combined $p$-value must satisfy $p_{\text{brown}} > 10^{-50}$. If it doesn't, the dependence correction is not sufficient and label-permutation should be used.
+\item \textbf{Calibration check.} On a gene with simulated null edge t-statistics drawn from a multivariate normal with a known correlation matrix, the empirical-Brown $p$-value should be uniform on $[0,1]$ across $\geq 1000$ Monte Carlo replications (Kolmogorov--Smirnov test, $p>0.05$).
+\end{enumerate}
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 0.5 person-days for empirical-Brown plus tests; 1 person-day if the label-permutation alternative is also implemented. \textbf{Dependencies:} none. The fix lands cleanly inside the existing module.
+
+% ----------------------------------------------------
+\section{Fix 2 --- Hierarchical Benjamini--Bogomolov FDR}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+\code{src/statistics/permutation\_bootstrap.py} implements a ``focused permutation'' option that restricts the BH correction domain to the top decile of genes ranked by observed rewiring magnitude before applying BH. The repository defends this as ``the top-decile cutoff is defined by rank order of the observed rewiring, not by the permutation $p$-values themselves, avoiding circular inference.'' This defense is incorrect: under any reasonable null, observed rewiring magnitude and permutation $p$-value are monotonically related, so restricting BH to the top decile is post-hoc selection on a quantile of the test statistic. The result is anti-conservative.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item \code{src/statistics/permutation\_bootstrap.py} --- the \code{--focused-permutation} branch and its BH application.
+\item Optionally: a new helper module \code{src/statistics/hierarchical\_fdr.py}.
+\end{itemize}
+
+\subsection{Current Behavior}
+
+\begin{lstlisting}[style=pythonstyle,caption={Current focused-permutation BH (representative excerpt).}]
+if args.focused_permutation:
+    # Define top-decile by OBSERVED rewiring magnitude
+    cutoff = np.quantile(rewiring_obs, args.focused_quantile)  # e.g. 0.90
+    in_domain = rewiring_obs >= cutoff
+    # Apply BH only on the in-domain subset
+    p_in = p_perm[in_domain]
+    q_in = bh_fdr(p_in)
+    q_full = np.full_like(p_perm, np.nan)
+    q_full[in_domain] = q_in
+\end{lstlisting}
+
+\subsection{Proposed Behavior}
+
+The Benjamini--Bogomolov (2014) hierarchical procedure is the cleanest formal replacement. The procedure is:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Stage~1.} Test all $M$ pathways for rewiring enrichment. Apply BH at level $\alpha$ to the pathway $p$-values. Let $\mathcal{P}^*$ be the set of pathways significant at stage~1.
+\item \textbf{Stage~2.} For each pathway $P\in\mathcal{P}^*$, apply BH at level $\alpha\cdot |\mathcal{P}^*|/M$ to the gene-level $p$-values within $P$.
+\end{enumerate}
+
+For pre-specified non-overlapping families, the level adjustment gives the cleanest FDR interpretation. When gene sets overlap, the remediated code reports conservative BY sensitivity columns and the limitation must be stated explicitly. The procedure recovers the power advantage that focused permutation was trying to claim --- i.e., it concentrates testing on a smaller, biologically plausible domain --- without selecting the testing set from the observed top-decile statistic.
+
+\begin{lstlisting}[style=pythonstyle,caption={Hierarchical Benjamini--Bogomolov implementation.}]
+def benjamini_bogomolov(pathway_pvals, gene_pvals_per_pathway, alpha=0.05):
+    """
+    Two-stage hierarchical FDR (Benjamini & Bogomolov, JRSS-B 2014).
+
+    Parameters
+    ----------
+    pathway_pvals : dict {pathway_name: p_value}
+    gene_pvals_per_pathway : dict {pathway_name: dict {gene: p_value}}
+    alpha : nominal FDR level
+
+    Returns
+    -------
+    significant_pathways : list of pathways significant at stage 1
+    significant_genes : dict {pathway: list of significant genes at stage 2}
+    """
+    M = len(pathway_pvals)
+    # Stage 1: BH on pathway p-values
+    pwy = list(pathway_pvals.keys())
+    pwy_p = np.array([pathway_pvals[p] for p in pwy])
+    pwy_q = bh_fdr(pwy_p)
+    sig_pathways = [pwy[i] for i in range(M) if pwy_q[i] < alpha]
+    M_star = len(sig_pathways)
+    if M_star == 0:
+        return [], {}
+
+    # Stage 2: BH on gene p-values, level alpha * M_star / M
+    sig_genes = {}
+    level2 = alpha * M_star / M
+    for P in sig_pathways:
+        gene_p = gene_pvals_per_pathway[P]
+        names = list(gene_p.keys())
+        pvals = np.array([gene_p[g] for g in names])
+        qvals = bh_fdr(pvals)
+        sig_genes[P] = [names[i] for i in range(len(names)) if qvals[i] < level2]
+
+    return sig_pathways, sig_genes
+\end{lstlisting}
+
+\subsection{Validation}
+
+Three checks:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Null simulation.} Generate $K=1000$ datasets under a known null where no pathway is enriched and no gene is differentially rewired. For non-overlapping pre-specified families, the Benjamini--Bogomolov procedure should remain near the nominal level; for overlapping families, the implementation must report the conservative BY-adjusted sensitivity columns and document that strict independence guarantees do not apply.
+\item \textbf{Power simulation.} Generate $K=1000$ datasets where one pre-specified pathway is genuinely enriched and 5 of its 50 member genes are rewired. The hierarchical procedure should detect both stages with power $\geq 0.5$ at the OSD-771 sample size; if not, the level adjustment is too aggressive and a less stringent pre-registered candidate-only BH analysis should be reported separately.
+\item \textbf{Empirical comparison.} On the realized OSD-771 outputs, compare full-domain BH, pre-registered candidate-only BH, and hierarchical FDR outputs. Do not run the old observed-top-decile focused permutation as an inferential comparator; it is retained only as an audit example of invalid selective testing.
+\end{enumerate}
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 1 person-day. \textbf{Dependencies:} the pathway-level $p$-values from the existing pathway permutation variant must be available; if not, the pathway permutation must be run first.
+
+% ----------------------------------------------------
+\section{Fix 3 --- Reconcile RESULTS.md with the Latest Run}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+The current \code{RESULTS.md} cites gene-level findings (11 ISS-T-Young hits at FDR$<$0.05 under focused permutation; \emph{Slc6a20a}, \emph{Trf}, \emph{Cry2}, \emph{Gc}, \emph{Pfkp}, \emph{Foxq1}; retinol-metabolism OR$=19.9$, $q=1.6\times 10^{-5}$ in LAR Young) and a $B{=}50$ bootstrap that are not consistent with \code{run\_20260408\_191759\_2500g}. The latest run uses $B{=}2000$ and $K{=}5000$, yields 24 ISS-T-Young hits at FDR$<$0.05 under full-domain BH (not 11), and shows translation/ribosome/NMD pathways and PPAR signaling as the dominant cross-contrast biology rather than retinol metabolism.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item \code{RESULTS.md} --- entire file, but especially the headline-findings section, the gene-list section, the pathway-enrichment section, and any reference to bootstrap iteration counts.
+\item \code{METHODOLOGY.md} --- the Phase~6 section.
+\item \code{walkthrough.md} --- any summary numbers.
+\end{itemize}
+
+\subsection{Specific Edits Required}
+
+\begin{itemize}[leftmargin=*]
+\item Add a ``Run identifier and provenance'' section at the top of \code{RESULTS.md}: ``All numerical claims in this document are derived from \code{data/results/run\_20260408\_191759\_2500g/} (Git commit \code{90ee5bf}, 2026-04-08). Earlier runs cited in prior versions of this document have been superseded.''
+\item Replace any reference to ``$B{=}50$'' with ``$B{=}2000$'' globally.
+\item Replace ``11 genes at FDR$<$0.05 in ISS-T Young'' with ``24 genes at FDR$<$0.05 in ISS-T Young under full-domain BH; 0 in ISS-T Old, 0 in LAR Young, and 0 in LAR Old at $q<0.05$ under full-domain BH; 6, 6, and 0 genes respectively at $q<0.10$.''
+\item Replace the retinol-metabolism headline with the translation-machinery and PPAR signaling cluster: ``ISS-T Old shows convergent enrichment of translation-machinery pathways (ribosome, eukaryotic translation elongation, peptide chain elongation, selenocysteine synthesis, NMD-Enhanced, NMD-Independent, viral mRNA translation, GCN2-amino-acid-deficiency response) at $q\approx 0.005$ across KEGG and Reactome libraries. LAR Young is dominated by PPAR signaling at $q=1.77\times 10^{-3}$ (KEGG) and the same translation-machinery cluster at $q\approx 0.03$. LAR Old shows both signatures plus activated NOTCH1 signaling. ISS-T Young, despite the largest gene-level hit count, has the weakest pathway-level signal (best $q\approx 0.28$).''
+\item Add a ``Phase 8b: Validation Negative Result'' section that displays the enhanced-CV table directly, states that the audited run's feature construction was not fully fold-safe, and explains why the negative conclusion remains credible because network features lost to the expression baseline even with that favorable leakage risk. The remediated rerun must recompute LIONESS/features/scaling/PCA/feature selection inside each fold.
+\item Add a ``Caveats and Limitations'' section enumerating the post-hoc focused-permutation issue (resolved by candidate-only or hierarchical FDR per Fix~2), the Stouffer aggregation issue (resolved by signed empirical label-permutation per Fix~1), the silent-shifter DE-attachment issue (per Fix~5), and the absence of completed external cohort replication (guarded by Fix~4 once OSD-102 and OSD-513 are run).
+\end{itemize}
+
+\subsection{Validation}
+
+\code{RESULTS.md} should be searchable for ``$B{=}50$'' and ``retinol metabolism'' with zero hits after the edit, and for ``$B{=}2000$'' and ``translation-machinery'' with at least one hit each. The Run identifier and provenance section should match \code{run\_metadata.json} exactly.
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 1 hour for mechanical edits; an additional 1--2 hours if the biological narrative needs to be rewritten substantially. \textbf{Dependencies:} Fixes~1 and~3 should ideally land first so that the new \code{RESULTS.md} reflects the post-fix gene counts rather than the pre-fix counts.
+
+% ----------------------------------------------------
+\section{Fix 4 --- External Validation on OSD-102 (Primary) and OSD-513 (Sex-Stratification)}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+The current pipeline trains and tests every inferential layer on a single cohort (OSD-771). Even after Fix~2 legitimizes the gene-level FDR claims, the survival of those claims in an independent cohort is the single most decisive piece of evidence a peer reviewer can ask for.
+
+The originally proposed candidate (OSD-568, RRRM-1 kidney) is \emph{not} compatible with OSD-771 and has been removed from this guide. RRRM-1 used female BALB/cAnNTac mice while RRRM-2 uses female C57BL/6NTac --- BALB/c and C57BL/6 differ in baseline kidney transcriptome by an order of magnitude more than typical batch effects, and OSD-568 itself appears (from the OSDR release announcement) to be a miRNA-seq or scRNA-seq dataset rather than bulk RNA-seq. Pooling or replicating across BALB/c and C57BL/6 is not statistically defensible at the gene level.
+
+The two viable replication cohorts on NASA GeneLab are OSD-102 (RR-1 NASA Validation Flight, female C57BL/6J kidney, $n{=}6$ FLT $+$ $n{=}6$ GC, 16 weeks, 37-day flight, bulk RNA-seq) and OSD-513 (RR-23, \emph{male} C57BL/6J kidney, $n{=}9$ FLT $+$ $n{=}9$ HGC $+$ $n{=}9$ VGC, 16--17 weeks, 38-day flight, bulk RNA-seq). OSD-102 maps cleanly onto the RRRM-2 LAR-Young Flight-vs-GC contrast and is the primary external validation cohort: same sex, same age, same hardware (Rodent Habitat), same diet (NuRFB), same preservation (RNAlater $\to$ $-80\,^\circ$C), same light cycle (12h/12h), with only the C57BL/6J vs C57BL/6NTac sub-strain difference (the \emph{Nnt} deletion in 6J is the single kidney-relevant divergence). OSD-513 maps onto the same contrast but with a sex mismatch and is used for sex-stratification: it asks which OSD-102-replicated findings survive in male mice. Together they constitute a tiered replication --- primary in matched-sex, secondary in opposite-sex, with the differential reporting which findings are female-specific versus generally robust.
+
+Independent replication does \emph{not} require ComBat-seq. Each external cohort is analyzed independently and compared to the pre-registered RRRM-2 hypothesis set. ComBat-seq and PCA/batch checks belong only to Fix~14, the separate OSD-102 plus OSD-771 LAR-Young pooling path.
+
+The 24 ISS-T-Young hits cannot be validated in either cohort because neither has an ISS-T arm. They are reported as candidates pending an as-yet-unavailable ISS-T cohort.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item New module: \code{src/validation/external\_replication.py}.
+\item Pre-registration directory: \code{docs/external\_replication\_protocol/}.
+\item Output directory: \code{data/results/external\_replication/}.
+\end{itemize}
+
+\subsection{Pre-Registration Protocol}
+
+The pre-registration protocol must be committed \emph{before} any external data is loaded. This is the single most important step. The protocol fixes:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Hypothesis set.} The post-Fix-2 hierarchical-BH-corrected hits from the LAR-Young Flight-vs-GC contrast (the only RRRM-2 contrast that maps onto OSD-102 and OSD-513), plus the translation-machinery and PPAR signaling pathway sets. The 24 ISS-T-Young hits are excluded because neither external cohort has an ISS-T arm.
+\item \textbf{Replication criteria for OSD-102 (primary).} Per-gene rewiring direction agreement with RRRM-2 LAR-Young, per-gene $q<0.10$ in OSD-102, pathway $q<0.10$ in OSD-102.
+\item \textbf{Replication criteria for OSD-513 (sex-stratification).} The OSD-102-replicated hits are pre-screened against a kidney sex-DE list (Ranjit et al.\ 2024 \emph{Nature Genetics}; Tabula Muris Senis kidney sex-stratified atlas). Genes flagged as kidney-sex-DE are reported separately as ``female-specific.'' The remaining sex-independent subset is tested in OSD-513 with the same direction-and-$q$ criteria.
+\item \textbf{Pipeline parameters.} Identical to OSD-771 ($k{=}80$, $K{=}5000$, $B{=}2000$, 10 node2vec seeds, $d{=}128$, $p{=}0.25$, $q{=}4.0$).
+\item \textbf{Sub-strain handling.} The C57BL/6J vs C57BL/6NTac sub-strain difference is treated as a covariate-of-no-interest in both cohorts. The \emph{Nnt} deletion in 6J (which affects mitochondrial NADPH supply and may modulate oxidative-stress responses) is documented as a known confound.
+\item \textbf{Recovery-window handling.} OSD-102 mice were sacrificed shortly post-splashdown; RRRM-2 LAR mice had 24 days of recovery before sacrifice. Any RRRM-2 hit that is specifically a \emph{recovery-phase} phenomenon is expected to be absent from OSD-102, while any \emph{persistent} signal is expected to be present (possibly stronger). The pre-registration declares this asymmetric expectation up front so that selective non-replication is not retrofitted as confirmation.
+\item \textbf{Pool-sample exclusion.} OSD-102 contains technical pool samples (``Pool of all FLT samples,'' ``Pool of all GC samples,'' ``Pool of all FLT and GC samples,'' ``Empty Pool''); these are excluded from the per-mouse analysis. Use only individual mouse samples M23--M28 (FLT) and M33--M38 (GC), $n{=}12$ total.
+\item \textbf{Interpretation rules.} (i) Surviving in OSD-102 only $\to$ ``female-specific spaceflight signal.'' (ii) Surviving in both OSD-102 and OSD-513 (after sex-DE filter) $\to$ ``sex-robust spaceflight signal.'' (iii) Surviving in OSD-513 only after sex-DE filter $\to$ ``not female-specific'' (informative but unusual --- worth investigating). (iv) Failing both $\to$ ``not externally validated; the original LAR-Young claim is retracted at the gene level.''
+\end{enumerate}
+
+\subsection{Implementation Sketch}
+
+\begin{lstlisting}[style=pythonstyle,caption={External-replication driver for OSD-102 (primary) and OSD-513 (sex-stratification).}]
+# src/validation/external_replication.py
+import argparse
+from pathlib import Path
+import numpy as np
+import pandas as pd
+from src.run_all_phases import run_phases  # existing orchestrator
+
+LAR_YOUNG_CONTRAST = "LAR_YNG_FLT_minus_GC"
+
+
+def run_external_replication(cohort, counts, meta, hypothesis_set,
+                              out_dir, sex_de_list=None):
+    """Run Phases 0-3 on external cohort, then test pre-registered hits."""
+    out = Path(out_dir) / cohort
+    out.mkdir(parents=True, exist_ok=True)
+
+    # Phase 0-3: deconvolution, residualization, network construction,
+    # embeddings. The hypothesis set is FIXED; we do not refit it here.
+    run_phases(phases=[0, 1, 2, 3], counts=counts, meta=meta,
+               output_dir=str(out))
+
+    hyp = pd.read_csv(hypothesis_set, sep='\t')
+    ext_rewiring = pd.read_csv(
+        out / f"phase3_rewiring/{LAR_YOUNG_CONTRAST}_rewiring_agg.tsv",
+        sep='\t'
+    )
+    ext_q = pd.read_csv(
+        out / f"phase6_uncertainty/{LAR_YOUNG_CONTRAST}_perm_pvals.tsv",
+        sep='\t'
+    )
+
+    merged = hyp.merge(ext_rewiring, on="gene", how="left",
+                       suffixes=('_osd771', f'_{cohort}'))
+    merged = merged.merge(ext_q[["gene", "q_BH"]], on="gene", how="left",
+                          suffixes=('', '_external'))
+
+    merged["direction_agree"] = (
+        np.sign(merged["rewiring_osd771"]) ==
+        np.sign(merged[f"rewiring_{cohort}"])
+    )
+    merged["replicated"] = (
+        merged["direction_agree"] & (merged["q_BH_external"] < 0.10)
+    )
+
+    if sex_de_list is not None:
+        sex_de = set(pd.read_csv(sex_de_list, sep='\t')["gene"])
+        merged["is_kidney_sex_de"] = merged["gene"].isin(sex_de)
+    else:
+        merged["is_kidney_sex_de"] = False
+
+    merged.to_csv(out / "replication_report.tsv", sep='\t', index=False)
+    return merged
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--cohort", required=True, choices=["OSD-102", "OSD-513"])
+    ap.add_argument("--counts", required=True)
+    ap.add_argument("--meta", required=True)
+    ap.add_argument("--hypothesis-set",
+                    default="docs/external_replication_protocol/lar_young_hypothesis_set.tsv")
+    ap.add_argument("--sex-de-list",
+                    default="docs/external_replication_protocol/kidney_sex_de_genes.tsv",
+                    help="Used only for OSD-513 (sex stratification)")
+    ap.add_argument("--out", default="data/results/external_replication/")
+    args = ap.parse_args()
+
+    sex_de = args.sex_de_list if args.cohort == "OSD-513" else None
+    merged = run_external_replication(
+        args.cohort, args.counts, args.meta,
+        args.hypothesis_set, args.out, sex_de_list=sex_de,
+    )
+
+    n_total = len(merged)
+    n_repl = int(merged["replicated"].sum())
+    if args.cohort == "OSD-513":
+        non_sex_de = merged[~merged["is_kidney_sex_de"]]
+        n_sex_robust = int(non_sex_de["replicated"].sum())
+        print(f"[{args.cohort}] Replicated overall: {n_repl}/{n_total}")
+        print(f"[{args.cohort}] Sex-robust subset: "
+              f"{n_sex_robust}/{len(non_sex_de)}")
+    else:
+        print(f"[{args.cohort}] Replicated: {n_repl}/{n_total} at q<0.10")
+
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
+
+\subsection{Validation}
+
+Two replication reports are produced: \code{replication\_report.tsv} for OSD-102 and a second for OSD-513. The headline numbers for the manuscript are (i) the OSD-102 replication rate among LAR-Young pre-registered hits, (ii) the OSD-513 replication rate within the sex-DE-filtered subset, and (iii) the cross-cohort consistency rate (genes that replicate in both). A replication rate $\geq 0.5$ in OSD-102 is strong evidence for the LAR-Young claim; a sex-robust rate $\geq 0.5$ in OSD-513 is strong evidence that the signal generalizes beyond female mice. A rate of $0$ in either tells you the corresponding claim should be retracted. Either outcome is publishable.
+
+A sanity check is mandatory before any replication claim. OSD-102 has been analyzed by multiple groups (Beheshti et al.\ spaceflight meta-analyses; Mishra et al.\ 2024 kidney work; the GeneLab consensus pipeline outputs). If the pipeline's per-gene effect estimates on OSD-102 are wildly inconsistent with these published RR-1 kidney effect estimates, the discrepancy must be resolved before any replication claim is made. This is not a circularity (the published estimates are not the hypothesis being tested) --- it is a confirmation that the pipeline produces reasonable numbers on a well-characterized dataset.
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 2 person-days for the script and pre-registration protocol; an additional 0.5--1 day for OSD-102 and OSD-513 data ingestion and metadata harmonization to match the OSD-771 metadata schema. \textbf{Dependencies:} OSD-102 and OSD-513 must be downloadable from GeneLab; the kidney sex-DE list (Ranjit et al.\ 2024 \emph{Nature Genetics} supplementary tables, or the equivalent Tabula Muris Senis kidney sex-stratified analysis) must be obtained and committed to \code{docs/external\_replication\_protocol/}; the pre-registration document must be committed and tagged in Git before any external data is loaded.
+
+% ----------------------------------------------------
+\section{Fix 5 --- Silent-Shifter Null Calibration}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+The silent-shifter construct is the repository's signature biological category: genes with high rewiring (top decile) but low DE ($|\log_2\mathrm{FC}|<0.3$, DE FDR$>0.2$). The audited strict files, however, contained 250 rows per contrast because contrast-matched differential expression statistics were not actually attached. The reported 55--68 values were DE-supported counts within those rewiring-only files, not strict silent-shifter counts. This made the old tables internally inconsistent: they mixed candidate rewired genes, DE-supported rewired genes, and strict DE-null silent shifters without a shared null calibration.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item \code{src/statistics/silent\_shifters.py} --- entire module.
+\end{itemize}
+
+\subsection{Implemented Route}
+
+\textbf{Route A (formalize the existing construct).} Attach the contrast-matched gene-level DE table before classification, then write separate tables for candidate rewired genes, DE-supported rewired genes, strict DE-null silent shifters, and the supported strict subset. Report observed-versus-expected calibration under independence for every contrast. If observed $<$ expected, the construct should be reframed as an enumeration of high-rewiring DE-null genes, not a positive discovery category.
+
+\textbf{Route B (optional future sensitivity).} A residualized-rewiring statistic can still be used as an exploratory sensitivity analysis: regress per-gene rewiring on per-gene $|\log_2 \mathrm{FC}|$, take the residuals, and define silent shifters as the top decile of \emph{residualized} rewiring. This is not the primary remediated definition because the repository's published construct is threshold-based.
+
+\subsection{Implementation Sketch}
+
+\begin{lstlisting}[style=pythonstyle,caption={Silent-shifter null calibration (Route A) and residualization (Route B).}]
+import numpy as np
+import pandas as pd
+from scipy.stats import binomtest
+
+def silent_shifter_null_expectation(rewiring, lfc, fdr,
+                                     top_quantile=0.90,
+                                     lfc_max=0.3, fdr_min=0.2):
+    """Route A: report observed-vs-expected silent shifters under independence."""
+    n_genes = len(rewiring)
+    cutoff = np.quantile(rewiring, top_quantile)
+    high_rewiring = rewiring >= cutoff
+    low_de = (np.abs(lfc) < lfc_max) & (fdr > fdr_min)
+    # Expected under independence
+    p_high = high_rewiring.mean()
+    p_lowde = low_de.mean()
+    expected = p_high * p_lowde * n_genes
+    observed = (high_rewiring & low_de).sum()
+    # One-sided binomial/hypergeometric-style calibration: enrichment over null
+    test = binomtest(observed, n_genes, p_high * p_lowde, alternative='greater')
+    return {
+        "observed": int(observed),
+        "expected": float(expected),
+        "p_enrichment": float(test.pvalue),
+        "ratio": float(observed / max(expected, 1)),
+    }
+
+
+def residualized_rewiring(rewiring, lfc):
+    """Route B: rewiring residualized on |log2FC|."""
+    from sklearn.linear_model import LinearRegression
+    X = np.abs(lfc).reshape(-1, 1)
+    y = np.asarray(rewiring)
+    model = LinearRegression().fit(X, y)
+    residuals = y - model.predict(X)
+    return residuals
+
+
+def silent_shifters_residualized(rewiring, lfc, fdr,
+                                  top_quantile=0.90,
+                                  lfc_max=0.3, fdr_min=0.2):
+    """Route B: top decile of residualized rewiring with low DE."""
+    resid = residualized_rewiring(rewiring, lfc)
+    cutoff = np.quantile(resid, top_quantile)
+    high_resid = resid >= cutoff
+    low_de = (np.abs(lfc) < lfc_max) & (fdr > fdr_min)
+    return high_resid & low_de
+\end{lstlisting}
+
+\subsection{Validation}
+
+For Route~A, the observed-versus-null calibration should be reported alongside every silent-shifter table in \code{RESULTS.md}. Missing DE rows should fail the run by default. The strict table should no longer default to 250 genes per contrast unless those 250 genes genuinely satisfy the high-rewiring and DE-null criteria.
+
+For Route~B, validate by simulating: generate a dataset with known rewiring--DE correlation $\rho\in\{0, 0.1, 0.3, 0.5\}$ and check that the residualized procedure produces a silent-shifter set whose own $|\log_2 \mathrm{FC}|$ distribution is centered at zero regardless of $\rho$.
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 0.5 person-days. \textbf{Dependencies:} the per-gene DE statistics must be computed (already part of Phase~6).
+
+% ----------------------------------------------------
+\section{Fix 6 --- Anchor Pre-Registration Enforcement}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+\code{config/anchor\_genes.yaml} lists pre-registered housekeeping, ribosomal, and core-metabolism genes intended to serve as Procrustes anchors --- genes whose embeddings should be approximately invariant across contrasts so that orthogonal rotation can be estimated reliably. \code{src/networks/procrustes.py} actually selects anchors data-drivenly by reading Phase~3 rewiring tables and picking the bottom-$K$ genes by median absolute rewiring across contrasts. This is the genes that already have low rewiring under the pipeline being chosen as the reference for measuring rewiring --- a tautology.
+
+The realized run uses 154 anchors (from \code{phase3\_rewiring/anchors.txt}), all selected by this data-driven procedure. The list in \code{config/anchor\_genes.yaml} is unused.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item \code{src/networks/procrustes.py} --- the anchor-selection function.
+\item \code{config/anchor\_genes.yaml} --- already correct, but should be expanded to ensure $\geq 50$ anchors after gene-panel intersection.
+\end{itemize}
+
+\subsection{Implementation Sketch}
+
+\begin{lstlisting}[style=pythonstyle,caption={Anchor selection with --anchor-mode flag.}]
+import yaml
+from pathlib import Path
+
+def load_pre_registered_anchors(yaml_path, gene_panel):
+    """Load anchors from config/anchor_genes.yaml and intersect with panel."""
+    with open(yaml_path) as f:
+        anchor_lists = yaml.safe_load(f)
+    # anchor_lists is a dict like {housekeeping: [...], ribosomal: [...], ...}
+    all_anchors = set()
+    for category, genes in anchor_lists.items():
+        all_anchors.update(genes)
+    anchors_in_panel = sorted(all_anchors & set(gene_panel))
+    if len(anchors_in_panel) < 50:
+        raise ValueError(
+            f"Only {len(anchors_in_panel)} pre-registered anchors survive "
+            f"intersection with the gene panel of {len(gene_panel)}. "
+            f"Expand anchor_genes.yaml or relax the panel filter."
+        )
+    return anchors_in_panel
+
+
+def select_anchors(gene_panel, mode="pre_registered",
+                   anchor_yaml="config/anchor_genes.yaml",
+                   rewiring_table=None, k=150):
+    """Anchor selection with explicit mode."""
+    if mode == "pre_registered":
+        return load_pre_registered_anchors(anchor_yaml, gene_panel)
+    elif mode == "data_driven":
+        # Existing behavior: bottom-k by median absolute rewiring.
+        # Should only be used for sensitivity analysis, not for headline runs.
+        if rewiring_table is None:
+            raise ValueError("data_driven anchor mode requires rewiring_table")
+        median_abs_rewiring = rewiring_table.groupby("gene")["abs_rewiring"].median()
+        return median_abs_rewiring.nsmallest(k).index.tolist()
+    else:
+        raise ValueError(f"Unknown anchor mode: {mode}")
+\end{lstlisting}
+
+\subsection{Validation}
+
+A unit test should assert that, when \code{anchor\_genes.yaml} is loaded and intersected with the 2500-gene panel of \code{run\_20260408\_191759\_2500g}, at least 50 anchors survive. Procrustes alignment with the pre-registered anchor set should produce per-contrast rewiring distributions that are qualitatively similar to the data-driven selection but slightly more conservative (lower mean rewiring) because the pre-registered anchors are not pre-selected for low rewiring.
+
+A sensitivity analysis should compare:
+
+\begin{itemize}[leftmargin=*]
+\item Per-gene rewiring scores under \code{pre\_registered} vs.\ \code{data\_driven} anchor selection.
+\item Top-decile gene-list overlap between the two.
+\item FDR-significant counts under both selections.
+\end{itemize}
+
+If the lists diverge substantially, the gene-level claims are anchor-sensitive and should be reported as such.
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 1 hour. \textbf{Dependencies:} \code{config/anchor\_genes.yaml} must contain $\geq 50$ panel-intersecting genes. If not, the YAML must be expanded first (an additional hour to curate housekeeping / ribosomal lists from MGI).
+
+% ----------------------------------------------------
+\section{Fix 7 --- Config-Code Drift Removal}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+Before remediation, \code{config/hyperparameters.yaml} specified $k=50$ neighbors while \code{src/networks/shared\_topology.py} used $k=80$. The YAML specified a Random Forest with \code{n\_estimators=100} and unbounded depth while \code{src/validation/cross\_validation.py} used \code{max\_depth=5}. The YAML also mentioned \code{westfall\_young: true} even though no module implemented it. The remediated repository aligns config and execution at top-k 80, RF max depth 5, and implemented FDR modes only, with a test guard to prevent recurrence.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item \code{config/hyperparameters.yaml}.
+\item New: \code{tests/test\_config\_consistency.py}.
+\item Optional: a CI hook in \code{.github/workflows/} (or equivalent) that runs the config-consistency test.
+\end{itemize}
+
+\subsection{Implementation Sketch}
+
+\begin{lstlisting}[style=yamlstyle,caption={Corrected hyperparameters.yaml (excerpt).}]
+# config/hyperparameters.yaml
+# Last verified consistent with src/ on 2026-04-26 against
+# run_20260408_191759_2500g (Git 90ee5bf).
+
+network_topology:
+  topk: 80                    # was 50, now matches shared_topology.py
+  shrinkage: ledoit_wolf
+  partial_correlation: true
+
+node2vec:
+  dimensions: 128
+  p: 0.25
+  q: 4.0
+  walk_length: 80
+  num_walks: 200
+  window_size: 10
+  num_seeds: 10
+
+permutation:
+  K: 5000
+  B_bootstrap: 2000
+  hierarchical_fdr:           # was: westfall_young, which is unimplemented
+    alpha: 0.05
+    method: benjamini_bogomolov
+
+classifier:
+  random_forest:
+    n_estimators: 100
+    max_depth: 5              # was: null/unbounded, now matches cross_validation.py
+    min_samples_leaf: 2
+  logistic_regression:
+    C: 1.0
+    solver: liblinear
+\end{lstlisting}
+
+\begin{lstlisting}[style=pythonstyle,caption={Config-consistency unit test.}]
+# tests/test_config_consistency.py
+import yaml
+from pathlib import Path
+
+CONFIG_PATH = Path(__file__).resolve().parents[1] / "config/hyperparameters.yaml"
+
+def load_config():
+    with open(CONFIG_PATH) as f:
+        return yaml.safe_load(f)
+
+def test_topk_matches_code():
+    config = load_config()
+    from src.networks.shared_topology import DEFAULT_TOPK  # to be exported
+    assert config["network_topology"]["topk"] == DEFAULT_TOPK, (
+        f"YAML topk={config['network_topology']['topk']} but "
+        f"shared_topology.DEFAULT_TOPK={DEFAULT_TOPK}"
+    )
+
+def test_rf_max_depth_matches_code():
+    config = load_config()
+    from src.validation.cross_validation import DEFAULT_RF_MAX_DEPTH
+    assert config["classifier"]["random_forest"]["max_depth"] == DEFAULT_RF_MAX_DEPTH
+
+def test_no_unimplemented_methods():
+    config = load_config()
+    method = config["permutation"]["hierarchical_fdr"]["method"]
+    valid = {"benjamini_hochberg", "benjamini_bogomolov", "westfall_young"}
+    assert method in valid, f"Unknown FDR method: {method}"
+    if method == "westfall_young":
+        from src.statistics import permutation_bootstrap as pb
+        assert hasattr(pb, "westfall_young_correction"), (
+            "westfall_young method specified in YAML but not implemented in code."
+        )
+\end{lstlisting}
+
+\subsection{Validation}
+
+\code{pytest tests/test\_config\_consistency.py} must pass. The test should be added to CI (GitHub Actions, Jenkins, or whatever the team uses) so that future drift is caught at PR time rather than at audit time.
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 1 hour. \textbf{Dependencies:} the modules referenced by the test must export the relevant constants (\code{DEFAULT\_TOPK}, \code{DEFAULT\_RF\_MAX\_DEPTH}); these are 1-line additions.
+
+% ----------------------------------------------------
+\section{Fix 8 --- MuSiC Reference-Atlas Sensitivity Analysis}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+MuSiC deconvolution uses Tabula Muris Senis (TMS) as the single-cell reference. TMS samples male and female C57BL/6JN mice across six age groups (1, 3, 18, 21, 24, 30 months). OSD-771 uses female C57BL/6NTac mice at 16 and 34 weeks (approximately 4 and 8 months). The strain mismatch (C57BL/6JN vs.\ C57BL/6NTac) and the age-distribution mismatch are not addressed in the current pipeline, and any deconvolution bias propagates permanently into the global residualization in Phase~1.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item New: \code{src/preprocessing/deconvolution\_sensitivity.R}.
+\item Output: \code{data/results/deconvolution\_sensitivity/}.
+\end{itemize}
+
+\subsection{Implementation Sketch}
+
+The sensitivity analysis runs three deconvolution methods on the same input, with the same TMS reference, and reports cross-method agreement. If the per-sample cell-type proportions agree across methods (Spearman $\rho > 0.9$ for each compartment), the strain mismatch concern is empirically defused. If they disagree, the residualization is method-sensitive and the manuscript must report which method was used and why.
+
+\begin{lstlisting}[style=rstyle,caption={Deconvolution sensitivity analysis.}]
+# src/preprocessing/deconvolution_sensitivity.R
+suppressPackageStartupMessages({
+  library(MuSiC)
+  library(Biobase)
+  library(SummarizedExperiment)
+})
+
+run_music <- function(bulk_eset, sc_eset, cell_types) {
+  res <- music_prop(bulk.mtx = exprs(bulk_eset),
+                    sc.eset  = sc_eset,
+                    clusters = "cluster",
+                    samples  = "sample_id",
+                    select.ct = cell_types)
+  return(res$Est.prop.weighted)
+}
+
+run_bMIND <- function(bulk_mat, sc_ref, cell_types) {
+  # Sketch only: requires bMIND package and properly formatted reference
+  library(MIND)
+  res <- bMIND(bulk = bulk_mat,
+               profile = sc_ref,
+               ncore = 4)
+  return(res$frac)
+}
+
+run_cibersortx <- function(bulk_mat, sc_signature) {
+  # CIBERSORTx is API-based; this function should call the CIBERSORTx
+  # web service or the Docker container. Returns a matrix of fractions.
+  stop("Implement CIBERSORTx call to local Docker or API.")
+}
+
+# Cross-method comparison
+prop_music    <- run_music(bulk_eset, tms_kidney_sc, cell_types)
+prop_bmind    <- run_bMIND(bulk_mat, tms_signature, cell_types)
+# prop_cibersortx <- run_cibersortx(bulk_mat, tms_signature)
+
+# Per-compartment Spearman correlation across methods
+for (ct in cell_types) {
+  rho_mb <- cor(prop_music[, ct], prop_bmind[, ct], method = "spearman")
+  cat(sprintf("%s: MuSiC vs bMIND Spearman = %.3f\n", ct, rho_mb))
+}
+
+# Save side-by-side proportions for downstream sensitivity testing
+write.table(prop_music, "data/results/deconvolution_sensitivity/music_props.tsv",
+            sep = "\t", quote = FALSE)
+write.table(prop_bmind, "data/results/deconvolution_sensitivity/bmind_props.tsv",
+            sep = "\t", quote = FALSE)
+\end{lstlisting}
+
+\subsection{Downstream Sensitivity Validation}
+
+In addition to comparing the proportions themselves, the residualization in Phase~1 should be re-run using each method's CLR-transformed proportions, and the per-gene rewiring scores in Phase~3 should be computed under each. If the top-decile gene lists agree (Jaccard $\geq 0.7$) across methods, the deconvolution choice is not driving the headline biology. If they disagree, the manuscript must report the dependence and the choice of MuSiC must be justified or the sensitivity range reported as a confidence band.
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 1 person-day for the sensitivity analysis itself; an additional 1--2 days if the downstream rewiring re-run is required and disagreement is found. \textbf{Dependencies:} bMIND and CIBERSORTx must be installable. CIBERSORTx requires a local Docker container or web-API access (free for academic use).
+
+% ----------------------------------------------------
+\section{Fix 9 --- Permutation-Statistic Renaming and Appendix-Tier Full-Pipeline Permutation}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+The Phase~3 observed statistic is row-wise cosine distance between Procrustes-aligned node2vec embeddings. The Phase~6 permutation null is the per-gene sum of absolute $\Delta z$ over edges incident on that gene (\code{node\_rewiring\_abs}), \emph{not} the cosine-distance statistic. These two quantities are correlated under the alternative hypothesis but are not identical, and there is no theoretical guarantee that the relative ranking of the cosine-distance scores matches the ranking of the edge-sum permutation $p$-values.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item \code{src/statistics/permutation\_bootstrap.py} --- docstrings, output column names, and \code{RESULTS.md} terminology.
+\item Optional: a new module \code{src/statistics/full\_pipeline\_permutation.py} for the appendix-tier expensive variant.
+\end{itemize}
+
+\subsection{Cheap Fix: Rename and Document}
+
+\begin{lstlisting}[style=pythonstyle,caption={Renaming and documentation update.}]
+# In permutation_bootstrap.py docstring, add:
+"""
+NOTE: This module computes a permutation null for the EDGE-REWIRING statistic
+(per-gene sum of absolute Delta-z over incident edges), NOT for the cosine-
+distance EMBEDDING-REWIRING statistic computed in Phase 3. The two statistics
+are correlated but not identical; the p-values reported here test the
+hypothesis 'no change in the LIONESS-edge-weight neighborhood of this gene'
+rather than 'no change in the embedding geometry of this gene.' Users who
+need a permutation null for the cosine-distance statistic itself should use
+src/statistics/full_pipeline_permutation.py.
+"""
+
+# Output column rename (in the per-gene perm_pvals tables):
+#   p_perm           -> p_perm_edge_rewiring
+#   q_BH             -> q_BH_edge_rewiring
+#   rewiring_abs_obs -> edge_rewiring_abs_obs
+\end{lstlisting}
+
+\subsection{Expensive Fix: Full-Pipeline Permutation on Top Hits}
+
+For the top 24 ISS-T-Young hits (or whatever the post-hierarchical-FDR list is), permute the FLT/GC labels within Age$\times$Arm strata $K=200$ times, and for each permutation re-run Phase~2 (skeleton, LIONESS, edge regression), Phase~3 (node2vec embedding, Procrustes alignment, cosine distance), and record the per-gene cosine-distance statistic. The resulting empirical $p$-value is a true cosine-distance permutation $p$-value.
+
+\begin{lstlisting}[style=pythonstyle,caption={Sketch: full-pipeline permutation for top-hit verification.}]
+# src/statistics/full_pipeline_permutation.py
+def full_pipeline_perm_for_genes(top_genes, n_perms=200,
+                                  n_workers=100, seed=0):
+    """Verify cosine-distance significance for a small list of top genes."""
+    rng = np.random.default_rng(seed)
+    null_distribution = {gene: [] for gene in top_genes}
+
+    for k in range(n_perms):
+        perm_labels = stratified_permute_labels(rng)
+        meta_perm = meta_with_permuted_labels(perm_labels)
+
+        # Re-run Phase 2 with the permuted labels
+        skeleton_k = build_skeleton_with_meta(meta_perm)
+        lioness_k  = run_lioness_with_meta(meta_perm)
+        predicted_k = run_edge_regression(meta_perm)
+
+        # Re-run Phase 3 on the permuted predicted networks
+        embeddings_k = run_node2vec_multi_seed(predicted_k)
+        rewiring_k = procrustes_cosine_distance(embeddings_k)
+
+        for gene in top_genes:
+            null_distribution[gene].append(rewiring_k.loc[gene])
+
+    # Empirical p-value per gene
+    p_values = {}
+    for gene in top_genes:
+        obs = observed_rewiring[gene]
+        null_array = np.array(null_distribution[gene])
+        p_values[gene] = (np.sum(null_array >= obs) + 1) / (n_perms + 1)
+    return p_values
+\end{lstlisting}
+
+\noindent At $K=200$ for 24 genes, the run takes roughly 200 full Phase~2/3 iterations. On a 100-CPU cluster with one Phase~2/3 iteration per CPU, this is $\sim$200 minutes total; on a single 16-core workstation, $\sim$24 hours. Both are tractable.
+
+\subsection{Validation}
+
+After the cheap rename, all references in \code{RESULTS.md} and \code{METHODOLOGY.md} should consistently distinguish ``edge-rewiring permutation'' from ``embedding-rewiring permutation.'' After the expensive fix, the cosine-distance permutation $p$-values for the top hits should be reported alongside the edge-rewiring permutation $p$-values, and any discrepancy between the two rankings should be flagged.
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 1 person-day for the rename; 1 person-day for the expensive variant plus 24 hours of cluster time. \textbf{Dependencies:} the existing Phase~2 and Phase~3 modules must be callable from Python (already true).
+
+\clearpage
+
+% ====================================================
+\part*{Tier 2 — Phase 8 Design Interventions}
+\addcontentsline{toc}{section}{Tier 2 — Phase 8 Design Interventions}
+% ====================================================
+
+\noindent The interventions in this tier do not address the inferential layer; they target the structural cause of the Phase~8 negative result, namely the noise floor of leave-one-out per-sample LIONESS estimation at $n{=}5$ biological replicates per Age$\times$Arm$\times$EnvGroup cell. Each intervention has the potential to move Phase~8 from ``network features lose to expression baseline'' to ``network features add classification value above expression baseline,'' but each does so by changing an aspect of the experimental or analytical design rather than fixing a defect in the existing pipeline.
+
+% ----------------------------------------------------
+\section{Fix 10 --- LIONESS Pooling Across Age$\times$Arm$\times$EnvGroup Cells}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+Within each Age$\times$Arm$\times$EnvGroup cell ($n{=}5$ mice), the leave-one-out Pearson correlation underlying LIONESS is computed on $N{-}1{=}4$ samples. The variance of a 4-sample Pearson correlation is dominated by sampling noise; the LIONESS formula amplifies this noise into the per-sample edge weight. Even after the safety guards (clip $|r|<0.9995$, cap $|z_s|<20$), the per-sample LIONESS feature is dominated by the LOO noise rather than by the FLT-vs-GC signal at this sample size.
+
+\subsection{Pooling Strategy}
+
+Rebuild the LIONESS pool at a coarser stratification level. Three options, in order of aggression:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Pool within Arm} ($N=20$). Pools FLT, GC, VIV, BSL within an arm; sacrifices Age and EnvGroup specificity. The LOO is now over 19 samples instead of 4.
+\item \textbf{Pool within Age} ($N=40$). Pools both arms within an age; sacrifices Arm specificity.
+\item \textbf{Pool globally} ($N=80$). Pools everything; sacrifices all design specificity. This is closest to the ``standard'' LIONESS use case in the literature.
+\end{enumerate}
+
+\noindent The aggressiveness trades per-sample variance reduction against the risk of confounding the FLT-vs-GC signal with Age- or Arm-specific effects. Option~1 (pool within Arm) is the recommended starting point because it preserves the Arm dimension that the audit identified as the strongest signal carrier and quadruples the LOO sample size simultaneously.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item \code{src/networks/lioness.py} --- add a \code{--pool-strata} argument that accepts \code{age\_arm\_envgroup} (current default), \code{arm}, \code{age}, or \code{global}.
+\item \code{src/validation/cross\_validation.py} --- propagate the same flag through the fold-wise rebuild.
+\end{itemize}
+
+\subsection{Implementation Sketch}
+
+\begin{lstlisting}[style=pythonstyle,caption={Stratified pooling parameter for LIONESS.}]
+# In lioness.py main:
+ap.add_argument("--pool-strata", default="age_arm_envgroup",
+                choices=["age_arm_envgroup", "arm", "age", "global"],
+                help="Stratification level for LIONESS pooling. Coarser pools "
+                     "reduce per-sample LOO variance at the cost of "
+                     "stratum-specificity.")
+
+# Pooling logic
+def get_pool_indices(meta, sample_id, pool_level):
+    """Return indices of samples in the same pool as sample_id."""
+    s = meta.loc[sample_id]
+    if pool_level == "age_arm_envgroup":
+        mask = (meta["Age"] == s["Age"]) & \
+               (meta["Arm"] == s["Arm"]) & \
+               (meta["EnvGroup"] == s["EnvGroup"])
+    elif pool_level == "arm":
+        mask = (meta["Arm"] == s["Arm"])
+    elif pool_level == "age":
+        mask = (meta["Age"] == s["Age"])
+    else:  # global
+        mask = pd.Series(True, index=meta.index)
+    return meta.index[mask].tolist()
+
+
+# In the main LIONESS loop:
+for s_idx, sample in enumerate(samples):
+    pool = get_pool_indices(meta, sample, args.pool_strata)
+    pool_idx = [i for i, sn in enumerate(samples) if sn in pool]
+    N_pool = len(pool_idx)
+    # Re-derive Sx, Sxx, Sxy on the pool only
+    X_pool = X[:, pool_idx]
+    Sx_pool = X_pool.sum(axis=1)
+    Sxx_pool = (X_pool**2).sum(axis=1)
+    # ... compute LIONESS as before but with N=N_pool
+\end{lstlisting}
+
+\subsection{Validation}
+
+Three checks:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Per-sample variance.} Bootstrap the LIONESS weights for a representative sample under each pool level and report the median per-edge variance. Pool level \code{arm} ($N=20$) should reduce the median per-edge LIONESS standard deviation by approximately a factor of $\sqrt{20/5} = 2$ relative to the current default.
+\item \textbf{Phase~8b re-run.} Rerun Phase~8b under each pool level and report the network-vs-expression-baseline accuracy table. If LIONESS noise is the binding constraint, accuracy should rise monotonically with pool size.
+\item \textbf{Confound check.} For each pool level, compute the correlation between the per-sample LIONESS first principal component and the Age (or Arm) covariate. If the correlation is high, the pooling has confounded the FLT-vs-GC signal with Age (or Arm) and the result is uninterpretable.
+\end{enumerate}
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 1 person-day. \textbf{Dependencies:} none.
+
+% ----------------------------------------------------
+\section{Fix 11 --- Alternative Sample-Specific-Network Methods}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+LIONESS is the default for sample-specific networks but is not the only available method. SSN (Liu et al., \emph{Nucleic Acids Research} 2016), CSN (Cell-Specific Networks, Dai et al., 2019), and \pkg{scLink} are alternatives with different bias-variance tradeoffs at small $N$. If LIONESS noise is the structural cause of the Phase~8 negative result, an alternative method may have a more favorable noise floor at $n{=}5$ per cell. If \emph{no} method works at this sample size, the conclusion is that the per-sample classification problem is genuinely intractable at the current cohort size, and Fix~14 (multi-study cohort pooling) becomes the only path forward.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item New: \code{src/networks/alternative\_methods.py}.
+\item New: \code{src/networks/method\_benchmark.py} for cross-method comparison.
+\end{itemize}
+
+\subsection{Methods to Implement}
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{SSN.} Computes a per-sample $z$-score against an aggregate reference network: $z_{ij}^{(s)} = (r_{ij}^{(\text{ref}+s)} - r_{ij}^{(\text{ref})}) / \sigma_{ij}$. The variance term $\sigma_{ij}$ is estimated from the reference network only.
+\item \textbf{CSN.} Tests, for each sample, whether the joint distribution of expression in a small neighborhood around the sample is consistent with independence between gene pairs. Returns a binary edge mask per sample.
+\item \textbf{scLink.} Sparse precision-matrix estimation per sample using a regularized graphical lasso with shrinkage toward a population precision matrix.
+\end{itemize}
+
+\subsection{Implementation Sketch}
+
+\begin{lstlisting}[style=pythonstyle,caption={Wrapper for SSN.}]
+def ssn_per_sample(X, ref_idx, sample_idx, edge_list):
+    """
+    Sample-Specific Network (Liu 2016):
+        z_e = (r_{ref+s,e} - r_{ref,e}) / sigma_e
+    where sigma_e is computed from the reference network's bootstrap.
+    """
+    ref_X = X[:, ref_idx]
+    n_ref = len(ref_idx)
+
+    # Reference correlations
+    r_ref = pearson_edges(ref_X, edge_list)
+
+    # Reference bootstrap variance
+    n_boot = 500
+    boot_r = np.empty((n_boot, len(edge_list)))
+    rng = np.random.default_rng(0)
+    for b in range(n_boot):
+        idx = rng.choice(ref_idx, size=n_ref, replace=True)
+        boot_r[b] = pearson_edges(X[:, idx], edge_list)
+    sigma_e = boot_r.std(axis=0)
+
+    # ref + sample correlation
+    aug_idx = list(ref_idx) + [sample_idx]
+    r_aug = pearson_edges(X[:, aug_idx], edge_list)
+
+    z = (r_aug - r_ref) / np.maximum(sigma_e, 1e-6)
+    return z
+
+
+def csn_per_sample(X, sample_idx, k_neighbors=5):
+    """
+    Cell-Specific Network (Dai 2019, simplified):
+    For each gene pair (i,j), test whether sample s is consistent with
+    independence in a local neighborhood around s.
+    """
+    # Identify k nearest neighbors of sample s in expression space
+    # Compute per-gene-pair contingency table on this neighborhood
+    # Return chi-square test statistic per edge
+    raise NotImplementedError("Implement per the Dai 2019 algorithm.")
+\end{lstlisting}
+
+\subsection{Validation}
+
+Run each method through Phase~8b under leakage-safe CV and report the network-vs-expression-baseline table side by side with LIONESS. The method with the largest network advantage (or, equivalently, the smallest negative network advantage) is the new default. If all methods produce negative network advantage at OSD-771's sample size, document that the per-sample-network classification problem is intractable at $n{=}5$ per cell regardless of method choice.
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 3 person-days for the three method wrappers; an additional 1 day for the benchmark. \textbf{Dependencies:} \pkg{scLink} requires R; SSN and CSN are pure Python.
+
+% ----------------------------------------------------
+\section{Fix 12 --- Alternative Feature Engineering for Phase 8}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+The current Phase~8 features are ``top 50 node-strength features by training-fold variance + 10 PCA components.'' Node strength (sum of $|z|$ over incident edges) is a coarse summary; it integrates over edges that may carry signal in opposite directions, producing a feature that is constant across many samples even when the underlying network differs. Per-edge LIONESS values, pairwise embedding distances, or graph-theoretic centrality measures may carry signal that node-strength averages out.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item \code{src/validation/cross\_validation.py} --- the feature-engineering function.
+\end{itemize}
+
+\subsection{Feature Sets to Compare}
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Current.} Top-50 node-strength features by training variance + 10 PCA components.
+\item \textbf{Per-edge.} All $\sim 180{,}000$ LIONESS edge weights, with $L_1$-regularized logistic regression to enforce sparsity. The classifier picks its own discriminative edges.
+\item \textbf{Embedding distance.} Pairwise cosine distance between each test sample's per-mouse node2vec embedding and the per-condition consensus embedding. The feature for sample $s$ is the cosine distance from FLT consensus and from GC consensus; classification reduces to ``which consensus is the test sample closer to.''
+\item \textbf{Graph centrality.} Betweenness centrality, eigenvector centrality, and clustering coefficient computed on the per-sample LIONESS network thresholded at the top-$k$ edges.
+\end{enumerate}
+
+\subsection{Implementation Sketch}
+
+\begin{lstlisting}[style=pythonstyle,caption={Per-edge feature set with L1 logistic regression.}]
+from sklearn.linear_model import LogisticRegressionCV
+from sklearn.preprocessing import StandardScaler
+
+def per_edge_features(z_lioness):
+    """Treat every edge as its own feature."""
+    return z_lioness  # shape: (n_samples, n_edges)
+
+
+def evaluate_per_edge_l1(X_train, y_train, X_test, y_test):
+    scaler = StandardScaler().fit(X_train)
+    Xs_train = scaler.transform(X_train)
+    Xs_test = scaler.transform(X_test)
+    clf = LogisticRegressionCV(
+        Cs=10, penalty='l1', solver='liblinear',
+        cv=4, scoring='accuracy', max_iter=2000
+    ).fit(Xs_train, y_train)
+    return clf.score(Xs_test, y_test), clf.predict_proba(Xs_test)
+\end{lstlisting}
+
+\begin{lstlisting}[style=pythonstyle,caption={Embedding-distance feature.}]
+def embedding_distance_features(test_emb, flt_consensus, gc_consensus):
+    """For each test sample, return [d(test, flt), d(test, gc), d_diff]."""
+    from scipy.spatial.distance import cosine
+    feats = []
+    for s in range(test_emb.shape[0]):
+        d_flt = cosine(test_emb[s], flt_consensus)
+        d_gc  = cosine(test_emb[s], gc_consensus)
+        feats.append([d_flt, d_gc, d_flt - d_gc])
+    return np.array(feats)
+\end{lstlisting}
+
+\subsection{Validation}
+
+Run all four feature sets through Phase~8b under leakage-safe CV and report the resulting network-vs-expression-baseline table. The feature set with the largest positive network advantage in any stratum is reported. If none produces positive network advantage, the conclusion is that feature engineering is not the binding constraint and Fix~10 (LIONESS pooling) or Fix~14 (cohort pooling) is required.
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 1.5 person-days. \textbf{Dependencies:} the per-edge feature set requires care with leakage-safe scaling; the embedding-distance feature requires per-fold rebuild of the FLT and GC consensus embeddings.
+
+% ----------------------------------------------------
+\section{Fix 13 --- Continuous Classification Targets}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+The current Phase~8 target is binary FLT-vs-GC. At $n{=}5$ per stratum the binary task discards most of the available variation: a continuous biological response is being thresholded into a 0/1 label, and the classifier must squeeze 40 samples into a binary decision. A continuous target derived from independent kidney-injury biomarkers (KIM-1, NGAL, HAVCR1) lets the classifier exploit ordinal information.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item New: \code{src/validation/continuous\_target.py}.
+\item Required input: kidney-injury biomarker expression for each sample (already present in the OSD-771 counts matrix; specific genes need to be looked up by symbol).
+\end{itemize}
+
+\subsection{Stress-Score Definition}
+
+The stress score for sample $s$ is the residualized $z$-score of:
+\begin{itemize}[leftmargin=*]
+\item \emph{Havcr1} (Kim-1) --- canonical proximal-tubule injury marker.
+\item \emph{Lcn2} (NGAL) --- distal-tubule injury marker.
+\item \emph{Trf} --- iron-homeostasis stress marker (already among the top hits).
+\item \emph{Spp1}, \emph{Vim}, \emph{Cdkn1a} --- additional kidney-stress markers.
+\end{itemize}
+
+The score is the first principal component of the residualized $z$-scores, scaled to $[0, 1]$.
+
+\subsection{Implementation Sketch}
+
+\begin{lstlisting}[style=pythonstyle,caption={Continuous stress-score regression target.}]
+def kidney_stress_score(rtech, marker_genes):
+    """Construct a continuous stress score from kidney injury markers."""
+    from sklearn.decomposition import PCA
+    from sklearn.preprocessing import StandardScaler
+
+    Y = rtech.loc[marker_genes].T  # (n_samples, n_markers)
+    Y_scaled = StandardScaler().fit_transform(Y)
+    pc1 = PCA(n_components=1).fit_transform(Y_scaled).ravel()
+    # Min-max scale to [0, 1] for interpretability
+    return (pc1 - pc1.min()) / (pc1.max() - pc1.min())
+
+
+def regression_phase8(X_train, y_train, X_test, y_test):
+    """Continuous-target version of Phase 8, using Spearman rho as metric."""
+    from sklearn.ensemble import RandomForestRegressor
+    from scipy.stats import spearmanr
+    rf = RandomForestRegressor(n_estimators=100, max_depth=5, random_state=0)
+    rf.fit(X_train, y_train)
+    y_pred = rf.predict(X_test)
+    rho, p = spearmanr(y_pred, y_test)
+    return rho, p
+\end{lstlisting}
+
+\subsection{Validation}
+
+The Spearman correlation between predicted and observed stress scores should be reported per fold and per stratum, alongside the existing classification accuracy. The new metric to beat is ``network features predict stress score with $\rho > \rho_{\text{expression}}$.'' If the network features predict stress scores significantly better than expression alone (one-sided permutation $p < 0.05$), this is positive evidence for the network framework even if the binary classifier remains negative.
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 2 person-days. \textbf{Dependencies:} the marker-gene list must be intersected with the 2500-gene panel; if any are missing, the panel must be expanded or the score must be recomputed on the full residualized matrix.
+
+% ----------------------------------------------------
+\section{Fix 14 --- Multi-Study Cohort Pooling for LAR-Young (OSD-102 $+$ OSD-771)}
+% ----------------------------------------------------
+
+\subsection{Problem}
+
+The binding constraint on per-sample classification is $n{=}5$ per Age$\times$Arm$\times$EnvGroup cell. At this sample size no analytical fix produces a stable per-sample LIONESS feature set, because leave-one-out correlations are computed on $N{-}1{=}4$ samples and the resulting per-mouse weights inherit excessive sampling variance. The only intervention that genuinely changes the noise floor is to add more biological replicates.
+
+The originally proposed pooling partner (OSD-568, RRRM-1 kidney) has been removed: it uses a different mouse strain (BALB/cAnNTac vs C57BL/6NTac) and likely a different assay (miRNA-seq or scRNA-seq, per the OSDR release announcement). The strain mismatch is fatal --- ComBat-seq cannot remove BALB/c-vs-C57BL/6 baseline biology without also removing real spaceflight signal --- and the assay mismatch makes count-level pooling impossible.
+
+The viable pooling partner is \textbf{OSD-102 (RR-1 NASA Validation Flight)}: female C57BL/6J kidney, $n{=}6$ FLT $+$ $n{=}6$ GC, 16 weeks at sacrifice, 37-day flight, bulk RNA-seq, RNAlater $\to$ $-80\,^\circ$C, NuRFB diet, Rodent Habitat hardware, 12h/12h light cycle. Only the C57BL/6J vs C57BL/6NTac sub-strain difference remains, which is small enough (1--2\% of kidney genes show baseline divergence) to be handled as a study-as-batch covariate in ComBat-seq.
+
+\textbf{The pool is stratum-specific, not global.} OSD-102 has no ISS-T arm, no aged cohort, and no basal control, so pooling can only augment one of the 16 RRRM-2 cells: \emph{LAR-Young}. After pooling, the LAR-Young cell has $n{=}11$ FLT $+$ $n{=}11$ GC instead of $n{=}5{+}5$, which means LIONESS LOO correlations are computed on 21 samples instead of 4 --- a per-sample variance reduction of $\sqrt{21/4}\approx 2.3$. The other three RRRM-2 cells (ISS-T-Young, ISS-T-Old, LAR-Old) cannot be augmented this way and continue at $n{=}5$. Fix~14 is therefore a targeted intervention on the LAR-Young classification problem, not a global remedy. If LIONESS noise at $n{=}5$ is the binding constraint on Phase~8 (the diagnosis converged on in the audit), this is the largest noise-floor reduction available without running new mice and is plausibly large enough to flip the LAR-Young classifier from below-chance to above-expression-baseline.
+
+\subsection{Affected Files and Lines}
+
+\begin{itemize}[leftmargin=*]
+\item New: \code{src/validation/multi\_study\_pool.py}.
+\item Required preprocessing: cross-study batch correction.
+\item New: \code{src/preprocessing/cross\_study\_harmonization.R}.
+\end{itemize}
+
+\subsection{Implementation Strategy}
+
+The pooled analysis must address inter-study technical variation while preserving the FLT-vs-GC biology. Four preprocessing steps:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Restrict RRRM-2 to LAR-Young.} Keep only the 10 mice ($n{=}5$ FLT $+$ $n{=}5$ GC; pooling 5 HGC and 5 VIV with 6 OSD-102 GC) from the LAR-Young cell. Optionally also include LAR-Young VIV as additional GC ($n{=}5$); decide pre-registration, not post-hoc.
+\item \textbf{Restrict OSD-102 to individual mice.} Use only M23--M28 (FLT) and M33--M38 (GC), $n{=}12$ total. Exclude all four pool samples (``Pool of all FLT samples,'' ``Pool of all GC samples,'' ``Pool of all FLT and GC samples,'' ``Empty Pool'').
+\item \textbf{Gene-name harmonization.} Map both studies to a common gene-ID space (Ensembl IDs are the most reliable; both NASA GeneLab releases include Ensembl). Drop genes not present in both.
+\item \textbf{ComBat-seq batch correction.} Apply ComBat-seq (Zhang et al., 2020) with study as the batch and FLT-vs-GC as the biology to preserve. Critically, do \emph{not} also try to preserve sex (both studies female), age (both 16 weeks at sacrifice), or strain (study-as-batch already absorbs the C57BL/6J vs C57BL/6NTac sub-strain difference). Adding a redundant covariate to \code{covar\_mod} can over-correct.
+\item \textbf{QC harmonization.} Apply a unified CPM and gene-detection filter to the combined cohort.
+\end{enumerate}
+
+After harmonization, the pipeline runs as before but with $n_{\text{LAR-Young}}{=}11$ FLT $+$ $n{=}11$ GC (or $11{+}16$ if VIV is included as additional GC).
+
+\subsection{Implementation Sketch}
+
+\begin{lstlisting}[style=rstyle,caption={LAR-Young cohort harmonization for OSD-771 + OSD-102 pooling.}]
+# src/preprocessing/cross_study_harmonization.R
+suppressPackageStartupMessages({
+  library(sva)        # for ComBat_seq
+  library(edgeR)
+})
+
+harmonize_lar_young <- function(counts_771, meta_771, counts_102, meta_102,
+                                 include_viv_as_gc = FALSE) {
+  # Restrict OSD-771 to LAR-Young
+  is_lar_young <- meta_771$Age == "Young" & meta_771$Arm == "LAR"
+  if (include_viv_as_gc) {
+    keep_771 <- is_lar_young &
+      meta_771$EnvGroup %in% c("FLT", "HGC", "VIV")
+  } else {
+    keep_771 <- is_lar_young & meta_771$EnvGroup %in% c("FLT", "HGC")
+  }
+  meta_771_sub  <- meta_771[keep_771, ]
+  c771_sub      <- counts_771[, keep_771]
+
+  # Restrict OSD-102 to individual mice (drop pool samples)
+  pool_samples <- grepl("^Pool|^Empty Pool", meta_102$`Source Name`)
+  meta_102_sub <- meta_102[!pool_samples, ]
+  c102_sub     <- counts_102[, !pool_samples]
+
+  # Common Ensembl IDs
+  common <- intersect(rownames(c771_sub), rownames(c102_sub))
+  combined <- cbind(c771_sub[common, ], c102_sub[common, ])
+
+  # Build a unified meta with FLT-vs-GC label and study-as-batch
+  treatment <- c(
+    ifelse(meta_771_sub$EnvGroup == "FLT", "FLT", "GC"),
+    ifelse(grepl("FLT", meta_102_sub$`Factor Value: Spaceflight`), "FLT", "GC")
+  )
+  study <- c(rep("OSD-771", nrow(meta_771_sub)),
+             rep("OSD-102", nrow(meta_102_sub)))
+  meta_combined <- data.frame(sample_id = colnames(combined),
+                               study = study,
+                               treatment = treatment)
+
+  # ComBat-seq: study as batch, treatment as the only biology to preserve.
+  # DO NOT add sex/age/strain to covar_mod -- they are confounded with study
+  # at this restricted slice (both studies female, both 16 weeks).
+  biology <- model.matrix(~ treatment, data = meta_combined)
+  corrected <- ComBat_seq(
+    counts    = as.matrix(combined),
+    batch     = meta_combined$study,
+    group     = NULL,
+    covar_mod = biology
+  )
+
+  list(counts = corrected, meta = meta_combined)
+}
+\end{lstlisting}
+
+\subsection{Validation}
+
+Three checks, plus a fallback path:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Batch effect resolution.} PCA of the post-ComBat-seq matrix on the LAR-Young pool should not separate by study (OSD-771 vs OSD-102). If it does, ComBat-seq has under-corrected --- usually a sign that the residual sub-strain difference is too strong to absorb with study-as-batch alone.
+\item \textbf{Biology preservation.} PCA of the post-ComBat-seq matrix should still separate by treatment (FLT vs GC). If it doesn't, ComBat-seq has over-corrected.
+\item \textbf{Phase~8b re-run.} Phase~8b on the pooled LAR-Young cohort should show a substantially smaller negative network advantage relative to the original RRRM-2-only run --- ideally crossing zero into positive territory --- if the LIONESS-noise hypothesis is correct. If LAR-Young network advantage stays negative even at $n{=}11$ per condition, the LIONESS-noise hypothesis is partially refuted and the residual negative result is more likely a genuine ``network rewiring is redundant with expression'' phenomenon (\S 4 of the audit's diagnosis discussion).
+\end{enumerate}
+
+\textbf{Fallback if either PCA check fails.} If batch effect resolution fails, fall back to a fixed-effects gene-level meta-analysis: compute per-gene effect estimates separately on RRRM-2 LAR-Young and on OSD-102, then combine them with sample-size-weighted Stouffer (or, better, a fixed-effects inverse-variance-weighted average of standardized effects). This is a weaker form of pooling because it operates at the per-gene level rather than the per-mouse network level, and it cannot rebuild a pooled LIONESS network --- so it does not address the Phase~8 noise floor. But it does provide a defensible cross-cohort effect estimate that is robust to count-level batch contamination.
+
+\subsection{Effort and Dependencies}
+
+\textbf{Effort:} 4 person-days. \textbf{Dependencies:} OSD-102 must be downloadable from GeneLab; the metadata harmonization between OSD-102 and OSD-771 (different field names: OSD-102 uses ISA-Tab columns like ``Factor Value: Spaceflight,'' OSD-771 uses RRRM-2 schema with EnvGroup) must be done manually or via an explicit lookup table; the four pool samples in OSD-102 must be excluded.
+
+\clearpage
+
+% ====================================================
+\section{Implementation Roadmap}
+\label{sec:roadmap}
+% ====================================================
+
+\subsection{Dependency Graph}
+
+The fixes have nontrivial dependencies. The recommended ordering, with rationale:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Fix 7 (config drift)} first --- 1 hour, no dependencies, prevents downstream confusion about which parameter values are actually used.
+\item \textbf{Fix 6 (anchor pre-registration)} second --- 1 hour, modifies the gene panel marginally, will rerun Phase~3 once.
+\item \textbf{Fix 1 (Brown's aggregation)} third --- 0.5 days, removes the most numerically broken outputs.
+\item \textbf{Fix 5 (silent-shifter null)} fourth --- 0.5 days, can run in parallel with Fix~1.
+\item \textbf{Fix 2 (hierarchical FDR)} fifth --- 1 day, gates Fix~3 (RESULTS reconciliation, deferred until all docs are regenerated post-fix-batch).
+\item \textbf{Fix 9 (statistic rename)} sixth --- 1 day, can run in parallel with Fix~2.
+\item \textbf{Fix 3 (RESULTS reconciliation)} --- deferred. Per the abstract, all documentation overhauls (README, RESULTS, METHODOLOGY) are batched and regenerated at the end, not interleaved with the inferential fixes. Mark Fix 3 ``deferred to post-fix documentation pass.''
+\item \textbf{Fix 8 (MuSiC sensitivity)} seventh --- 1 day, can run in parallel with the inferential fixes.
+\item \textbf{Fix 4 (external validation)} eighth --- 2 days, requires Fix~2 to fix the hypothesis set.
+\item \textbf{Fix 10 (LIONESS pooling)} ninth --- 1 day, first Tier-2 intervention.
+\item \textbf{Fix 12 (feature engineering)} tenth --- 1.5 days, runs alongside Fix~10.
+\item \textbf{Fix 11 (alternative SSN methods)} eleventh --- 3 days.
+\item \textbf{Fix 13 (continuous targets)} twelfth --- 2 days.
+\item \textbf{Fix 14 (cohort pooling)} thirteenth --- 4 days, the most expensive and most decisive.
+\end{enumerate}
+
+\subsection{Total Effort}
+
+Tier 1: $\approx 7$ person-days (without external-cohort data ingestion delays). Down from the earlier 8-day estimate because the Phase~8 narrative reframe has been removed --- documentation is now batched and regenerated at the end rather than interleaved.
+Tier 2: $\approx 12$ person-days plus cluster time.
+Total: $\approx 19$ person-days for one engineer working full-time on remediation, plus a final 0.5--1 day documentation pass at the end to regenerate \code{README.md}, \code{RESULTS.md}, and \code{METHODOLOGY.md} against the post-fix realized numbers. Roughly 4 calendar weeks at 5 days/week.
+
+\subsection{Minimum-Viable Path to Publication}
+
+If the goal is to reach a publishable manuscript as quickly as possible, the minimum-viable path is Fixes 7, 1, 2, 5, and 4 (in that order). This is roughly 4 person-days plus the OSD-102 (and optionally OSD-513) download and run. Documentation regeneration (the work that the original Fix~2 ``Phase~8 narrative reframe'' and Fix~3 ``RESULTS.md reconciliation'' would have addressed) is deferred to a single batch at the end and is not on this minimum-viable critical path. The result is a manuscript with:
+
+\begin{itemize}[leftmargin=*]
+\item Statistically defensible gene-level FDR claims (hierarchical Benjamini--Bogomolov on the post-Brown's-method aggregation).
+\item Externally validated hypothesis set for the LAR-Young arm (the surviving genes after OSD-102 replication, with OSD-513 as the sex-stratification check).
+\item Correctly silent-shifter-null-calibrated gene categories.
+\item A documentation pass (deferred to the very end) that reflects the post-fix realized numbers and the leakage-safe Phase~8 negative result.
+\end{itemize}
+
+\noindent The remaining Tier-1 fixes (Fix 6 anchor pre-registration, Fix 8 MuSiC sensitivity, Fix 9 permutation rename, Fix 3 RESULTS reconciliation as part of the deferred doc pass) sharpen the manuscript but do not gate publication. The Tier-2 fixes are appropriate for a follow-up study.
+
+\subsection{Risk Register}
+
+Each fix carries a small risk that should be tracked:
+
+\begin{center}
+\small
+\begin{tabular}{p{0.05\textwidth}p{0.45\textwidth}p{0.45\textwidth}}
+\toprule
+\textbf{\#} & \textbf{Risk} & \textbf{Mitigation} \\
+\midrule
+1 & Empirical-Brown over-corrects when edge dependence is weak. & Fall back to label-permutation aggregation if Stouffer and Brown disagree by less than 1\%. \\
+2 & Hierarchical procedure rejects too few; the manuscript ends up with no gene-level hits. & Report both the hierarchical and the unadjusted gene lists; let reviewers see both. \\
+4 & OSD-102 fails to replicate the LAR-Young hits; or OSD-513 reveals all surviving hits are sex-DE. & Plan for both outcomes in advance. The pathway-level findings (translation machinery, PPAR signaling) likely survive even if individual genes do not, and a ``female-specific spaceflight signature'' result is itself publishable. ISS-T-Young hits cannot be validated without a future ISS-T cohort; report as candidates. \\
+6 & Pre-registered anchor list intersection is too small. & Expand \code{anchor\_genes.yaml} from MGI housekeeping and ribosomal lists. \\
+10 & Pooling within Arm reintroduces Age confounding. & The validation step explicitly checks for this; if Age confounding is detected, escalate to Pool-within-Age and document. \\
+11 & All alternative methods produce the same negative result. & This is the informative outcome --- it tells you the per-sample classification problem is intractable at $n{=}5$ and Fix~14 is required. \\
+14 & ComBat-seq under- or over-corrects. & The two PCA validation checks catch both failure modes. If either fails, fall back to a fixed-effects-only meta-analysis at the gene level rather than a pooled per-sample analysis. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ====================================================
+\section{Acceptance Criteria}
+% ====================================================
+
+The remediation is complete when:
+
+\begin{enumerate}[leftmargin=*]
+\item \code{phase6\_regression/} no longer produces \code{p\_stouffer = 0.0} for any gene with median per-edge $|t|<2$.
+\item \code{phase6\_uncertainty/} reports both the existing edge-rewiring permutation $p$-values \emph{and} a hierarchical-Benjamini--Bogomolov-corrected gene list.
+\item \code{phase5\_silent\_shifters\_strict/} reports observed-versus-expected counts under the null per Fix~5.
+\item \code{phase3\_rewiring/anchors.txt} matches the union of pre-registered anchors in \code{config/anchor\_genes.yaml} intersected with the gene panel.
+\item \code{config/hyperparameters.yaml} matches \code{src/} verbatim, verified by \code{tests/test\_config\_consistency.py}.
+\item \code{data/results/external\_replication/OSD-102/replication\_report.tsv} exists and reports the per-gene replication outcomes on OSD-102 for the LAR-Young hypothesis set; \code{data/results/external\_replication/OSD-513/replication\_report.tsv} exists and reports the sex-stratified replication outcomes on OSD-513.
+\item Documentation regeneration pass: \code{README.md}, \code{RESULTS.md}, and \code{METHODOLOGY.md} are regenerated as a single batch after all inferential and Tier-2 fixes have landed, against the post-fix realized run. They reference the post-fix run identifier (replacing \code{run\_20260408\_191759\_2500g}) and frame Phase~8 according to whichever outcome the Tier-2 interventions produce (negative result if they fail, positive result if they succeed).
+\item \code{data/results/deconvolution\_sensitivity/} reports cross-method Spearman correlations for each cell-type proportion.
+\item Optional (Tier 2): \code{data/results/phase8\_pooled\_arm/} reports Phase~8b accuracy under LIONESS pooling within Arm; if positive network advantage emerges, the manuscript adopts this as the new default.
+\end{enumerate}
+
+\noindent At that point the pipeline's inferential layer is publication-defensible, its narrative is consistent with the realized outputs, and the path to a stronger Phase~8 result has been mapped (even if not all Tier~2 interventions have been attempted).
+
+\vspace{1.5em}
+\begin{center}
+\rule{0.4\textwidth}{0.4pt}
+\end{center}
+\vspace{0.5em}
+
+\noindent\textit{This guide is a companion to \code{critique\_report.tex}. It translates the audit's identified weaknesses into concrete file-level remediations with code sketches and validation procedures. All Tier~1 fixes (1--9) are necessary for publication; the Tier~2 fixes (10--14) target the structural cause of the Phase~8 negative result and are appropriate for a follow-up study unless the authors have the engineering bandwidth to land them on the current submission timeline. Documentation overhauls (README, RESULTS, METHODOLOGY) are deliberately deferred to a single regeneration pass at the end rather than interleaved with the technical fixes.}
+
+\end{document}

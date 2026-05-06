@@ -4,7 +4,7 @@ publication_figures.py — Generate all key publication-ready figures.
 
 Figures produced (all saved under <results_dir>/figures/publication/):
   1. rewiring_vs_logfc.png        — 4-panel scatter: rewiring vs |log2FC|, annotated
-  2. focused_perm_rank_*.png      — Per-contrast rank plots with sig genes labeled
+  2. edge_sum_perm_rank.png       — Per-contrast edge-sum rank plots with candidates labeled
   3. pathway_dotplot.png          — OR dot plot across all contrasts × pathways
   4. pathway_barplot.png          — Horizontal bar chart of top pathway hits
   5. age_comparison.png           — ISS-T Young vs ISS-T Old rewiring scatter
@@ -137,13 +137,39 @@ def _load_de(repo_root: Path, contrast_key: str) -> Optional[pd.DataFrame]:
     return pd.read_csv(p, sep="\t")
 
 
-def _load_focused_perm(results_dir: Path, contrast_key: str) -> Optional[pd.DataFrame]:
-    """Load focused permutation results — checks both GC and GND variants."""
+def _load_gene_perm_inference(results_dir: Path, contrast_key: str) -> Optional[pd.DataFrame]:
+    """Load Phase 6 edge-sum/candidate gene inference tables."""
     for suffix in ["GC", "GND"]:
         base = CONTRAST_REWIRING_NAMES.get(contrast_key, "").replace("GC", suffix)
-        p = results_dir / f"phase6_uncertainty/{base}_perm_focused.tsv"
-        if p.exists():
-            return pd.read_csv(p, sep="\t")
+        for fname in [
+            f"{base}_perm_candidate_genes.tsv",
+            f"{base}_perm_edge_sum_pvals.tsv",
+            f"{base}_perm_pvals.tsv",
+        ]:
+            p = results_dir / f"phase6_uncertainty/{fname}"
+            if p.exists():
+                return pd.read_csv(p, sep="\t")
+    return None
+
+
+def _q_col(df: pd.DataFrame) -> Optional[str]:
+    for c in ["q_BH_candidate", "q_BH_edge_sum", "q_BH", "q_BB_two_stage"]:
+        if c in df.columns:
+            return c
+    return None
+
+
+def _p_col(df: pd.DataFrame) -> Optional[str]:
+    for c in ["p_perm_edge_sum", "p_perm"]:
+        if c in df.columns:
+            return c
+    return None
+
+
+def _edge_sum_col(df: pd.DataFrame) -> Optional[str]:
+    for c in ["edge_sum_node_rewiring_obs", "rewiring_abs_obs"]:
+        if c in df.columns:
+            return c
     return None
 
 
@@ -202,11 +228,12 @@ def fig_rewiring_vs_logfc(results_dir: Path, repo_root: Path, out_dir: Path) -> 
 
         ax.scatter(df["absFC"], df["rewiring"], c=colors, alpha=0.35, s=8, rasterized=True)
 
-        # Load focused-perm significant genes for annotation
-        foc = _load_focused_perm(results_dir, ckey)
+        # Load valid gene-level inference for annotation.
+        foc = _load_gene_perm_inference(results_dir, ckey)
         annotated = set()
-        if foc is not None:
-            sig = foc[foc["q_BH_focused"] < 0.05]["gene"]
+        qcol = _q_col(foc) if foc is not None else None
+        if foc is not None and qcol:
+            sig = foc[foc[qcol] < 0.05]["gene"]
             ann_df = df[df["gene"].isin(sig)].sort_values("rewiring", ascending=False)
             ax.scatter(ann_df["absFC"], ann_df["rewiring"],
                        c=PALETTE[ckey], s=60, zorder=5, edgecolors="black", linewidths=0.5)
@@ -244,10 +271,10 @@ def fig_rewiring_vs_logfc(results_dir: Path, repo_root: Path, out_dir: Path) -> 
     _save(fig, out_dir / "rewiring_vs_logfc.png")
 
 
-# ── Figure 2: Focused Permutation Rank Plots ─────────────────────────────
+# ── Figure 2: Edge-Sum Permutation Rank Plots ────────────────────────────
 
 def fig_focused_perm_rank(results_dir: Path, repo_root: Path, out_dir: Path) -> None:
-    """Per-contrast: rank vs rewiring, significant genes labeled."""
+    """Per-contrast: rank vs edge-sum rewiring, significant candidates labeled."""
     e2s, _ = _load_id_map(repo_root)
     contrasts = ["ISS_T_YNG", "ISS_T_OLD", "LAR_YNG", "LAR_OLD"]
 
@@ -256,7 +283,7 @@ def fig_focused_perm_rank(results_dir: Path, repo_root: Path, out_dir: Path) -> 
 
     for ax, ckey in zip(axes, contrasts):
         perm = _load_perm_pvals(results_dir, ckey)
-        foc  = _load_focused_perm(results_dir, ckey)
+        foc  = _load_gene_perm_inference(results_dir, ckey)
 
         if perm is None:
             ax.text(0.5, 0.5, "Permutation data not available",
@@ -264,16 +291,24 @@ def fig_focused_perm_rank(results_dir: Path, repo_root: Path, out_dir: Path) -> 
             ax.set_title(LABEL_MAP[ckey])
             continue
 
-        perm = perm.sort_values("rewiring_abs_obs", ascending=False).reset_index(drop=True)
+        rew_col = _edge_sum_col(perm)
+        if rew_col is None:
+            ax.text(0.5, 0.5, "Edge-sum column not available",
+                    ha="center", va="center", transform=ax.transAxes)
+            ax.set_title(LABEL_MAP[ckey])
+            continue
+
+        perm = perm.sort_values(rew_col, ascending=False).reset_index(drop=True)
         perm["rank"] = perm.index + 1
         perm["sym"]  = perm["gene"].map(e2s).fillna("???")
 
         # Color: significant (FDR<0.05), near-sig (FDR<0.10), rest
         sig_genes  = set()
         near_genes = set()
-        if foc is not None:
-            sig_genes  = set(foc[foc["q_BH_focused"] < 0.05]["gene"])
-            near_genes = set(foc[(foc["q_BH_focused"] >= 0.05) & (foc["q_BH_focused"] < 0.10)]["gene"])
+        qcol = _q_col(foc) if foc is not None else None
+        if foc is not None and qcol:
+            sig_genes  = set(foc[foc[qcol] < 0.05]["gene"])
+            near_genes = set(foc[(foc[qcol] >= 0.05) & (foc[qcol] < 0.10)]["gene"])
 
         color_list = []
         for g in perm["gene"]:
@@ -286,19 +321,14 @@ def fig_focused_perm_rank(results_dir: Path, repo_root: Path, out_dir: Path) -> 
 
         sizes = [60 if g in sig_genes else 25 if g in near_genes else 6 for g in perm["gene"]]
 
-        ax.scatter(perm["rank"], perm["rewiring_abs_obs"],
+        ax.scatter(perm["rank"], perm[rew_col],
                    c=color_list, s=sizes, alpha=0.7, rasterized=True)
-
-        # Dashed line at top-decile boundary
-        decile_boundary = len(perm) * 0.10
-        ax.axvline(decile_boundary, color="gray", linestyle="--", lw=1, alpha=0.7,
-                   label="Top 10% boundary")
 
         # Annotate significant genes
         ann_df = perm[perm["gene"].isin(sig_genes)].head(15)
         for _, row in ann_df.iterrows():
             ax.annotate(row["sym"],
-                        xy=(row["rank"], row["rewiring_abs_obs"]),
+                        xy=(row["rank"], row[rew_col]),
                         xytext=(6, 0), textcoords="offset points",
                         fontsize=7, color="#222222",
                         arrowprops=dict(arrowstyle="-", color="gray", lw=0.5))
@@ -306,7 +336,7 @@ def fig_focused_perm_rank(results_dir: Path, repo_root: Path, out_dir: Path) -> 
         n_sig  = len(sig_genes)
         n_near = len(near_genes)
         ax.set_xlabel("Gene rank (by rewiring magnitude)")
-        ax.set_ylabel("Summed absolute rewiring")
+        ax.set_ylabel("Edge-sum node rewiring")
         ax.set_title(f"{LABEL_MAP[ckey]}\n"
                      f"{n_sig} FDR<0.05 ●  {n_near} FDR<0.10 ●")
 
@@ -318,11 +348,11 @@ def fig_focused_perm_rank(results_dir: Path, repo_root: Path, out_dir: Path) -> 
         ]
         ax.legend(handles=legend_handles, fontsize=7, loc="upper right")
 
-    fig.suptitle("Focused Permutation Test: Gene Rewiring Significance\n"
-                 "(BH correction restricted to top-decile genes; K = 5,000 permutations)",
+    fig.suptitle("Phase 6 Edge-Sum Node-Rewiring Permutation Test\n"
+                 "(full-domain BH, candidate-only BH only when pre-registered)",
                  fontsize=12, y=1.02)
     plt.tight_layout()
-    _save(fig, out_dir / "focused_perm_rank.png")
+    _save(fig, out_dir / "edge_sum_perm_rank.png")
 
 
 # ── Figure 3: Pathway Enrichment Dot Plot ────────────────────────────────
@@ -619,7 +649,7 @@ def fig_pipeline_schematic(out_dir: Path) -> None:
         (5.5, 6.0,  "Phase 2\nNetwork Construction\n(LIONESS + Regression)", "#FAD7A0"),
         (8.0, 6.0,  "Phase 3\nEmbeddings\n(node2vec + Procrustes)",  "#F9E79F"),
         (10.5,6.0,  "Phase 5\nSilent Shifters\n+ Interaction Metrics","#D2B4DE"),
-        (0.5, 3.0,  "Phase 6\nPermutation Testing\n(Focused BH, K=5000)", "#F1948A"),
+        (0.5, 3.0,  "Phase 6\nEdge-Sum Permutation\n+ Candidate/Hierarchical FDR", "#F1948A"),
         (3.5, 3.0,  "Phase 6\nFull Regression\n(n=80, factorial)",   "#F1948A"),
         (6.5, 3.0,  "Phase 7\nPathway Enrichment\n(KEGG/Reactome/Hallmark)", "#ABEBC6"),
         (9.5, 3.0,  "Phase 9\nFigure Generation\n(this output)",     "#D5DBDB"),
@@ -692,19 +722,21 @@ def fig_retinol_subnetwork(results_dir: Path, repo_root: Path, out_dir: Path) ->
     for ckey in ["ISS_T_YNG", "ISS_T_OLD", "LAR_YNG", "LAR_OLD"]:
         rew = _load_rewiring(results_dir, ckey)
         perm = _load_perm_pvals(results_dir, ckey)
-        foc  = _load_focused_perm(results_dir, ckey)
+        foc  = _load_gene_perm_inference(results_dir, ckey)
         if rew is None:
             continue
         rew["sym"] = rew["gene"].map(e2s).fillna("???")
 
-        sig_set  = set(foc["gene"]) if foc is not None and "q_BH_focused" in foc.columns else set()
-        sig05    = set(foc[foc["q_BH_focused"] < 0.05]["gene"]) if foc is not None else set()
-        sig10    = set(foc[foc["q_BH_focused"] < 0.10]["gene"]) if foc is not None else set()
+        qcol = _q_col(foc) if foc is not None else None
+        sig_set  = set(foc["gene"]) if foc is not None and qcol else set()
+        sig05    = set(foc[foc[qcol] < 0.05]["gene"]) if foc is not None and qcol else set()
+        sig10    = set(foc[foc[qcol] < 0.10]["gene"]) if foc is not None and qcol else set()
 
         # p_perm lookup
         p_lookup = {}
         if perm is not None:
-            p_lookup = dict(zip(perm["gene"], perm["p_perm"]))
+            pcol = _p_col(perm)
+            p_lookup = dict(zip(perm["gene"], perm[pcol])) if pcol else {}
 
         for sym in RETINOL_GENES:
             eid = s2e.get(sym.lower())
@@ -804,15 +836,18 @@ def _build_result_tables(results_dir: Path, repo_root: Path, out_dir: Path) -> N
     """Write Table 1 (sig genes) and Table 2 (sig pathways) as TSVs."""
     e2s, _ = _load_id_map(repo_root)
 
-    # Table 1: Focused-perm significant genes
+    # Table 1: valid gene-level edge-sum/candidate candidates
     rows = []
     for ckey in ["ISS_T_YNG", "ISS_T_OLD", "LAR_YNG", "LAR_OLD"]:
-        foc = _load_focused_perm(results_dir, ckey)
+        foc = _load_gene_perm_inference(results_dir, ckey)
         rew = _load_rewiring(results_dir, ckey)
         de  = _load_de(repo_root, ckey)
         if foc is None or rew is None:
             continue
-        sig = foc[foc["q_BH_focused"] < 0.05].copy()
+        qcol = _q_col(foc)
+        if qcol is None:
+            continue
+        sig = foc[foc[qcol] < 0.05].copy()
         if sig.empty:
             continue
         sig["sym"] = sig["gene"].map(e2s).fillna("???")
@@ -820,19 +855,25 @@ def _build_result_tables(results_dir: Path, repo_root: Path, out_dir: Path) -> N
             sig = sig.merge(de[["gene", "log2FC", "FDR"]].rename(
                 columns={"FDR": "DE_FDR"}), on="gene", how="left")
         sig["contrast"]       = LABEL_MAP[ckey]
-        sig["rewiring_rank"]  = sig["rewiring_abs_obs"].rank(ascending=False).astype(int)
+        rew_col = _edge_sum_col(sig)
+        if rew_col:
+            sig["rewiring_rank"] = sig[rew_col].rank(ascending=False).astype(int)
+        pcol = _p_col(sig)
+        sig["q_value"] = sig[qcol]
+        sig["p_value"] = sig[pcol] if pcol else np.nan
+        sig["q_value_source"] = qcol
         rows.append(sig)
 
     if rows:
         t1 = pd.concat(rows, ignore_index=True)
-        cols = ["contrast", "sym", "gene", "rewiring_abs_obs", "rewiring_rank",
-                "p_perm", "q_BH_focused"]
+        cols = ["contrast", "sym", "gene", "edge_sum_node_rewiring_obs", "rewiring_abs_obs",
+                "rewiring_rank", "p_value", "q_value", "q_value_source"]
         if "log2FC" in t1.columns:
             cols += ["log2FC", "DE_FDR"]
         t1 = t1[[c for c in cols if c in t1.columns]]
-        t1 = t1.sort_values(["contrast", "q_BH_focused"])
-        t1.to_csv(out_dir / "table1_significant_genes.tsv", sep="\t", index=False)
-        print(f"  [saved] table1_significant_genes.tsv ({len(t1)} rows)")
+        t1 = t1.sort_values(["contrast", "q_value"])
+        t1.to_csv(out_dir / "table1_edge_sum_candidates.tsv", sep="\t", index=False)
+        print(f"  [saved] table1_edge_sum_candidates.tsv ({len(t1)} rows)")
 
     # Table 2: Significant enrichment pathways
     enr = _build_enrichment_table(results_dir)
@@ -864,7 +905,7 @@ def generate_all_figures(results_dir: Path, repo_root: Path) -> None:
     except Exception as e:
         print(f"    [ERROR] {e}")
 
-    print("\n  [2/8] Focused permutation rank plots...")
+    print("\n  [2/8] Edge-sum permutation rank plots...")
     try:
         fig_focused_perm_rank(results_dir, repo_root, out_dir)
     except Exception as e:

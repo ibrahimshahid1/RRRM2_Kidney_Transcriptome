@@ -22,10 +22,12 @@ import argparse
 import re
 from pathlib import Path
 
-from src.common import REPO_ROOT
+from src.common import REPO_ROOT, load_anchor_config, resolve_configured_genes
 import numpy as np
 import pandas as pd
 from sklearn.covariance import LedoitWolf
+
+DEFAULT_TOPK = 80
 
 
 def load_rtech(path: str) -> pd.DataFrame:
@@ -49,6 +51,56 @@ def load_biotype_map(id_map_path: str) -> pd.DataFrame:
         if c not in df.columns:
             raise ValueError(f"id_map.tsv missing required column: {c}")
     return df[cols].copy()
+
+
+def configured_anchor_ids(
+    anchor_config: str | Path,
+    id_map: str | Path,
+    expression_genes: set[str],
+    min_anchors: int | None = None,
+    warn_threshold: int | None = None,
+) -> tuple[list[str], pd.DataFrame]:
+    """Resolve configured anchor symbols to Ensembl IDs present in expression."""
+    cfg, records = load_anchor_config(anchor_config)
+    symbols = [r["symbol"] for r in records]
+    resolved = resolve_configured_genes(symbols, id_map, panel_genes=expression_genes)
+
+    # Attach YAML group/role metadata for auditability.
+    rec_df = pd.DataFrame(records).rename(columns={"symbol": "query"})
+    if not resolved.empty:
+        resolved = resolved.merge(rec_df, on="query", how="left")
+    else:
+        resolved = rec_df.assign(
+            query_type="symbol",
+            symbol=rec_df["query"],
+            ensembl_gene_id="",
+            status="unmapped",
+            in_panel=False,
+        )
+
+    validation = cfg.get("validation", {}) if isinstance(cfg, dict) else {}
+    min_anchors = int(min_anchors if min_anchors is not None else validation.get("minimum_anchors", 20))
+    warn_threshold = int(warn_threshold if warn_threshold is not None else validation.get("warn_threshold", 50))
+
+    mapped_present = resolved[
+        (resolved["status"] == "mapped") &
+        (resolved["ensembl_gene_id"] != "") &
+        (resolved["in_panel"] == True)
+    ]["ensembl_gene_id"].drop_duplicates().tolist()
+
+    if len(mapped_present) < min_anchors:
+        missing = resolved[resolved["in_panel"] != True][["query", "status", "ensembl_gene_id"]].head(20)
+        raise RuntimeError(
+            f"Only {len(mapped_present)} configured anchors are present in the expression universe; "
+            f"minimum_anchors={min_anchors}. First missing/unavailable anchors:\n"
+            f"{missing.to_string(index=False)}"
+        )
+    if len(mapped_present) < warn_threshold:
+        print(
+            f"  WARNING: {len(mapped_present)} configured anchors are present; "
+            f"warn_threshold={warn_threshold}. Alignment may be fragile."
+        )
+    return mapped_present, resolved
 
 
 # Regex patterns for noise genes to exclude regardless of biotype
@@ -247,7 +299,7 @@ def main():
                     help="Maximum genes for skeleton")
     ap.add_argument("--cell_cols", default="Age,Arm,EnvGroup",
                     help="Comma-separated columns defining experimental cells")
-    ap.add_argument("--topk", type=int, default=80,
+    ap.add_argument("--topk", type=int, default=DEFAULT_TOPK,
                     help="Top-k neighbors per gene (~G*k edges)")
     ap.add_argument("--force_include", default="",
                     help="Path to gene list file (one gene per line) to force-include")
@@ -260,6 +312,12 @@ def main():
                          "Set to 'none' to disable. Default: protein_coding")
     ap.add_argument("--no_noise_symbol_filter", action="store_true",
                     help="Disable filtering of Gm-prefix / Rik / unmapped symbols")
+    ap.add_argument("--anchor_config", default=str(REPO_ROOT / "config/anchor_genes.yaml"),
+                    help="Configured Procrustes anchor YAML. Mapped anchors are force-included.")
+    ap.add_argument("--no_anchor_force_include", action="store_true",
+                    help="Disable configured-anchor force inclusion (not recommended; for diagnostics only)")
+    ap.add_argument("--anchor_report", default="anchor_force_include_report.tsv",
+                    help="Filename under outdir for configured-anchor mapping report")
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
@@ -295,13 +353,13 @@ def main():
     print(f"  Aligned: {len(common)} samples")
 
     # Gene selection
-    force_include = None
+    force_include = []
     if args.force_include and Path(args.force_include).exists():
-        force_include = [
+        force_include.extend([
             line.strip() for line in
             Path(args.force_include).read_text().strip().split("\n")
             if line.strip()
-        ]
+        ])
         print(f"\nLoaded {len(force_include)} force-include genes from {args.force_include}")
 
     # Load biotype annotations if filtering is enabled
@@ -319,6 +377,31 @@ def main():
         else:
             print(f"\n  WARNING: id_map not found at {id_map_path}, "
                   f"skipping biotype filter. Run build_id_map.py first.")
+
+    if not args.no_anchor_force_include:
+        anchor_config = Path(args.anchor_config)
+        if not anchor_config.is_absolute():
+            anchor_config = REPO_ROOT / anchor_config
+        id_map_for_anchors = Path(args.id_map)
+        if not id_map_for_anchors.is_absolute():
+            id_map_for_anchors = REPO_ROOT / id_map_for_anchors
+        print(f"\nConfigured-anchor force include: {anchor_config}")
+        anchor_ids, anchor_report = configured_anchor_ids(
+            anchor_config=anchor_config,
+            id_map=id_map_for_anchors,
+            expression_genes=set(rtech.index),
+        )
+        force_include.extend(anchor_ids)
+        report_path = outdir / args.anchor_report
+        anchor_report.to_csv(report_path, sep="\t", index=False)
+        print(f"  Mapped anchors present in expression universe: {len(anchor_ids)}")
+        print(f"  Anchor mapping report: {report_path}")
+
+    force_include = sorted(set(force_include))
+    if force_include:
+        print(f"  Total force-include genes after DCT/anchor merge: {len(force_include)}")
+    else:
+        force_include = None
 
     genes = pick_genes(
         rtech,

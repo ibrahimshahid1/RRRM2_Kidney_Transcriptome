@@ -1,0 +1,5 @@
+analysis	study	hypothesis_type	feature	expected_direction	discovery_effect	q_threshold	claim_boundary
+lar_young	OSD-102	pathway	PPAR_signaling	positive_edge_sum_enrichment	1.0	0.10	primary pathway-level replication only
+lar_young	OSD-102	pathway	translation_machinery	positive_edge_sum_enrichment	1.0	0.10	primary pathway-level replication only
+sex_robustness	OSD-513	pathway	PPAR_signaling	same_direction_as_OSD102_or_RRRM2	1.0	0.10	secondary sex-robustness check only
+sex_robustness	OSD-513	pathway	translation_machinery	same_direction_as_OSD102_or_RRRM2	1.0	0.10	secondary sex-robustness check only
