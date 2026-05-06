@@ -1,0 +1,369 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\usepackage{microtype}
+
+\title{Repository and Statistical Rigor Audit\\\large RRRM2\_Kidney\_Transcriptome}
+\author{Static audit prepared for Ibrahim Shahid}
+\date{April 24, 2026}
+
+\begin{document}
+\maketitle
+
+\section*{Executive Summary}
+
+This repository is a serious and unusually ambitious analysis pipeline for the NASA RRRM-2 kidney transcriptome data set.  Its central scientific goal is to detect age- and arm-dependent transcriptomic network rewiring in mouse kidney after spaceflight, especially genes whose network context changes even when their marginal differential expression is small.  The repository is organized around a full factorial Age $\times$ Arm $\times$ Environment design, shared-topology network construction, LIONESS-style sample-specific edges, edge-wise regression, node2vec graph embeddings, Procrustes alignment, silent-shifter detection, enrichment analysis, and leakage-safe predictive validation.
+
+The strongest aspects of the repository are: (i) the explicit full factorial design, (ii) the attempt to avoid Simpson's paradox by selecting topology after within-cell standardization, (iii) careful sample-order alignment checks, (iv) use of shrinkage covariance for high-dimensional network estimation, (v) multi-seed node2vec runs, (vi) explicit attempts at permutation, bootstrap, and cross-validation, and (vii) clear recognition that validation must avoid data leakage.
+
+The weakest aspects are: (i) the biological claims may currently be stronger than the statistical support warrants, (ii) LIONESS and node2vec introduce substantial uncertainty that is only partially propagated, (iii) the permutation/bootstrap module tests a node-strength proxy rather than the same node2vec/Procrustes rewiring statistic used for the headline results, (iv) several silent-shifter outputs appear to be rewiring-only because differential-expression and support columns are blank in at least one committed table, (v) the number of hypotheses is large relative to $n=5$ per cell, and (vi) some reported gene-level significance procedures combine dependent edge p-values in ways that are useful for screening but not yet fully rigorous for final inference.
+
+Overall: this is a strong exploratory systems-biology pipeline, but it should be framed as discovery-oriented unless the key claims are supported by stricter resampling, preregistered candidate sets, external validation, or orthogonal biological evidence.  The most defensible claims are about reproducible computational patterns and candidate pathways, not definitive causal mechanisms.
+
+\section{Audit Scope and Limitations}
+
+This audit was performed by static inspection of the repository files exposed through the GitHub connector.  The pipeline was not re-run because the external NASA GeneLab count files and Tabula Muris Senis single-cell reference files are not included in the repository, and the execution environment available for this audit could not clone GitHub directly.  Therefore, this report evaluates the repository structure, code design, statistical logic, and committed outputs that were visible through repository search and file reads.  It does not independently verify numerical reproducibility of the final figures.
+
+The most important inspected files include:
+\begin{itemize}[leftmargin=1.5em]
+    \item \texttt{README.md}
+    \item \texttt{config/metadata\_design.yaml}
+    \item \texttt{config/hyperparameters.yaml}
+    \item \texttt{src/preprocessing/deconvolution.R}
+    \item \texttt{src/preprocessing/residualization.R}
+    \item \texttt{src/networks/shared\_topology.py}
+    \item \texttt{src/networks/lioness.py}
+    \item \texttt{src/networks/edge\_regression.py}
+    \item \texttt{src/networks/embeddings.py}
+    \item \texttt{src/networks/procrustes.py}
+    \item \texttt{src/statistics/differential\_expression.R}
+    \item \texttt{src/statistics/silent\_shifters.py}
+    \item \texttt{src/statistics/permutation\_bootstrap.py}
+    \item \texttt{src/statistics/full\_regression.py}
+    \item \texttt{src/enrichment/biological\_grounding.py}
+    \item \texttt{src/validation/cross\_validation.py}
+    \item selected committed result summaries and silent-shifter tables.
+\end{itemize}
+
+\section{Repository Structure}
+
+The repository has a modular scientific-computing layout.  It is not just a notebook-style analysis.  The important layers are:
+
+\begin{longtable}{p{0.24\linewidth} p{0.68\linewidth}}
+\toprule
+\textbf{Path} & \textbf{Role} \\
+\midrule
+\texttt{config/} & Stores the formal experimental design, hyperparameters, anchor genes, and curated gene sets.  This is good practice because statistical assumptions are separated from implementation. \\
+\texttt{src/preprocessing/} & Handles metadata alignment, count export, cell-type deconvolution, VST/SVA/residualization, and sanity checks. \\
+\texttt{src/networks/} & Core network machinery: shared skeleton construction, LIONESS sample-specific edges, edge regression, node2vec embeddings, and Procrustes rewiring. \\
+\texttt{src/statistics/} & Downstream inferential logic: silent shifter definition, permutation/bootstrap uncertainty, full regression, interaction metrics, and differential expression. \\
+\texttt{src/enrichment/} & Gene-set loading and pathway/biological grounding. \\
+\texttt{src/validation/} & Cross-validation and sample-level feature extraction. \\
+\texttt{src/visualization/} & Publication plots, network diagnostics, and figure generation. \\
+\texttt{data/results/} and \texttt{src/data/results/} & Versioned or intermediate output directories.  Some result outputs are committed, including figure summaries and silent-shifter tables. \\
+\texttt{scripts/} & Utility scripts, plotting scripts, and run-comparison helpers. \\
+\bottomrule
+\end{longtable}
+
+The repository is conceptually organized as a multi-phase pipeline:
+
+\begin{enumerate}[leftmargin=1.5em]
+    \item Download and align bulk RNA-seq data and metadata.
+    \item Deconvolve tissue composition using a single-cell kidney reference.
+    \item Residualize expression for technical and compositional covariates.
+    \item Select genes and build a shared network topology using within-cell standardization.
+    \item Compute LIONESS-style sample-specific edge weights.
+    \item Fit edge-wise regression models and generate predicted contrast networks.
+    \item Embed condition-specific networks using node2vec.
+    \item Align embeddings with Procrustes rotation and compute gene-level rewiring.
+    \item Identify silent shifters by high rewiring and low marginal differential expression.
+    \item Perform uncertainty testing, biological enrichment, and predictive validation.
+\end{enumerate}
+
+\section{Scientific Design}
+
+\subsection{Experimental Design}
+
+The design file correctly treats the data as a full factorial structure:
+\[
+\text{Age} \times \text{Arm} \times \text{EnvironmentGroup}
+= 2 \times 2 \times 4,
+\]
+with a nominal total of 80 mice and 5 mice per Age $\times$ Arm $\times$ EnvironmentGroup cell.  This is exactly the right starting point.  The design file also explicitly warns that euthanasia location is not an independent factor because it is confounded with Arm $\times$ Group.  That warning is scientifically important and should stay in the manuscript/reporting.
+
+The repository also distinguishes a four-bin legacy view from the primary factorial design.  That is a major strength.  Pooling across arms can obscure recovery/persistence effects and confound terminal ISS dissection with live animal return.  The primary analysis should continue using the full factorial design, with any four-bin analysis clearly labeled as secondary.
+
+\subsection{Scientific Hypothesis}
+
+The central hypothesis is that spaceflight causes network-context changes in kidney genes, and that these changes differ by age and by arm.  This is a reasonable systems-biology hypothesis because marginal differential expression can miss coordinated covariance rewiring.  The ``silent shifter'' framing is compelling, but it is also statistically fragile: a gene can appear silent because the marginal DE test is underpowered, not because it is truly unchanged.  Therefore, ``silent'' should be interpreted as ``not detectably DE under this data set and model,'' not ``biologically unchanged in expression.''
+
+\section{Preprocessing and Deconvolution}
+
+The preprocessing design is strong in principle.  The README describes VST normalization, MuSiC deconvolution with a Tabula Muris Senis kidney reference, CLR-transformed cell proportions, SVA, and residual matrices \texttt{Rtech} and \texttt{Rall}.  This addresses the biggest biological problem in bulk kidney RNA-seq: changes in nephron segment or immune/stromal composition can masquerade as gene regulation.
+
+Key strengths:
+\begin{itemize}[leftmargin=1.5em]
+    \item Explicit alignment between metadata and count columns.
+    \item Attempted deconvolution of nephron segments and non-epithelial compartments.
+    \item Use of CLR-like compositional handling, which is more appropriate than raw proportions.
+    \item Recognition that biology-preserved residuals and fully residualized residuals have different roles.
+\end{itemize}
+
+Key concerns:
+\begin{itemize}[leftmargin=1.5em]
+    \item Cell-type deconvolution can be unstable when the reference atlas differs in age, platform, dissociation bias, sex, or kidney region.  The downstream network results may depend strongly on this step.
+    \item If SVA is run without careful model protection, surrogate variables can accidentally remove biological signal.  The report/manuscript should state exactly which variables were protected in SVA.
+    \item Residualizing cell proportions before network analysis changes the biological estimand.  It asks about rewiring beyond composition, not total tissue-level rewiring.  Both are scientifically valid, but they are different claims.
+\end{itemize}
+
+\section{Network Construction}
+
+\subsection{Shared Topology}
+
+The shared-topology approach is one of the strongest parts of the repository.  The code selects a fixed skeleton from a cell-standardized expression matrix and uses Ledoit--Wolf shrinkage before converting the precision matrix to partial correlations.  Within-cell standardization before pooling is a thoughtful defense against Simpson's paradox: if two groups differ in mean expression, naive pooled correlation can invent edges that are really group separation artifacts.
+
+The gene-selection function also filters ERCC spike-ins, supports protein-coding filtering, excludes common low-confidence/noisy symbols, and force-includes important pathway genes.  That is practical and scientifically sensible.
+
+However, there are still important limitations:
+\begin{itemize}[leftmargin=1.5em]
+    \item The skeleton is selected using all samples in the primary pipeline.  That is acceptable for unsupervised discovery, but not for predictive validation.  The validation code correctly rebuilds the skeleton inside each training fold.
+    \item Top-$k$ edge selection imposes near-uniform degree pressure.  This improves comparability but can hide true hub structure and create forced edges for weakly connected genes.
+    \item The number of edges is very large relative to 80 samples.  Shrinkage helps, but edge-level inference remains high-dimensional.
+    \item Partial correlation estimates from 2,500 genes and 80 samples are still model-based approximations, not direct measurements.
+\end{itemize}
+
+\subsection{LIONESS Edge Weights}
+
+The LIONESS implementation is careful about sample order, clipping correlations before Fisher transformation, and capping pathological z-values.  It computes pooled and leave-one-out correlations on the fixed skeleton and stores the sample order for downstream regression.  These are good engineering choices.
+
+A major conceptual issue is that the code applies the LIONESS formula in Fisher-z space.  That may be numerically convenient for regression, but the original LIONESS identity is defined for linear network reconstruction functions.  Fisher transformation is nonlinear, so LIONESS-in-z-space is not exactly equivalent to LIONESS-on-correlation followed by z-transform.  This does not invalidate the method, but it should be described as a stabilized LIONESS-style score rather than a literal unbiased sample-specific correlation estimator.
+
+Another concern is that leave-one-out correlations with $N=80$ are stable enough globally, but within-stratum biological contrasts later depend on small group sizes.  Sample-specific edges are noisy, especially when a gene has low variance after residualization.
+
+\section{Edge Regression}
+
+The edge regression module is strong in several ways.  It aligns metadata to \texttt{lioness\_samples.txt}, normalizes factor labels, constructs a cell-means model, uses limma empirical Bayes moderation, and defines biologically meaningful contrasts.  The optional control pooling mode, comparing FLT to the average of GC, VIV, and BSL, is useful for power and for defining a broader non-flight reference.
+
+Strengths:
+\begin{itemize}[leftmargin=1.5em]
+    \item Cell-means modeling avoids fragile interpretation of multiple interaction coefficients.
+    \item The design matrix is generated in R and checked for coefficient names.
+    \item Contrast definitions are saved to JSON for reproducibility.
+    \item Limma empirical Bayes is an appropriate choice for many parallel edge-wise models.
+\end{itemize}
+
+Concerns:
+\begin{itemize}[leftmargin=1.5em]
+    \item Edges are not independent.  Limma handles many features but does not make the dependency between incident edges disappear.
+    \item If technical covariates are collinear with Arm, Age, or EnvironmentGroup, the cell-means model plus covariates can become difficult to interpret.
+    \item The edge-wise model may be statistically stronger than the downstream embedding inference, because node2vec/Procrustes adds another non-linear transformation that is not included in edge-level p-values.
+\end{itemize}
+
+\section{Embeddings and Procrustes Rewiring}
+
+The repository uses PecanPy/node2vec on condition-specific predicted networks, with weights defined as $|\tanh(z)|$.  Multiple seeds are run and embedding stability is summarized.  Procrustes alignment then rotates control embeddings toward flight embeddings using anchor genes, and gene-level rewiring is computed as cosine distance.
+
+This is innovative and useful for hypothesis generation.  It converts thousands of edge changes into a gene-level network-context phenotype.
+
+The biggest statistical caveats are:
+\begin{itemize}[leftmargin=1.5em]
+    \item node2vec embeddings are stochastic and non-identifiable up to rotations and other transformations.  Multi-seed averaging helps, but uncertainty is not fully propagated into final p-values.
+    \item The Procrustes anchor selection is currently based on low median rewiring from available rewiring tables.  This is pragmatic but potentially circular: anchors are chosen using the same type of output they help stabilize.
+    \item Using $|\tanh(z)|$ discards edge sign.  This may be defensible if the goal is interaction strength, but it loses the distinction between activation-like and repression-like coexpression changes.
+    \item Cosine distance in embedding space is sensitive to node2vec hyperparameters, graph sparsity, and anchor choice.
+\end{itemize}
+
+For publication-grade rigor, the repository should include sensitivity analyses over: top-$k$, gene panel size, signed vs absolute edges, anchor set definitions, node2vec $p/q$, number of seeds, and control definition (GC-only vs pooled controls).
+
+\section{Silent Shifter Analysis}
+
+The silent-shifter definition is:
+\[
+\text{high rewiring} \cap |\log_2 FC| < 0.3 \cap \text{DE FDR} > 0.2.
+\]
+This is a strong and interpretable operational definition.  It is also conservative with respect to marginal expression magnitude.
+
+However, at least one committed silent-shifter table appears to have blank \texttt{logFC}, \texttt{FDR}, \texttt{q\_BH}, and \texttt{supported} columns, with \texttt{low\_DE=True} for all rows.  That means the table was likely generated in rewiring-only mode, not true strict silent-shifter mode with DE and permutation/regression support.  This is a major issue for scientific interpretation.  Such rows should not be described as confirmed silent shifters.  They should be labeled as ``high-rewiring candidates pending DE/support integration.''
+
+Recommended fix:
+\begin{enumerate}[leftmargin=1.5em]
+    \item Require \texttt{--gene\_de} for any output file named \texttt{silent\_shifters}.
+    \item If DE is absent, write \texttt{high\_rewiring\_candidates.tsv} instead.
+    \item Fail loudly if support columns are requested but unavailable.
+    \item Add a summary JSON recording whether DE and support evidence were actually merged.
+\end{enumerate}
+
+\section{Differential Expression}
+
+The DESeq2 script is appropriate in broad structure: it uses raw counts, aligns metadata, constructs a cell factor, filters by CPM, disables outlier replacement for small $n$, and extracts FLT vs GC contrasts within Age $\times$ Arm strata.  Optional \texttt{ashr} shrinkage is a good addition.
+
+Concerns:
+\begin{itemize}[leftmargin=1.5em]
+    \item The code comments mention GC/HGC labels in different places.  The pipeline should standardize whether the hardware ground control is called \texttt{GC}, \texttt{HGC}, or both.
+    \item DESeq2 with $n=5$ per cell is valid but underpowered for subtle effects.  A gene with FDR $>0.2$ is not proof of no expression change.
+    \item Silent-shifter status depends on DE power.  The manuscript should avoid implying that low-DE genes are truly expression-invariant.
+\end{itemize}
+
+\section{Uncertainty Estimation}
+
+The permutation/bootstrap module is thoughtful and explicitly acknowledges the combinatorial limits of small group sizes.  It can pool controls, run focused permutation on top-decile genes, and test pathway-level statistics.  This is a strong addition.
+
+The main limitation is that it avoids rerunning node2vec by using an edge-space proxy: sum of absolute incident edge deltas.  That proxy is useful, but it is not the same statistic as Procrustes cosine rewiring.  Therefore, p-values from this module should not be presented as direct p-values for node2vec/Procrustes rewiring unless validated empirically.
+
+A stronger version would use a two-tier strategy:
+\begin{itemize}[leftmargin=1.5em]
+    \item Fast edge-space permutations for screening.
+    \item Full graph rebuild + node2vec + Procrustes permutations for a small preregistered candidate set or pathway set.
+\end{itemize}
+
+\section{Full Regression and Gene-Level Inference}
+
+The full regression script fits a $2 \times 2 \times 2$ model on FLT vs GC samples and aggregates edge-level p-values to genes using Stouffer's method.  This is a reasonable screening strategy, but it has limitations.
+
+Strengths:
+\begin{itemize}[leftmargin=1.5em]
+    \item It uses all FLT/GC samples rather than separate tiny tests when estimating main and interaction effects.
+    \item It reports flight, Age $\times$ Flight, Arm $\times$ Flight, and three-way effects.
+    \item It records number of incident edges per gene and median beta/t statistics.
+\end{itemize}
+
+Concerns:
+\begin{itemize}[leftmargin=1.5em]
+    \item Stouffer combination assumes p-values are not too strongly dependent.  Incident edges around the same gene are highly dependent.
+    \item High-degree genes automatically contribute many p-values, which can inflate apparent evidence unless degree is handled carefully.
+    \item A gene-level p-value from combined incident edges should be interpreted as a network-screening statistic, not a classical gene-level hypothesis test.
+\end{itemize}
+
+Potential improvement: use degree-preserving permutation, competitive nulls by degree bin, or empirical gene-level null distributions that preserve the edge dependency structure.
+
+\section{Biological Grounding and Enrichment}
+
+The enrichment module tests whether high-rewiring genes are enriched in curated or database gene sets using Fisher's exact test and BH correction.  It also handles Ensembl-to-symbol mapping, which is essential for mouse data.
+
+Strengths:
+\begin{itemize}[leftmargin=1.5em]
+    \item Explicit mapping checks reduce the risk of zero-overlap ID failures.
+    \item Gene universe expansion using DE results is a good idea if used consistently.
+    \item Curated gene sets provide a sanity check against known kidney and spaceflight pathways.
+\end{itemize}
+
+Concerns:
+\begin{itemize}[leftmargin=1.5em]
+    \item Fisher's exact test on top-decile genes is sensitive to the chosen cutoff.
+    \item Standard gene-set tests do not account for gene-gene network dependency.
+    \item If the gene universe is only the selected network panel, enrichment results answer a panel-conditioned question, not a whole-transcriptome question.
+\end{itemize}
+
+Recommended improvement: report both panel-conditioned and all-expressed-gene universes, and add rank-based enrichment using continuous rewiring scores rather than only top-decile thresholding.
+
+\section{Predictive Validation}
+
+The validation module is one of the most commendable parts of the repository.  It explicitly rebuilds the skeleton inside each training fold and computes test-sample features relative to the training pool.  This is the correct mindset for avoiding leakage.
+
+Strengths:
+\begin{itemize}[leftmargin=1.5em]
+    \item Train-fold skeleton construction.
+    \item Train-fitted PCA and scaler applied to test fold.
+    \item Stratification by Age $\times$ Arm.
+    \item Use of both logistic regression and random forest.
+\end{itemize}
+
+Concerns:
+\begin{itemize}[leftmargin=1.5em]
+    \item The code says stratified by Age $\times$ Arm, but the target is FLT vs GC.  It should ensure each fold preserves both Age $\times$ Arm and class balance.  Stratifying only on Age $\times$ Arm can still yield uneven FLT/GC splits within folds.
+    \item The test-sample LIONESS computation augments the training pool with one test sample.  This is defensible for constructing that sample's own network, but it should be described carefully.
+    \item With only FLT/GC samples, effective $n$ is small.  AUC estimates will have wide uncertainty.
+\end{itemize}
+
+Recommended improvement: use grouped repeated cross-validation or nested bootstrap confidence intervals around AUC, and compare against simpler baselines such as DE/PCA-only classifiers.
+
+\section{Committed Results and Interpretive Caution}
+
+A committed figure summary for one run reports 23 plots and 20 tables spanning deconvolution, rewiring, silent shifters, uncertainty, and regression.  That indicates the pipeline has been executed through most major stages.
+
+However, the available silent-shifter table inspected during this audit contains blank DE and support fields.  This is the single most important interpretive red flag.  If those outputs were used for a poster/manuscript, the wording should be revised from ``silent shifters'' to ``high-rewiring candidates'' unless DE and support evidence were merged from the appropriate files.
+
+\section{What the Repository Does Correctly}
+
+\begin{enumerate}[leftmargin=1.5em]
+    \item Treats the experiment as a factorial design rather than collapsing too early.
+    \item Explicitly acknowledges confounding of euthanasia location.
+    \item Uses residualization and deconvolution to address tissue-composition confounding.
+    \item Builds a shared topology to avoid comparing unrelated graphs.
+    \item Uses within-cell standardization before topology selection.
+    \item Uses shrinkage covariance for high-dimensional network construction.
+    \item Preserves sample order for LIONESS and regression alignment.
+    \item Uses limma empirical Bayes for many edge-wise models.
+    \item Uses multi-seed graph embeddings rather than relying on one stochastic embedding.
+    \item Includes uncertainty, enrichment, visualization, and validation modules.
+    \item Recognizes leakage risk and implements fold-wise validation machinery.
+    \item Separates configuration from implementation, making the pipeline auditable.
+\end{enumerate}
+
+\section{Main Problems to Fix}
+
+\begin{longtable}{p{0.08\linewidth} p{0.36\linewidth} p{0.44\linewidth}}
+\toprule
+\textbf{Severity} & \textbf{Issue} & \textbf{Recommended Fix} \\
+\midrule
+High & Silent-shifter outputs can be generated without DE/support evidence. & Rename rewiring-only outputs; require DE for strict silent shifters; add metadata flags to output files. \\
+High & Procrustes/node2vec rewiring p-values are not directly generated by full statistic permutation. & Run full-statistic permutation for candidate genes/pathways; use edge-space proxy only as screening. \\
+High & Edge/gene tests face massive multiple testing with small $n$. & Use preregistered candidate sets, pathway-level primary endpoints, and empirical nulls. \\
+Medium & Anchor gene selection may be circular. & Define anchors from external housekeeping/stability evidence or train-only/fold-only procedures. \\
+Medium & Edge sign is discarded in embeddings. & Add signed-edge sensitivity: positive, negative, absolute, and signed multiplex embeddings. \\
+Medium & GC/HGC label consistency needs tightening. & Standardize labels globally and document mapping from original metadata. \\
+Medium & Stouffer gene-level p-values ignore edge dependence. & Use degree-preserving empirical nulls or report as screening scores only. \\
+Medium & Enrichment depends on top-decile cutoff. & Add rank-based enrichment and cutoff sensitivity. \\
+Low & Results directories appear split between \texttt{data/results} and \texttt{src/data/results}. & Consolidate outputs under one canonical results root. \\
+Low & No visible automated tests from inspected files. & Add unit tests for label normalization, sample alignment, contrast construction, and no-leakage CV. \\
+\bottomrule
+\end{longtable}
+
+\section{Recommended Future Research Directions}
+
+\subsection{Novel but Practical Directions}
+
+\begin{enumerate}[leftmargin=1.5em]
+    \item \textbf{Full-statistic candidate permutation.}  For the top 50--200 candidate genes, rerun the entire statistic under label permutations: topology, LIONESS, edge regression, node2vec, Procrustes, and cosine rewiring.  This would directly validate the headline statistic.
+
+    \item \textbf{Signed multiplex rewiring.}  Build separate positive-edge and negative-edge embeddings, then quantify whether genes shift through gain of positive coexpression, loss of positive coexpression, gain of anti-correlation, or loss of anti-correlation.  This would add biological interpretability.
+
+    \item \textbf{Degree-matched rewiring nulls.}  Compare each gene's rewiring to genes with similar degree, expression level, and variance.  This would reduce false positives driven by graph topology.
+
+    \item \textbf{Cell-composition bifurcation analysis.}  Run parallel pipelines on tissue-level expression and composition-residualized expression.  Genes that rewire only before residualization may be composition-mediated; genes that remain after residualization are stronger cell-intrinsic candidates.
+
+    \item \textbf{Pathway-level primary endpoint.}  Make pathway rewiring the primary inferential unit.  This is more statistically realistic than gene-level claims with thousands of hypotheses and small cell sizes.
+
+    \item \textbf{Age-resilience index.}  Define a scalar index comparing Young vs Old flight effects across ISS-T and LAR arms, with bootstrap confidence intervals.  This could quantify recovery/persistence rather than just listing genes.
+
+    \item \textbf{Graph perturbation stability.}  Perturb the skeleton by resampling genes, changing top-$k$, and adding/removing weak edges.  Candidate genes that remain high-rewiring across perturbations are more credible.
+
+    \item \textbf{External validation through orthogonal tissues or missions.}  Apply the same pipeline to other GeneLab kidney, liver, retina, or immune data sets to test whether the same pathways show network rewiring under spaceflight.
+
+    \item \textbf{Mechanistic prioritization score.}  Combine rewiring, DE, pathway membership, cell-type specificity, known kidney biology, and recovery/persistence into one transparent candidate-ranking score.
+
+    \item \textbf{Causal graph sensitivity.}  Use covariate-adjusted graphical models or invariant causal prediction ideas to test whether specific network relationships persist across controls but break under flight.
+\end{enumerate}
+
+\section{Bottom-Line Assessment}
+
+This repository is scientifically creative and much more rigorous than a typical high-school or undergraduate bioinformatics project.  It shows real understanding of factorial design, leakage, composition confounding, shrinkage, high-dimensional inference, graph embeddings, and validation.  The project is strong enough to support a serious exploratory systems-biology poster or methods-focused manuscript.
+
+The main thing to fix is not ambition; it is claim calibration.  The pipeline can generate impressive candidate lists, but the final language should distinguish:
+\begin{itemize}[leftmargin=1.5em]
+    \item high-rewiring candidates,
+    \item strict silent shifters with DE evidence,
+    \item statistically supported candidates with permutation/regression evidence,
+    \item pathway-level findings,
+    \item and biologically validated mechanisms.
+\end{itemize}
+
+If the repository adds direct full-statistic validation for a small candidate set, signed-edge sensitivity, degree-matched empirical nulls, and stricter output labeling, the scientific rigor would increase substantially.  The core architecture is strong; the next step is to make the inferential claims match the strongest validated layer of the pipeline.
+
+\end{document}
