@@ -526,6 +526,67 @@ def phase_6(dry_run: bool = False, skip_r: bool = False,
     return True
 
 
+def phase_wgcna(dry_run: bool = False, max_genes: int = 5000, n_pres_perms: int = 200) -> bool:
+    """WGCNA Module Analysis (replaces LIONESS phases 2/3/5/6/7 when --network-method wgcna)"""
+    log("WGCNA: Module Discovery + Trait Association + Preservation")
+
+    results_dir = os.environ.get("RRRM_RESULTS_DIR")
+    rtech_path = find_artifact("phase1_residuals/Rtech.tsv.gz")
+    meta_path = find_artifact("phase1_residuals/meta_phase1.tsv.gz")
+
+    if rtech_path is None or meta_path is None:
+        log("Phase 1 outputs not found; cannot run WGCNA", "WARN")
+        return False
+
+    id_map = REPO_ROOT / "data/processed/resources/id_map.tsv"
+    gene_sets = REPO_ROOT / "config/gene_sets.yaml"
+
+    wgcna_args = [
+        f"--rtech={rtech_path}",
+        f"--meta={meta_path}",
+        f"--outdir={results_dir}/wgcna",
+        f"--max_genes={max_genes}",
+        f"--n_pres_perms={n_pres_perms}",
+    ]
+    if id_map.exists():
+        wgcna_args.append(f"--id_map={id_map}")
+    if gene_sets.exists():
+        wgcna_args.append(f"--gene_sets={gene_sets}")
+
+    return run_rscript("src/networks/wgcna_analysis.R", wgcna_args, dry_run=dry_run)
+
+
+def phase_10(dry_run: bool = False) -> bool:
+    """Phase 10: Direct Differential Co-expression Test (Fisher z-test validation)"""
+    log("PHASE 10: Direct Differential Co-expression Test")
+
+    results_dir = os.environ.get("RRRM_RESULTS_DIR")
+    networks_dir = os.environ.get("RRRM_NETWORKS_DIR")
+
+    meta_path = find_artifact("phase1_residuals/meta_phase1.tsv.gz")
+    rtech_path = find_artifact("phase1_residuals/Rtech.tsv.gz")
+
+    if meta_path is None or rtech_path is None:
+        log("Phase 1 outputs not found; cannot run direct coexpression test", "WARN")
+        return False
+
+    rewiring_dir = Path(results_dir) / "phase3_rewiring"
+    id_map = REPO_ROOT / "data/processed/resources/id_map.tsv"
+
+    coexpr_args = [
+        f"--rtech={rtech_path}",
+        f"--meta={meta_path}",
+        f"--phase2_dir={networks_dir}",
+        f"--outdir={results_dir}/phase10_direct_coexpr",
+    ]
+    if rewiring_dir.exists():
+        coexpr_args.append(f"--rewiring_dir={rewiring_dir}")
+    if id_map.exists():
+        coexpr_args.append(f"--id_map={id_map}")
+
+    return run_python("src.statistics.direct_coexpression_test", coexpr_args, dry_run=dry_run)
+
+
 def phase_9(dry_run: bool = False) -> bool:
     """Phase 9: Generate Publication-Ready Figures (runs last)"""
     log("PHASE 9: Figure Generation")
@@ -732,6 +793,13 @@ Examples:
                         help="Sample-label permutations per external pathway feature.")
     parser.add_argument("--external-pathway-method", choices=["gsea", "mean_t"], default="gsea",
                         help="External pathway statistic: preranked GSEA or legacy mean pathway t.")
+    parser.add_argument("--network-method", choices=["lioness", "wgcna"], default="lioness",
+                        help="Network analysis method: lioness (default, existing pipeline) or "
+                             "wgcna (WGCNA module-based analysis replacing phases 2/3/5/6/7).")
+    parser.add_argument("--wgcna-genes", type=int, default=5000,
+                        help="Max genes for WGCNA (top by variance, default: 5000)")
+    parser.add_argument("--wgcna-pres-perms", type=int, default=200,
+                        help="Permutations for WGCNA module preservation (default: 200)")
     
     args = parser.parse_args()
     
@@ -739,7 +807,7 @@ Examples:
     
     # Determine which phases to run first (needed for init_run)
     # Note: Phase 9 (figures) runs last, after all data phases
-    phases_available = [0, 1, 1.5, 2, 3, 5, 6, 7, 8, 8.5, 9]
+    phases_available = [0, 1, 1.5, 2, 3, 5, 6, 7, 8, 8.5, 10, 9]
     if args.external_validation_only:
         to_run = []
         args.external_validation = True
@@ -783,19 +851,42 @@ Examples:
         7: lambda: phase_7(args.dry_run),
         8: lambda: phase_8(args.dry_run, args.max_genes, args.topk),
         8.5: lambda: phase_8b(args.dry_run, args.max_genes, args.topk),
+        10: lambda: phase_10(args.dry_run),
         9: lambda: phase_9(args.dry_run),  # Figure generation runs last
     }
     
     log(f"RRRM-2 Pipeline Runner", "INFO")
+    log(f"Network method: {args.network_method}")
     log(f"Phases to run: {to_run}")
     log(f"Max genes: {args.max_genes}")
     log(f"Skip R steps: {args.skip_r}")
     log(f"Dry run: {args.dry_run}")
     print()
     
-    # Run phases in dependency-aware order (Phase 6 BEFORE Phase 5 for regression support)
-    execution_order = [0, 1, 1.5, 2, 3, 6, 5, 7, 8, 8.5, 9]
-    phases_to_execute = [p for p in execution_order if p in to_run]
+    # ── WGCNA routing ─────────────────────────────────────────────────
+    # When --network-method wgcna, replace LIONESS phases (2,3,5,6,7)
+    # with a single WGCNA phase.  Phases 0, 1, 1.5, 8, 8.5, 10, 9 are
+    # unchanged (preprocessing, validation, diagnostics, figures).
+    if args.network_method == "wgcna":
+        lioness_phases = {2, 3, 5, 6, 7}
+        # Remove LIONESS-specific phases from run list
+        to_run = [p for p in to_run if p not in lioness_phases]
+        # Insert WGCNA phase (runs after Phase 1.5, before Phase 8)
+        phases["wgcna"] = lambda: phase_wgcna(
+            args.dry_run, args.wgcna_genes, args.wgcna_pres_perms)
+        # Build execution order with wgcna inserted
+        execution_order = [0, 1, 1.5, "wgcna", 8, 8.5, 10, 9]
+        phases_to_execute = []
+        for p in execution_order:
+            if p == "wgcna" and any(x in lioness_phases for x in (args.phases or phases_available)):
+                phases_to_execute.append("wgcna")
+            elif p in to_run:
+                phases_to_execute.append(p)
+        log(f"WGCNA mode: replacing phases {sorted(lioness_phases)} with single WGCNA analysis")
+    else:
+        # Standard LIONESS execution order (Phase 6 BEFORE Phase 5 for regression support)
+        execution_order = [0, 1, 1.5, 2, 3, 6, 5, 7, 8, 8.5, 10, 9]
+        phases_to_execute = [p for p in execution_order if p in to_run]
     
     failed = []
     for phase_num in phases_to_execute:
