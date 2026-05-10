@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.validation.enhanced_cv import build_network_features_fold
+from src.validation.enhanced_cv import build_network_features_fold, run_classifier
 
 
 def test_sparse_edge_selection_uses_training_variance_only():
@@ -23,3 +23,26 @@ def test_sparse_edge_selection_uses_training_variance_only():
     )
     assert x_train.shape[1] == 100
     assert 1_000_000 not in set(x_test.ravel())
+
+
+def test_run_classifier_returns_one_prediction_per_test_sample():
+    x_train = np.array([
+        [-2.0, -1.8],
+        [-1.7, -2.1],
+        [-1.9, -1.6],
+        [1.8, 2.0],
+        [2.2, 1.7],
+        [1.6, 2.1],
+    ])
+    y_train = np.array([0, 0, 0, 1, 1, 1])
+    x_test = np.array([
+        [-1.5, -1.7],
+        [1.4, 1.8],
+        [2.4, 2.0],
+    ])
+
+    pred, prob = run_classifier(x_train, y_train, x_test, "LogisticRegression")
+
+    assert pred.shape == (3,)
+    assert prob.shape == (3,)
+    assert np.isfinite(prob).all()

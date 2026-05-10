@@ -45,12 +45,18 @@ Phase 8b now computes all transforms inside folds: network pooling, skeleton con
 
 Classifier outputs are validation only if they beat expression baselines under the fold-safe rerun. The audited run is negative.
 
-## External Replication And Pooling
+## External Replication, Context Mapping, And Pooling
 
 Independent replication is separate from multi-study pooling.
 
 OSD-102 is primary for LAR-Young-like findings only and does not require ComBat-seq in independent replication mode. OSD-513 is secondary for sex robustness. Multi-study OSD-102 plus OSD-771 LAR-Young pooling is implemented separately and requires ComBat-seq plus PCA gates before pooled-network claims.
 
-The main runner exposes this as `--external-validation`, which appends protocol-gated OSD-102/OSD-513 validation to a pipeline run. `--external-validation-only` runs just the downloaded external cohorts. This validation builds independent expression-level pathway feature tables from the GeneLab VST matrices and then applies the committed hypothesis registry; it does not pool OSD-771 with OSD-102/513.
+OSD-163 and OSD-253 extend the external layer from strict validation to biology-first context mapping. They are analyzed independently against a frozen remodeling panel: PPAR/fatty-acid metabolism, cholesterol biosynthesis, ECM remodeling, EMT/fibrosis, tubular ion transport, TGF-beta/Wnt signaling, oxidative stress, and translation machinery. Registry rows for these cohorts use `discovery_effect = 0`, so a passing q-value is reported as `context_detected`, not as a directional replication claim.
+
+The main runner exposes this as `--external-validation`, which appends protocol-gated OSD validation/context mapping to a pipeline run. `--external-validation-only` runs just the downloaded external cohorts. By default `--external-studies auto` runs every supported study folder present under `data/external/osdr`; pass `--external-studies OSD-102,OSD-513,OSD-163,OSD-253` to require the four-cohort panel.
+
+The external pathway statistic defaults to preranked GSEA over all mapped genes. For directional OSD-102/513 rows, the enrichment score must agree with the registered discovery direction and pass the registered q threshold. For OSD-163/253 context rows, the GSEA statistic is two-sided through `abs(ES)` and is reported as `context_detected`, not as `replicated`. The legacy mean pathway t-statistic remains available through `--external-pathway-method mean_t` for sensitivity analysis.
+
+This validation builds independent expression-level pathway feature tables from the GeneLab VST matrices and then applies the committed hypothesis registry; it does not pool OSD-771 with external cohorts.
 
 References for data access: [NASA OSDR](https://www.nasa.gov/osdr/) and [OSDR Developer API](https://www.nasa.gov/reference/osdr-developer-api/).

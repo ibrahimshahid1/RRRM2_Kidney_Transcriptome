@@ -1,5 +1,5 @@
 {
-  "version": "2026-05-05",
+  "version": "2026-05-09",
   "independent_replication": {
     "primary": {
       "study": "OSD-102",
@@ -17,6 +17,21 @@
       "scope": "sex-stratification and sex-robustness only",
       "no_combat_seq": true,
       "q_threshold": 0.1
+    },
+    "context_mapping": {
+      "studies": [
+        "OSD-163",
+        "OSD-253"
+      ],
+      "scope": "fixed lipid/ECM/tubular remodeling panel; non-directional context mapping rather than strict replication",
+      "no_combat_seq": true,
+      "q_threshold": 0.1,
+      "criteria": [
+        "cohort analyzed independently from OSD-771",
+        "fixed feature list before loading cohort results",
+        "reported as context_detected when q <= threshold",
+        "not counted as confirmatory replicated unless a nonzero directional discovery_effect is registered"
+      ]
     },
     "excluded": [
       "OSD-568"

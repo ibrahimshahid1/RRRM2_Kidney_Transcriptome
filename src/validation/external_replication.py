@@ -1,10 +1,12 @@
 # src/validation/external_replication.py
 """
-Protocol-guarded independent external replication.
+Protocol-guarded independent external cohort analysis.
 
 OSD-102 is the primary LAR-Young-like replication partner. OSD-513 is secondary
-and limited to sex-robustness/sex-stratification checks. OSD-568 is explicitly
-excluded from validation claims in this remediation pass.
+and limited to sex-robustness/sex-stratification checks. OSD-163 and OSD-253 are
+context-mapping cohorts for the biology-first remodeling panel; they are not
+used as strict one-to-one replication cohorts for RRRM-2 gene claims. OSD-568 is
+explicitly excluded from validation claims in this remediation pass.
 
 This module does not require ComBat-seq. Each external cohort is analyzed
 independently and compared against pre-registered direction, q-value, and
@@ -23,8 +25,14 @@ import pandas as pd
 
 from src.common import REPO_ROOT
 
-ALLOWED_STUDIES = {"OSD-102", "OSD-513"}
+ALLOWED_STUDIES = {"OSD-102", "OSD-513", "OSD-163", "OSD-253"}
 EXCLUDED_STUDIES = {"OSD-568"}
+EXPECTED_ANALYSIS_BY_STUDY = {
+    "OSD-102": "lar_young",
+    "OSD-513": "sex_robustness",
+    "OSD-163": "cross_strain_context",
+    "OSD-253": "rr7_context",
+}
 REQUIRED_HYPOTHESIS_COLUMNS = {
     "analysis",
     "study",
@@ -48,16 +56,15 @@ def validate_study_scope(study: str, analysis: str) -> None:
         raise ValueError("OSD-568 is excluded from future-validation claims and must not be used here.")
     if study not in ALLOWED_STUDIES:
         raise ValueError(f"{study} is not in the approved independent-replication scope: {sorted(ALLOWED_STUDIES)}")
-    if study == "OSD-102" and analysis != "lar_young":
-        raise ValueError("OSD-102 independent replication is restricted to LAR-Young-like findings/pathways.")
-    if study == "OSD-513" and analysis != "sex_robustness":
-        raise ValueError("OSD-513 is restricted to secondary sex-robustness analysis.")
+    expected = EXPECTED_ANALYSIS_BY_STUDY[study]
+    if analysis != expected:
+        raise ValueError(f"{study} is restricted to analysis={expected}.")
 
 
 def write_template_protocol(protocol_dir: Path) -> None:
     protocol_dir.mkdir(parents=True, exist_ok=True)
     protocol = {
-        "version": "2026-05-05",
+        "version": "2026-05-09",
         "independent_replication": {
             "primary": {
                 "study": "OSD-102",
@@ -76,6 +83,12 @@ def write_template_protocol(protocol_dir: Path) -> None:
                 "no_combat_seq": True,
                 "q_threshold": 0.10,
             },
+            "context_mapping": {
+                "studies": ["OSD-163", "OSD-253"],
+                "scope": "fixed lipid/ECM/tubular remodeling panel; non-directional context mapping, not strict replication",
+                "no_combat_seq": True,
+                "q_threshold": 0.10,
+            },
             "excluded": ["OSD-568"],
         },
         "non_claims": [
@@ -86,7 +99,7 @@ def write_template_protocol(protocol_dir: Path) -> None:
         ],
     }
     (protocol_dir / "protocol.json").write_text(json.dumps(protocol, indent=2) + "\n")
-    hypothesis = pd.DataFrame([
+    directional_rows = [
         {
             "analysis": "lar_young",
             "study": "OSD-102",
@@ -127,7 +140,31 @@ def write_template_protocol(protocol_dir: Path) -> None:
             "q_threshold": 0.10,
             "claim_boundary": "secondary sex-robustness check only",
         },
-    ])
+    ]
+    context_features = [
+        "PPAR_signaling",
+        "cholesterol_biosynthesis",
+        "ECM_remodeling",
+        "EMT_fibrosis",
+        "tubular_ion_transport",
+        "TGF_beta_Wnt",
+        "oxidative_stress",
+        "translation_machinery",
+    ]
+    context_rows = []
+    for study, analysis in [("OSD-163", "cross_strain_context"), ("OSD-253", "rr7_context")]:
+        for feature in context_features:
+            context_rows.append({
+                "analysis": analysis,
+                "study": study,
+                "hypothesis_type": "pathway",
+                "feature": feature,
+                "expected_direction": "context_dependent_screen",
+                "discovery_effect": 0.0,
+                "q_threshold": 0.10,
+                "claim_boundary": "cross-cohort context mapping only; not a directional replication claim",
+            })
+    hypothesis = pd.DataFrame(directional_rows + context_rows)
     hypothesis.to_csv(protocol_dir / "hypothesis_registry.tsv", sep="\t", index=False)
 
 
@@ -191,7 +228,10 @@ def validate_discovery_table_against_registry(discovery: pd.DataFrame, registry:
     if merged["effect"].isna().any():
         missing_features = merged.loc[merged["effect"].isna(), "feature"].tolist()
         raise ValueError(f"Discovery table is missing registered features: {missing_features}")
-    if not (np.sign(merged["discovery_effect"]) == np.sign(merged["effect"])).all():
+    directional = np.sign(merged["discovery_effect"]) != 0
+    if directional.any() and not (
+        np.sign(merged.loc[directional, "discovery_effect"]) == np.sign(merged.loc[directional, "effect"])
+    ).all():
         raise ValueError("Discovery table effect signs disagree with the committed hypothesis registry")
 
 
@@ -225,16 +265,20 @@ def compare_directional_replication(
     )
     if q_threshold is not None:
         merged["q_threshold"] = float(q_threshold)
-    merged["same_direction"] = np.sign(merged["discovery_effect"]) == np.sign(merged["external_effect"])
+    merged["directional_claim"] = np.sign(merged["discovery_effect"]) != 0
+    same_direction = np.sign(merged["discovery_effect"]) == np.sign(merged["external_effect"])
+    merged["same_direction"] = same_direction.where(merged["directional_claim"], pd.NA)
     merged["external_pass_q"] = merged["q_value"] <= merged["q_threshold"]
-    merged["replicated"] = merged["same_direction"] & merged["external_pass_q"]
+    merged["context_detected"] = merged["external_pass_q"]
+    merged["replicated"] = merged["directional_claim"] & merged["same_direction"].fillna(False) & merged["external_pass_q"]
     return merged
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Protocol-guarded independent OSD replication")
     ap.add_argument("--study", required=True, choices=sorted(ALLOWED_STUDIES | EXCLUDED_STUDIES))
-    ap.add_argument("--analysis", required=True, choices=["lar_young", "sex_robustness"])
+    ap.add_argument("--analysis", required=True,
+                    choices=["lar_young", "sex_robustness", "cross_strain_context", "rr7_context"])
     ap.add_argument("--protocol_dir", default=str(REPO_ROOT / "docs/external_replication_protocol"))
     ap.add_argument("--write-template-protocol", action="store_true")
     ap.add_argument("--discovery_table", default="",

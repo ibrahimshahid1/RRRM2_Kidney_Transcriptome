@@ -3,3 +3,19 @@ lar_young	OSD-102	pathway	PPAR_signaling	positive_edge_sum_enrichment	1.0	0.10	p
 lar_young	OSD-102	pathway	translation_machinery	positive_edge_sum_enrichment	1.0	0.10	primary pathway-level replication only
 sex_robustness	OSD-513	pathway	PPAR_signaling	same_direction_as_OSD102_or_RRRM2	1.0	0.10	secondary sex-robustness check only
 sex_robustness	OSD-513	pathway	translation_machinery	same_direction_as_OSD102_or_RRRM2	1.0	0.10	secondary sex-robustness check only
+cross_strain_context	OSD-163	pathway	PPAR_signaling	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+cross_strain_context	OSD-163	pathway	cholesterol_biosynthesis	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+cross_strain_context	OSD-163	pathway	ECM_remodeling	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+cross_strain_context	OSD-163	pathway	EMT_fibrosis	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+cross_strain_context	OSD-163	pathway	tubular_ion_transport	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+cross_strain_context	OSD-163	pathway	TGF_beta_Wnt	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+cross_strain_context	OSD-163	pathway	oxidative_stress	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+cross_strain_context	OSD-163	pathway	translation_machinery	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+rr7_context	OSD-253	pathway	PPAR_signaling	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+rr7_context	OSD-253	pathway	cholesterol_biosynthesis	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+rr7_context	OSD-253	pathway	ECM_remodeling	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+rr7_context	OSD-253	pathway	EMT_fibrosis	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+rr7_context	OSD-253	pathway	tubular_ion_transport	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+rr7_context	OSD-253	pathway	TGF_beta_Wnt	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+rr7_context	OSD-253	pathway	oxidative_stress	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim
+rr7_context	OSD-253	pathway	translation_machinery	context_dependent_screen	0.0	0.10	cross-cohort context mapping only; not a directional replication claim

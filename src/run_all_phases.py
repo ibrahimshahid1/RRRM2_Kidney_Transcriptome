@@ -557,9 +557,11 @@ def phase_external_validation(
     dry_run: bool = False,
     external_root: str = "data/external/osdr",
     k_perm: int = 5000,
+    studies: str = "auto",
+    method: str = "gsea",
 ) -> bool:
-    """Protocol-gated independent validation in OSD-102 and OSD-513."""
-    log("EXTERNAL VALIDATION: OSD-102 primary + OSD-513 secondary")
+    """Protocol-gated independent validation/context mapping in downloaded OSD cohorts."""
+    log(f"EXTERNAL VALIDATION: downloaded OSD cohorts ({studies})")
 
     results_dir = os.environ.get("RRRM_RESULTS_DIR")
     outdir = Path(results_dir) / "external_validation"
@@ -568,7 +570,9 @@ def phase_external_validation(
         f"--protocol_dir={REPO_ROOT / 'docs/external_replication_protocol'}",
         f"--id_map={REPO_ROOT / 'data/processed/resources/id_map.tsv'}",
         f"--outdir={outdir}",
+        f"--studies={studies}",
         f"--K_perm={k_perm}",
+        f"--method={method}",
     ], dry_run=dry_run)
 
 
@@ -717,13 +721,17 @@ Examples:
     parser.add_argument("--hierarchical-fdr", action="store_true",
                         help="Run Benjamini-Bogomolov-style hierarchical FDR over configured gene sets.")
     parser.add_argument("--external-validation", action="store_true",
-                        help="After selected phases, run protocol-gated OSD-102/OSD-513 external validation.")
+                        help="After selected phases, run protocol-gated OSD external validation/context mapping.")
     parser.add_argument("--external-validation-only", action="store_true",
-                        help="Run only OSD-102/OSD-513 external validation and skip OSD-771 phases.")
+                        help="Run only downloaded OSD external validation/context mapping and skip OSD-771 phases.")
     parser.add_argument("--external-root", default="data/external/osdr",
-                        help="Root directory containing OSD-102 and OSD-513 downloaded files.")
+                        help="Root directory containing downloaded OSD cohort folders.")
+    parser.add_argument("--external-studies", default="auto",
+                        help="Comma-separated external studies to run, or auto for downloaded supported folders.")
     parser.add_argument("--external-validation-perms", type=int, default=5000,
                         help="Sample-label permutations per external pathway feature.")
+    parser.add_argument("--external-pathway-method", choices=["gsea", "mean_t"], default="gsea",
+                        help="External pathway statistic: preranked GSEA or legacy mean pathway t.")
     
     args = parser.parse_args()
     
@@ -800,6 +808,8 @@ Examples:
             args.dry_run,
             external_root=args.external_root,
             k_perm=args.external_validation_perms,
+            studies=args.external_studies,
+            method=args.external_pathway_method,
         ):
             failed.append("external_validation")
             log("External validation failed", "ERROR")

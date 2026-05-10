@@ -75,7 +75,12 @@ def load_curated_pathway_masks(gene_set_yaml: Path, id_map: Path, genes: list[st
     return masks
 
 
-def run_classifier(X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray, classifier: str) -> tuple[int, float]:
+def run_classifier(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_test: np.ndarray,
+    classifier: str,
+) -> tuple[np.ndarray, np.ndarray]:
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
@@ -90,11 +95,11 @@ def run_classifier(X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray,
     else:
         model = LogisticRegression(max_iter=2000, C=0.1, penalty="l2", random_state=42)
     model.fit(X_train, y_train)
-    pred = int(model.predict(X_test)[0])
+    pred = model.predict(X_test).astype(int)
     try:
-        prob = float(model.predict_proba(X_test)[0, 1])
+        prob = model.predict_proba(X_test)[:, 1].astype(float)
     except Exception:
-        prob = 0.5
+        prob = np.full(X_test.shape[0], 0.5, dtype=float)
     return pred, prob
 
 
@@ -379,8 +384,8 @@ def main() -> None:
                         for classifier in ["RandomForest", "LogisticRegression"]:
                             key = (feature_name, classifier)
                             pred, prob = run_classifier(X_train, y_train, X_test, classifier)
-                            fold_predictions.setdefault(key, []).append(pred)
-                            fold_probabilities.setdefault(key, []).append(prob)
+                            fold_predictions.setdefault(key, []).extend(pred.tolist())
+                            fold_probabilities.setdefault(key, []).extend(prob.tolist())
                             fold_feature_counts.setdefault(key, []).append(X_train.shape[1])
                     fold_truth.extend(y_test.tolist())
 
