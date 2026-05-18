@@ -25,8 +25,11 @@ edge_mask = np.array([(i in ecm_idx_set) or (j in ecm_idx_set) for i, j in zip(e
 ecm_edge_indices = np.where(edge_mask)[0]
 print(f"Found {len(ecm_edge_indices)} edges involving ECM genes")
 
-# Load Z for those edges only
-W_full = np.load(phase2_dir / 'lioness_z_edges.npy')
+# Load LIONESS edge weights for those edges only
+lioness_path = phase2_dir / 'lioness_edges.npy'
+if not lioness_path.exists():
+    lioness_path = phase2_dir / 'lioness_z_edges.npy'
+W_full = np.load(lioness_path)
 W_sub = W_full[:, ecm_edge_indices]
 
 # Load and align metadata
@@ -91,4 +94,3 @@ print(res_df.head(20).to_string(index=False))
 # arm_flight interaction = (ISS-T FLT - ISS-T GC) - (LAR FLT - LAR GC)
 # Positive: The increase in connectivity due to flight is GREATER on ISS-T than LAR.
 # Negative: The increase in connectivity due to flight is WEAKER (or decreases) on ISS-T compared to LAR.
-

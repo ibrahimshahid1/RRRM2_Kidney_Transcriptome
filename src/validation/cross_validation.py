@@ -31,6 +31,7 @@ from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix
 from sklearn.preprocessing import StandardScaler
 
 from src.common import REPO_ROOT, find_sample_col, normalize_labels
+from src.networks.lioness import compute_lioness_weights, robust_scale_edges, rank_normalize_edges
 
 DEFAULT_TOPK = 80
 DEFAULT_RF_MAX_DEPTH = 5
@@ -104,7 +105,7 @@ def lioness_on_fold(
     edge_i: np.ndarray,
     edge_j: np.ndarray,
 ) -> np.ndarray:
-    """Compute LIONESS Fisher-z weights for samples in sample_mask.
+    """Compute raw LIONESS correlation contributions for samples in sample_mask.
 
     The pooled network is computed from ALL samples indicated by sample_mask
     (the training set).  For each sample s, the leave-one-out network is
@@ -113,58 +114,50 @@ def lioness_on_fold(
     For test samples, we compute their LIONESS relative to the training pool
     (the test sample influences only its own network, not the pool).
 
-    Returns lioness_z of shape (len(sample_mask), n_edges).
+    Returns raw LIONESS contributions of shape (len(sample_mask), n_edges).
     """
-    CLIP_R = 0.9995
-    ZCAP = 20.0
-
-    X = rtech  # genes × all_samples
-    G, N_all = X.shape
     idx_pool = np.where(sample_mask)[0]
-    N_pool = len(idx_pool)
+    weights, _ = compute_lioness_weights(rtech[:, idx_pool], edge_i, edge_j, transform="raw")
+    return weights
 
-    # Precompute pooled sums over pool
-    X_pool = X[:, idx_pool]
-    Sx = X_pool.sum(axis=1)
-    Sxx = (X_pool ** 2).sum(axis=1)
-    Xi_pool = X_pool[edge_i, :]
-    Xj_pool = X_pool[edge_j, :]
-    Sxy = (Xi_pool * Xj_pool).sum(axis=1)
 
-    def pearson_from_sums(n, sx_i, sx_j, sxx_i, sxx_j, sxy, eps=1e-12):
-        num = n * sxy - sx_i * sx_j
-        denx = n * sxx_i - sx_i * sx_i
-        deny = n * sxx_j - sx_j * sx_j
-        den = np.sqrt(np.maximum(denx, 0.0) * np.maximum(deny, 0.0))
-        r = np.where(den > eps, num / den, 0.0)
-        return np.clip(r, -1.0, 1.0)
+def _rank_normalize_with_reference(train_w: np.ndarray, test_w: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Rank-normalize train weights and map test weights via train empirical CDF."""
+    train_z = rank_normalize_edges(train_w).astype(np.float32)
+    n_train, n_edges = train_w.shape
+    if n_train < 2:
+        return np.zeros_like(train_w, dtype=np.float32), np.zeros_like(test_w, dtype=np.float32)
+    test_z = np.empty_like(test_w, dtype=np.float32)
+    from scipy.stats import norm
+    for e in range(n_edges):
+        ref = np.sort(train_w[:, e])
+        right = np.searchsorted(ref, test_w[:, e], side="right")
+        left = np.searchsorted(ref, test_w[:, e], side="left")
+        rank = (left + right + 1.0) / 2.0
+        q = np.clip(rank / (n_train + 1.0), 0.5 / (n_train + 1.0), 1.0 - 0.5 / (n_train + 1.0))
+        test_z[:, e] = norm.ppf(q).astype(np.float32)
+    return train_z, test_z
 
-    r_all = pearson_from_sums(N_pool, Sx[edge_i], Sx[edge_j],
-                               Sxx[edge_i], Sxx[edge_j], Sxy)
-    z_all = np.arctanh(np.clip(r_all, -CLIP_R, CLIP_R))
 
-    # LIONESS for each sample in the pool (training samples)
-    E = len(edge_i)
-    out = np.empty((N_pool, E), dtype=np.float32)
-
-    for k, s_idx in enumerate(idx_pool):
-        xs_i = X[edge_i, s_idx]
-        xs_j = X[edge_j, s_idx]
-
-        Sx_i_loo = Sx[edge_i] - xs_i
-        Sx_j_loo = Sx[edge_j] - xs_j
-        Sxx_i_loo = Sxx[edge_i] - xs_i ** 2
-        Sxx_j_loo = Sxx[edge_j] - xs_j ** 2
-        Sxy_loo = Sxy - xs_i * xs_j
-
-        r_loo = pearson_from_sums(N_pool - 1, Sx_i_loo, Sx_j_loo,
-                                   Sxx_i_loo, Sxx_j_loo, Sxy_loo)
-        z_loo = np.arctanh(np.clip(r_loo, -CLIP_R, CLIP_R))
-
-        z_s = N_pool * z_all - (N_pool - 1) * z_loo
-        out[k, :] = np.clip(z_s, -ZCAP, ZCAP).astype(np.float32)
-
-    return out
+def transform_fold_edge_weights(
+    train_w: np.ndarray,
+    test_w: np.ndarray,
+    transform: str = "raw_ranknorm",
+) -> tuple[np.ndarray, np.ndarray]:
+    """Apply a fold-safe edge-weight transform fit only on training weights."""
+    if transform == "raw":
+        return train_w.astype(np.float32), test_w.astype(np.float32)
+    if transform == "raw_ranknorm":
+        return _rank_normalize_with_reference(train_w, test_w)
+    if transform == "raw_robust":
+        train_scaled = robust_scale_edges(train_w)
+        med = np.nanmedian(train_w, axis=0, keepdims=True)
+        mad = np.nanmedian(np.abs(train_w - med), axis=0, keepdims=True) * 1.4826
+        sd = np.nanstd(train_w, axis=0, keepdims=True)
+        scale = np.where(mad > 1e-8, mad, sd)
+        test_scaled = np.divide(test_w - med, scale + 1e-8, out=np.zeros_like(test_w), where=scale > 1e-8)
+        return train_scaled.astype(np.float32), test_scaled.astype(np.float32)
+    raise ValueError("CV supports raw, raw_ranknorm, or raw_robust LIONESS transforms")
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +183,9 @@ def main():
     ap.add_argument("--n_folds", type=int, default=5, help="Number of CV folds")
     ap.add_argument("--topk", type=int, default=DEFAULT_TOPK, help="Top-k neighbors for skeleton")
     ap.add_argument("--max_genes", type=int, default=2500, help="Max genes for network")
+    ap.add_argument("--lioness-transform", default="raw_ranknorm",
+                    choices=["raw_ranknorm", "raw_robust", "raw"],
+                    help="Fold-safe transform applied after raw LIONESS contributions")
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
@@ -271,7 +267,7 @@ def main():
         print(f"  Skeleton: {len(edge_i)} edges")
 
         # ── 3b) Compute LIONESS on training samples ──────────
-        print("  Computing LIONESS (training)...")
+        print("  Computing raw LIONESS contributions (training)...")
         train_mask = np.zeros(len(y), dtype=bool)
         train_mask[train_idx] = True
         lioness_train = lioness_on_fold(X_expr, train_mask, edge_i, edge_j)
@@ -279,7 +275,7 @@ def main():
         # ── 3c) Compute LIONESS for test samples ─────────────
         # For test: compute relative to training pool
         # Each test sample is added to the pool individually
-        print("  Computing LIONESS (test)...")
+        print("  Computing raw LIONESS contributions (test)...")
         lioness_test = np.empty((len(test_idx), len(edge_i)), dtype=np.float32)
         for k, t_idx in enumerate(test_idx):
             # Augment pool with this test sample
@@ -291,6 +287,10 @@ def main():
             aug_indices = np.where(aug_mask)[0]
             pos = np.searchsorted(aug_indices, t_idx)
             lioness_test[k, :] = aug_lioness[pos, :]
+
+        lioness_train, lioness_test = transform_fold_edge_weights(
+            lioness_train, lioness_test, transform=args.lioness_transform
+        )
 
         # ── 3d) Extract features ─────────────────────────────
         from src.validation.sample_features import (
@@ -397,6 +397,7 @@ def main():
         "n_gc": int((1 - y).sum()),
         "n_genes": G,
         "topk": args.topk,
+        "lioness_transform": args.lioness_transform,
         "target": "FLT_vs_GC",
         "stratification": "Age_x_Arm",
     }

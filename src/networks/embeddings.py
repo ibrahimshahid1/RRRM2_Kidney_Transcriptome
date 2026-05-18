@@ -1,12 +1,13 @@
 # src/networks/embeddings.py
 """
-Phase 3.2: PecanPy node2vec embeddings on Pred_*_z_hat.npy (multi-seed, fixed topology)
+Phase 3.2: PecanPy node2vec embeddings on predicted edge-weight networks.
 
 Builds biased random walks + trains embeddings using PecanPy for speed.
 
 Graph:
   - fixed topology from Phase 2 skeleton (edge_i, edge_j)
-  - condition-specific edge weights: w = abs(tanh(z_hat)) in [0,1)
+  - primary signed mode embeds positive and negative edge-weight channels
+    separately, then concatenates them per gene
 
 Targets:
   - by default embed only FLT/GC predicted networks via --patterns
@@ -65,6 +66,69 @@ def call_embed_version_safe(g, **kwargs):
     return g.embed(**safe)
 
 
+def embed_weighted_graph(
+    pecanpy_mod,
+    edgelist_path: Path,
+    weights: np.ndarray,
+    edge_i: np.ndarray,
+    edge_j: np.ndarray,
+    num_nodes: int,
+    dim: int,
+    args,
+    seed: int,
+) -> np.ndarray:
+    """Embed one nonnegative weighted graph, returning zeros for empty channels."""
+    if dim <= 0:
+        return np.empty((num_nodes, 0), dtype=np.float32)
+    if int((weights > args.weight_min).sum()) == 0:
+        return np.zeros((num_nodes, dim), dtype=np.float32)
+
+    write_edgelist_weighted(
+        edgelist_path,
+        edge_i=edge_i,
+        edge_j=edge_j,
+        w_edge=weights.astype(np.float32),
+        node_names=[],
+        w_min=float(args.weight_min),
+    )
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    g = pecanpy_mod.SparseOTF(
+        p=float(args.p),
+        q=float(args.q),
+        workers=int(args.workers),
+        verbose=False,
+    )
+    g.read_edg(str(edgelist_path), weighted=True, directed=False)
+
+    emb = call_embed_version_safe(
+        g,
+        dim=int(dim),
+        dimensions=int(dim),
+        num_walks=int(args.num_walks),
+        walk_length=int(args.walk_length),
+        window=int(args.window),
+        window_size=int(args.window),
+        epochs=int(args.epochs),
+        epoch=int(args.epochs),
+        verbose=False,
+        seed=int(seed),
+        workers=1,
+    )
+
+    if isinstance(emb, dict):
+        mat = np.zeros((num_nodes, dim), dtype=np.float32)
+        for k, v in emb.items():
+            mat[int(k), :] = np.asarray(v, dtype=np.float32)
+    else:
+        mat = np.asarray(emb, dtype=np.float32)
+        if mat.shape[0] != num_nodes:
+            raise RuntimeError(f"PecanPy returned {mat.shape[0]} nodes, expected {num_nodes}")
+    return mat
+
+
 def main():
     os.chdir(REPO_ROOT)
 
@@ -96,6 +160,9 @@ def main():
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     ap.add_argument("--weight_min", type=float, default=1e-8, help="Drop edges with weight <= this before writing edgelist")
     ap.add_argument("--keep_edgelists", action="store_true", help="Keep generated .edgelist files (debug/audit)")
+    ap.add_argument("--signed-mode", choices=["signed_split", "absolute"], default="signed_split",
+                    help="signed_split embeds positive/negative channels separately. "
+                         "absolute is an abs(edge weight) sensitivity mode.")
     args = ap.parse_args()
 
     phase2 = Path(args.phase2_dir)
@@ -144,12 +211,16 @@ def main():
         cond_dir = out / cond
         cond_dir.mkdir(parents=True, exist_ok=True)
 
-        z = np.load(f).astype(np.float64)
-        if z.shape[0] != E:
-            raise ValueError(f"{f.name}: expected {E} edges but got {z.shape[0]}")
+        edge_values = np.load(f).astype(np.float64)
+        if edge_values.shape[0] != E:
+            raise ValueError(f"{f.name}: expected {E} edges but got {edge_values.shape[0]}")
 
-        # Convert Fisher-z to correlation-ish magnitude weights
-        w_edge = np.abs(np.tanh(z)).astype(np.float32)
+        if args.signed_mode == "signed_split":
+            pos_weights = np.maximum(edge_values, 0.0).astype(np.float32)
+            neg_weights = np.maximum(-edge_values, 0.0).astype(np.float32)
+            w_edge = pos_weights + neg_weights
+        else:
+            w_edge = np.abs(edge_values).astype(np.float32)
 
         # Diagnostics
         w_mean = float(w_edge.mean())
@@ -159,17 +230,6 @@ def main():
         print(f"\n=== {cond} ===")
         print(f"  Edge weight stats: mean={w_mean:.4f}, 99th={w_99:.4f}, #dropped(<= {args.weight_min:g})={n_tiny}")
 
-        # Build a weighted edgelist file for PecanPy (fast + simple)
-        edgelist_path = cond_dir / f"{cond}.edgelist"
-        write_edgelist_weighted(
-            edgelist_path,
-            edge_i=edge_i,
-            edge_j=edge_j,
-            w_edge=w_edge,
-            node_names=genes,
-            w_min=float(args.weight_min),
-        )
-
         # Multi-seed embeddings
         embs = []
         seeds = [args.seed0 + k for k in range(args.num_seeds)]
@@ -177,48 +237,44 @@ def main():
         for sd in seeds:
             print(f"  Embedding seed {sd}...", end=" ", flush=True)
 
-            # Control RNG outside pecanpy (embed() may not accept seed)
-            random.seed(sd)
-            np.random.seed(sd)
-
-            # PecanPy graph + embedding
-            # Use SparseOTF for speed/memory on large graphs; it builds transition probs on-the-fly.
-            g = pecanpy_mod.SparseOTF(
-                p=float(args.p),
-                q=float(args.q),
-                workers=int(args.workers),
-                verbose=False,
-            )
-            g.read_edg(str(edgelist_path), weighted=True, directed=False)
-
-            # node2vec embedding (PecanPy includes training)
-            # Use a version-safe helper to handle API variations (seed, workers, names)
-            emb = call_embed_version_safe(
-                g,
-                dim=int(args.dimensions),
-                dimensions=int(args.dimensions),   # some versions use "dimensions"
-                num_walks=int(args.num_walks),
-                walk_length=int(args.walk_length),
-                window=int(args.window),
-                window_size=int(args.window),      # some versions use "window_size"
-                epochs=int(args.epochs),
-                epoch=int(args.epochs),            # some versions use "epoch"
-                verbose=False,
-                seed=int(sd),                      # ignored if unsupported
-                workers=1,                         # ignored if unsupported
-            )
-            
-
-            # PecanPy returns dict-like mapping or ndarray depending on version.
-            # Normalize to (N, D) array ordered by node id 0..N-1.
-            if isinstance(emb, dict):
-                mat = np.zeros((num_nodes, int(args.dimensions)), dtype=np.float32)
-                for k, v in emb.items():
-                    mat[int(k), :] = np.asarray(v, dtype=np.float32)
+            if args.signed_mode == "signed_split":
+                pos_dim = int(np.ceil(args.dimensions / 2))
+                neg_dim = int(args.dimensions) - pos_dim
+                pos_mat = embed_weighted_graph(
+                    pecanpy_mod,
+                    cond_dir / f"{cond}.positive.edgelist",
+                    pos_weights,
+                    edge_i,
+                    edge_j,
+                    num_nodes,
+                    pos_dim,
+                    args,
+                    sd,
+                )
+                neg_mat = embed_weighted_graph(
+                    pecanpy_mod,
+                    cond_dir / f"{cond}.negative.edgelist",
+                    neg_weights,
+                    edge_i,
+                    edge_j,
+                    num_nodes,
+                    neg_dim,
+                    args,
+                    sd + 10_000,
+                )
+                mat = np.hstack([pos_mat, neg_mat]).astype(np.float32)
             else:
-                mat = np.asarray(emb, dtype=np.float32)
-                if mat.shape[0] != num_nodes:
-                    raise RuntimeError(f"PecanPy returned {mat.shape[0]} nodes, expected {num_nodes}")
+                mat = embed_weighted_graph(
+                    pecanpy_mod,
+                    cond_dir / f"{cond}.absolute.edgelist",
+                    w_edge,
+                    edge_i,
+                    edge_j,
+                    num_nodes,
+                    int(args.dimensions),
+                    args,
+                    sd,
+                )
 
             np.save(cond_dir / f"seed_{sd}.npy", mat)
             embs.append(mat)
@@ -249,14 +305,16 @@ def main():
                 "edge_weight_mean": w_mean,
                 "edge_weight_99pct": w_99,
                 "edges_dropped": int(n_tiny),
+                "signed_mode": args.signed_mode,
             }
         )
 
         if not args.keep_edgelists:
-            try:
-                edgelist_path.unlink(missing_ok=True)
-            except Exception:
-                pass
+            for edgelist_path in cond_dir.glob("*.edgelist"):
+                try:
+                    edgelist_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
 
     summary = pd.DataFrame(all_stats_rows)
     summary_path = out / "embedding_seed_summary.tsv"

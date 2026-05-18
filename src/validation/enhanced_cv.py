@@ -30,6 +30,7 @@ from src.validation.cross_validation import (
     DEFAULT_TOPK,
     build_skeleton_on_fold,
     lioness_on_fold,
+    transform_fold_edge_weights,
 )
 from src.validation.sample_features import node_strength
 
@@ -274,6 +275,9 @@ def main() -> None:
     ap.add_argument("--pool_modes", default=",".join(POOL_MODES))
     ap.add_argument("--network_methods", default="lioness")
     ap.add_argument("--network_feature_sets", default=",".join(NETWORK_FEATURE_SETS))
+    ap.add_argument("--lioness-transform", default="raw_ranknorm",
+                    choices=["raw_ranknorm", "raw_robust", "raw"],
+                    help="Fold-safe transform for raw LIONESS contributions")
     ap.add_argument("--id_map", default=str(REPO_ROOT / "data/processed/resources/id_map.tsv"))
     ap.add_argument("--gene_sets", default=str(REPO_ROOT / "config/gene_sets.yaml"))
     args = ap.parse_args()
@@ -346,6 +350,10 @@ def main() -> None:
                     try:
                         train_w = sample_specific_weights(method, X_expr, pool_mask, train_idx, edge_i, edge_j)
                         test_w = sample_specific_weights(method, X_expr, pool_mask, test_idx, edge_i, edge_j)
+                        if method == "lioness":
+                            train_w, test_w = transform_fold_edge_weights(
+                                train_w, test_w, transform=args.lioness_transform
+                            )
                     except Exception as exc:
                         results.append({
                             "pool_mode": pool_mode,
@@ -485,6 +493,7 @@ def main() -> None:
         "pool_modes": pool_modes,
         "network_methods": network_methods,
         "network_feature_sets": feature_sets,
+        "lioness_transform": args.lioness_transform,
         "expression_baseline_preserved": True,
         "rf_max_depth": DEFAULT_RF_MAX_DEPTH,
         "topk": args.topk,

@@ -94,7 +94,8 @@ rewiring:
   silent_shifter:
     delta_percentile: 90
     log2fc_threshold: 0.3
-    de_fdr_threshold: 0.2
+    log2fc_ci_inside_fraction: 0.8
+    de_fdr_alpha: 0.05
     delta_fdr_threshold: 0.1
 
 # Statistical Testing (Phase 6)

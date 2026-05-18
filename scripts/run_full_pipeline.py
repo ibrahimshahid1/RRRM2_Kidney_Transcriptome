@@ -79,8 +79,8 @@ def run_full_pipeline(config: dict, data_path: str, output_dir: str):
     # Phase 3: LIONESS
     logger.info("\n>>> PHASE 3: LIONESS Sample-Specific Networks")
     logger.info("    [Placeholder] Compute sample-specific edge weights on E")
-    logger.info("    [Placeholder] Fisher z-transform")
-    logger.info("    [Placeholder] Save W_samp and Z_samp matrices")
+    logger.info("    [Placeholder] Rank-normalize raw LIONESS contributions by edge")
+    logger.info("    [Placeholder] Save sample-specific edge-weight matrix")
     # TODO: Implement actual phase3 pipeline
     
     # Phase 4: Edge Regression

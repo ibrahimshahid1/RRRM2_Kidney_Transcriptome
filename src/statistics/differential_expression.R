@@ -217,47 +217,63 @@ for (ctr in contrasts) {
     n_den <- sum(meta2$cell == ctr$denominator)
     cat("  Sample counts: FLT =", n_num, ", GC =", n_den, "\n")
 
-    # Extract results
-    res <- results(dds,
+    # Extract results. Keep the unshrunken result for p-values/FDR and use
+    # shrunken LFC + uncertainty for bounded-expression silent-shifter calls.
+    res_raw <- results(dds,
         contrast = c("cell", ctr$numerator, ctr$denominator),
         alpha = 0.05
     )
+    res <- res_raw
 
     # Apply LFC shrinkage if ashr is available (conservative log2FC for silent shifters)
     if (HAS_ASHR) {
         cat("  Applying LFC shrinkage (ashr)...\n")
         res <- lfcShrink(dds,
             contrast = c("cell", ctr$numerator, ctr$denominator),
-            res = res,
+            res = res_raw,
             type = "ashr"
         )
     }
 
     # Convert to data.frame
     res_df <- as.data.frame(res)
+    raw_df <- as.data.frame(res_raw)
     res_df$gene <- rownames(res_df)
+    raw_df$gene <- rownames(raw_df)
 
-    # Rename columns for compatibility with silent shifters script
-    res_df <- res_df[, c("gene", "log2FoldChange", "padj")]
-    colnames(res_df) <- c("gene", "log2FC", "FDR")
+    lfc_se <- if ("lfcSE" %in% names(res_df)) res_df$lfcSE else raw_df$lfcSE
+    out_df <- data.frame(
+        gene = res_df$gene,
+        log2FC_shrunken = res_df$log2FoldChange,
+        log2FC = res_df$log2FoldChange,
+        lfcSE = lfc_se,
+        lfc_ci_low = res_df$log2FoldChange - 1.96 * lfc_se,
+        lfc_ci_high = res_df$log2FoldChange + 1.96 * lfc_se,
+        FDR = raw_df$padj,
+        pvalue = raw_df$pvalue,
+        baseMean = raw_df$baseMean
+    )
 
     # Remove NA FDR (genes with too low counts)
-    res_df <- res_df[!is.na(res_df$FDR), ]
+    out_df <- out_df[!is.na(out_df$FDR), ]
 
     # Sort by FDR
-    res_df <- res_df[order(res_df$FDR), ]
+    out_df <- out_df[order(out_df$FDR), ]
 
     # Write output
     out_file <- file.path(out_dir, paste0(ctr$name, "_gene_DE.tsv"))
-    write.table(res_df, out_file, sep = "\t", row.names = FALSE, quote = FALSE)
+    write.table(out_df, out_file, sep = "\t", row.names = FALSE, quote = FALSE)
 
     cat("  Wrote:", out_file, "\n")
-    cat("  Genes:", nrow(res_df), "\n")
-    cat("  Significant (FDR < 0.05):", sum(res_df$FDR < 0.05), "\n")
-    cat("  |log2FC| > 1:", sum(abs(res_df$log2FC) > 1), "\n")
+    cat("  Genes:", nrow(out_df), "\n")
+    cat("  Significant (FDR < 0.05):", sum(out_df$FDR < 0.05), "\n")
+    cat("  |shrunken log2FC| > 1:", sum(abs(out_df$log2FC_shrunken) > 1), "\n")
     cat(
-        "  Silent shifter candidates (|log2FC| < 0.3 & FDR > 0.2):",
-        sum(abs(res_df$log2FC) < 0.3 & res_df$FDR > 0.2), "\n"
+        "  Bounded small-expression genes (|shrunken log2FC| < 0.3, CI mostly inside ±0.3, FDR >= 0.05):",
+        sum(abs(out_df$log2FC_shrunken) < 0.3 &
+            ((pmin(out_df$lfc_ci_high, 0.3) - pmax(out_df$lfc_ci_low, -0.3)) /
+             pmax(out_df$lfc_ci_high - out_df$lfc_ci_low, .Machine$double.eps)) >= 0.8 &
+            out_df$FDR >= 0.05, na.rm = TRUE), "\n"
     )
 }
 

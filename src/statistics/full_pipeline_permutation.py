@@ -1,6 +1,6 @@
 # src/statistics/full_pipeline_permutation.py
 """
-Appendix-tier full-pipeline permutation for selected top-hit genes.
+Full-pipeline permutation manifest for selected top-hit genes.
 
 This is deliberately separate from src.statistics.permutation_bootstrap. The
 fast Phase 6 test calibrates edge-sum node rewiring; this driver is reserved for
@@ -8,7 +8,7 @@ the expensive statistic that matches Phase 3 node2vec/Procrustes cosine-distance
 rewiring. It permutes labels, reruns the requested pipeline commands into
 isolated directories, and records a manifest for auditable execution.
 
-By default the module writes a dry-run manifest only. Use --execute after a
+By default the module writes a reviewable manifest only. Use --execute after a
 pre-registered top-hit file and command template have been reviewed.
 """
 
@@ -30,14 +30,18 @@ DEFAULT_COMMAND_TEMPLATE = (
     "{python} -m src.networks.shared_topology "
     "--rtech={rtech} --meta={meta} --outdir={phase2_dir} "
     "--max_genes={max_genes} --topk={topk} --id_map={id_map} "
-    "--anchor_config={anchor_config} --biotype_filter=protein_coding && "
+    "--anchor_config={anchor_config} --biotype_filter=protein_coding "
+    "--gene_sets={gene_sets} --pathway_prior_sets={pathway_prior_sets} "
+    "--edge_priors={edge_priors} && "
     "{python} -m src.networks.lioness "
-    "--rtech={rtech} --meta={meta} --phase2_dir={phase2_dir} && "
+    "--rtech={rtech} --meta={meta} --phase2_dir={phase2_dir} "
+    "--lioness-transform={lioness_transform} --out=lioness_edges.npy && "
     "{python} -m src.networks.edge_regression "
-    "--meta={meta} --phase2_dir={phase2_dir} --outdir={reg_dir} && "
+    "--meta={meta} --phase2_dir={phase2_dir} --edge-weights=lioness_edges.npy "
+    "--expression-source=residualized --outdir={reg_dir} && "
     "{python} -m src.networks.embeddings "
     "--phase2_dir={phase2_dir} --reg_dir={reg_dir} --outdir={emb_dir} "
-    "--num_seeds={num_seeds} --seed0={seed0} && "
+    "--num_seeds={num_seeds} --seed0={seed0} --signed-mode=signed_split && "
     "{python} -m src.networks.procrustes "
     "--phase2_dir={phase2_dir} --emb_dir={emb_dir} --outdir={rewiring_dir} "
     "--anchor_config={anchor_config} --id_map={id_map} "
@@ -133,6 +137,10 @@ def write_permutation_manifest(
     num_seeds: int,
     seed0: int,
     strata_cols: list[str],
+    gene_sets: Path | None = None,
+    pathway_prior_sets: str = "dct_ncc_wnk,ion_transport,calcium_handling",
+    edge_priors: str = "",
+    lioness_transform: str = "raw_ranknorm",
 ) -> pd.DataFrame:
     validate_command_template(command_template)
     meta = read_metadata(meta_path)
@@ -160,6 +168,10 @@ def write_permutation_manifest(
             rtech=shell_quote(rtech_path),
             id_map=shell_quote(id_map_path),
             anchor_config=shell_quote(anchor_config),
+            gene_sets=shell_quote(gene_sets or (REPO_ROOT / "config/gene_sets.yaml")),
+            pathway_prior_sets=shell_quote(pathway_prior_sets),
+            edge_priors=shell_quote(edge_priors),
+            lioness_transform=shell_quote(lioness_transform),
             repo_root=shell_quote(REPO_ROOT),
             python=shell_quote(sys.executable),
             max_genes=max_genes,
@@ -181,13 +193,16 @@ def write_permutation_manifest(
     (outdir / "top_hits.txt").write_text("\n".join(top_hits) + "\n")
     metadata = {
         "statistic": "Phase 3 node2vec/Procrustes cosine-distance rewiring",
-        "scope": "appendix-tier selected top hits only",
+        "scope": "direct full-pipeline selected top hits",
         "n_top_hits": len(top_hits),
         "k_perm": k_perm,
         "seed": seed,
         "meta_path": str(meta_path),
         "rtech_path": str(rtech_path),
         "permutation": f"FLT/GC labels shuffled within {' x '.join(strata_cols)} strata",
+        "lioness_transform": lioness_transform,
+        "edge_priors": edge_priors,
+        "pathway_prior_sets": pathway_prior_sets,
         "requires_execute_flag": True,
     }
     (outdir / "full_pipeline_permutation_metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
@@ -258,6 +273,11 @@ def main() -> None:
     ap.add_argument("--rtech", default=str(REPO_ROOT / "data/processed/phase1_residuals/Rtech.tsv.gz"))
     ap.add_argument("--id_map", default=str(REPO_ROOT / "data/processed/resources/id_map.tsv"))
     ap.add_argument("--anchor_config", default=str(REPO_ROOT / "config/anchor_genes.yaml"))
+    ap.add_argument("--gene_sets", default=str(REPO_ROOT / "config/gene_sets.yaml"))
+    ap.add_argument("--pathway_prior_sets", default="dct_ncc_wnk,ion_transport,calcium_handling")
+    ap.add_argument("--edge_priors", default="")
+    ap.add_argument("--lioness-transform", default="raw_ranknorm",
+                    choices=["raw_ranknorm", "raw_robust", "raw", "z_contribution"])
     ap.add_argument("--strata_cols", default="Age,Arm")
     ap.add_argument("--contrast", default="ISS_T_YNG_FLT_minus_GC")
     ap.add_argument("--max_genes", type=int, default=2500)
@@ -295,8 +315,12 @@ def main() -> None:
         num_seeds=args.num_seeds,
         seed0=args.seed0,
         strata_cols=strata_cols,
+        gene_sets=Path(args.gene_sets),
+        pathway_prior_sets=args.pathway_prior_sets,
+        edge_priors=args.edge_priors,
+        lioness_transform=args.lioness_transform,
     )
-    print(f"[OK] Wrote appendix-tier full-pipeline permutation manifest to {outdir}")
+    print(f"[OK] Wrote full-pipeline permutation manifest to {outdir}")
 
     if args.execute:
         failures = execute_manifest(manifest, stop_on_error=not args.continue_on_error)

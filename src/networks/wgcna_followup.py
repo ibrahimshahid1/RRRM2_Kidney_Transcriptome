@@ -4,23 +4,60 @@ WGCNA Manuscript Follow-up: Simple contrasts, hub genes, eigengene plots,
 GO/KEGG enrichment, and final integrated table.
 """
 from __future__ import annotations
-import json, warnings, gzip
+import json, os, warnings, gzip
 from pathlib import Path
 
 import numpy as np
+from numpy.linalg import inv
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 from scipy import stats as sp_stats
+import yaml
+import gseapy as gp
 
 warnings.filterwarnings("ignore")
-
 # ── Paths ─────────────────────────────────────────────────────────────────
-ROOT  = Path("/Users/ibrahimshahid/Documents/Github/RRRM2_Kidney_Transcriptome")
-WDIR  = ROOT / "data/results/run_20260505_remediated_2500g/wgcna"
-RTECH = ROOT / "data/results/run_20260408_191759_2500g/phase1_residuals/Rtech.tsv.gz"
-META  = ROOT / "data/results/run_20260408_191759_2500g/phase1_residuals/meta_phase1.tsv.gz"
+ROOT  = Path(__file__).resolve().parent.parent.parent
+_results_dir = os.environ.get("RRRM_RESULTS_DIR", "")
+
+if _results_dir:
+    # Running from pipeline — resolve paths from the active run
+    WDIR  = Path(_results_dir) / "wgcna"
+    # Find Phase 1 outputs: check current run first, then scan for latest
+    _rtech_candidate = Path(_results_dir) / "phase1_residuals/Rtech.tsv.gz"
+    if _rtech_candidate.exists():
+        RTECH = _rtech_candidate
+        META  = Path(_results_dir) / "phase1_residuals/meta_phase1.tsv.gz"
+    else:
+        # Phase 1 may have been run in a different run directory; scan
+        _results_root = ROOT / "data/results"
+        for rd in sorted(_results_root.glob("run_*"), reverse=True):
+            if (rd / "phase1_residuals/Rtech.tsv.gz").exists():
+                RTECH = rd / "phase1_residuals/Rtech.tsv.gz"
+                META  = rd / "phase1_residuals/meta_phase1.tsv.gz"
+                break
+        else:
+            raise FileNotFoundError("Cannot find Phase 1 Rtech.tsv.gz in any run directory")
+else:
+    # Standalone execution — use latest run
+    _results_root = ROOT / "data/results"
+    for rd in sorted(_results_root.glob("run_*"), reverse=True):
+        if (rd / "wgcna/module_assignments.csv").exists():
+            WDIR = rd / "wgcna"
+            break
+    else:
+        raise FileNotFoundError("No WGCNA run found")
+    for rd in sorted(_results_root.glob("run_*"), reverse=True):
+        if (rd / "phase1_residuals/Rtech.tsv.gz").exists():
+            RTECH = rd / "phase1_residuals/Rtech.tsv.gz"
+            META  = rd / "phase1_residuals/meta_phase1.tsv.gz"
+            break
+    else:
+        raise FileNotFoundError("No Phase 1 Rtech found")
+
 IDMAP = ROOT / "data/processed/resources/id_map.tsv"
 GSETS = ROOT / "config/gene_sets.yaml"
 OUTDIR = WDIR / "manuscript_followup"
@@ -57,7 +94,7 @@ sym_col = [c for c in id_df.columns if "symbol" in c.lower() or "mgi" in c.lower
 sym_map = dict(zip(id_df[eid_col].astype(str), id_df[sym_col].astype(str)))
 
 # Gene set membership for annotation
-import yaml
+
 with open(GSETS) as f:
     gs_config = yaml.safe_load(f)
 
@@ -101,7 +138,7 @@ strata = {
 #   β_Flight + a*β_Flight:AgeOld + r*β_Flight:ArmLAR + a*r*β_Flight:AgeOld:ArmLAR
 # Contrast vector c = [0, 1, 0, 0, a, r, 0, a*r] (matching intercept, Flight, AgeOld, ArmLAR, F:A, F:R, A:R, F:A:R)
 
-from numpy.linalg import inv
+
 
 X = np.column_stack([
     np.ones(len(meta_fg)),
@@ -257,7 +294,7 @@ for mod_color in plot_modules:
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
-    from matplotlib.patches import Patch
+
     ax.legend(handles=[Patch(facecolor=colors_flt, label="FLT"),
                        Patch(facecolor=colors_gc, label="GC")],
               loc="upper right", framealpha=0.8)
@@ -275,7 +312,7 @@ print("\n" + "="*60)
 print("4. GO/KEGG Enrichment for Significant Modules")
 print("="*60)
 
-import gseapy as gp
+
 
 enrich_dir = OUTDIR / "enrichment"
 enrich_dir.mkdir(exist_ok=True)

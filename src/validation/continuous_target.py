@@ -156,7 +156,10 @@ def main() -> None:
     genes = [g.strip() for g in (phase2 / "phase2_genes.txt").read_text().splitlines() if g.strip()]
     edge_i = np.load(phase2 / "edge_i.npy")
     edge_j = np.load(phase2 / "edge_j.npy")
-    lioness = np.load(phase2 / "lioness_z_edges.npy")
+    lioness_path = phase2 / "lioness_edges.npy"
+    if not lioness_path.exists():
+        lioness_path = phase2 / "lioness_z_edges.npy"
+    lioness = np.load(lioness_path)
     samples = [s.strip() for s in (phase2 / "lioness_samples.txt").read_text().splitlines() if s.strip()]
     sample_pos = [samples.index(s) for s in common if s in samples]
     common_lioness_samples = [samples[i] for i in sample_pos]

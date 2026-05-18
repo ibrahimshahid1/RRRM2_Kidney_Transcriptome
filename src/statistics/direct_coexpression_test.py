@@ -137,6 +137,7 @@ def run_stratum(
     rewiring_dir: Path | None,
     outdir: Path,
     id_map: dict[str, str] | None = None,
+    edge_meta: pd.DataFrame | None = None,
     rng: np.random.Generator | None = None,
 ) -> dict:
     """Run direct differential coexpression diagnostic for one stratum."""
@@ -281,6 +282,23 @@ def run_stratum(
         "delta_z": delta_z_obs[top_edge_idx],
         "abs_delta_z": np.abs(delta_z_obs[top_edge_idx]),
     }).sort_values("abs_delta_z", ascending=False)
+    if edge_meta is not None and len(edge_meta) == len(delta_z_obs):
+        extra_cols = [
+            c for c in ["edge_origin", "edge_source_detail", "is_fixed_prior"]
+            if c in edge_meta.columns
+        ]
+        extras = edge_meta.iloc[top_edge_idx][extra_cols].reset_index(drop=True)
+        edge_df = pd.concat([edge_df.reset_index(drop=True), extras], axis=1)
+        fixed = (
+            edge_df["is_fixed_prior"].fillna(False).astype(bool)
+            if "is_fixed_prior" in edge_df.columns
+            else pd.Series(False, index=edge_df.index)
+        )
+        edge_df["edge_p_value_scope"] = np.where(
+            fixed,
+            "fixed_prior_edge_diagnostic",
+            "exploratory_post_selection_data_driven_skeleton",
+        )
     edge_df.to_csv(sdir / "top_edges_by_delta_z.tsv", sep="\t", index=False)
 
     result = {
@@ -335,6 +353,7 @@ def main():
 
     edges = pd.read_csv(phase2 / "skeleton_edges.tsv", sep="\t")
     valid = edges["gene_i"].isin(gene_to_idx) & edges["gene_j"].isin(gene_to_idx)
+    edge_meta = edges.loc[valid].reset_index(drop=True)
     ei = edges.loc[valid, "gene_i"].map(gene_to_idx).astype(int).values
     ej = edges.loc[valid, "gene_j"].map(gene_to_idx).astype(int).values
     print(f"  Genes: {len(genes)}, Edges: {len(ei)}")
@@ -358,6 +377,7 @@ def main():
         genes = [g for g in genes if g in rtech.index]
         gene_to_idx = {g: i for i, g in enumerate(genes)}
         valid = edges["gene_i"].isin(gene_to_idx) & edges["gene_j"].isin(gene_to_idx)
+        edge_meta = edges.loc[valid].reset_index(drop=True)
         ei = edges.loc[valid, "gene_i"].map(gene_to_idx).astype(int).values
         ej = edges.loc[valid, "gene_j"].map(gene_to_idx).astype(int).values
 
@@ -390,7 +410,7 @@ def main():
 
         result = run_stratum(
             stratum_key, X_stratum, labels, ei, ej, genes,
-            args.n_perms, rewiring_dir, outdir, id_map, rng,
+            args.n_perms, rewiring_dir, outdir, id_map, edge_meta, rng,
         )
         all_results.append(result)
 
@@ -405,7 +425,7 @@ def main():
         "method": "Permutation-based aggregate diagnostic: gene-level mean|Δz| "
                   "with label-shuffled null. Concordance with LIONESS ranking "
                   "tested via permutation ρ.",
-        "note": "Skeleton built from all samples (diagnostic, not primary inference).",
+        "note": "Fisher-z group correlations are direct diagnostics. Edge-level rows from data-driven skeleton portions are exploratory after skeleton selection.",
     }
     with open(outdir / "direct_coexpr_metadata.json", "w") as f:
         json.dump(meta_out, f, indent=2)

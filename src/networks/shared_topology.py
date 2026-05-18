@@ -19,6 +19,7 @@ With biotype filtering (recommended):
 from __future__ import annotations
 
 import argparse
+from itertools import combinations
 import re
 from pathlib import Path
 
@@ -287,6 +288,222 @@ def topk_skeleton(pc: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
     return ii, jj
 
 
+def _read_gene_set_yaml(path: str | Path) -> dict:
+    try:
+        import yaml
+    except Exception as exc:  # pragma: no cover
+        raise ImportError("PyYAML is required for pathway prior edges") from exc
+    path = Path(path)
+    if not path.exists():
+        return {}
+    return yaml.safe_load(path.read_text()) or {}
+
+
+def _flatten_gene_symbols(value) -> list[str]:
+    genes: list[str] = []
+    if isinstance(value, str):
+        genes.append(value.strip())
+    elif isinstance(value, list):
+        for item in value:
+            genes.extend(_flatten_gene_symbols(item))
+    elif isinstance(value, dict):
+        for item in value.values():
+            genes.extend(_flatten_gene_symbols(item))
+    return [g for g in genes if g]
+
+
+def pathway_prior_edges(
+    gene_sets_yaml: str | Path,
+    selected_sets: list[str],
+    id_map: str | Path,
+    expression_genes: set[str],
+) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    """Resolve configured pathway genes and create pre-registered pairwise edges."""
+    if not selected_sets:
+        return pd.DataFrame(), pd.DataFrame(), []
+    cfg = _read_gene_set_yaml(gene_sets_yaml)
+    rows: list[dict[str, object]] = []
+    reports: list[pd.DataFrame] = []
+    force_ids: set[str] = set()
+    for set_name in selected_sets:
+        if set_name not in cfg or not isinstance(cfg[set_name], dict):
+            reports.append(pd.DataFrame([{
+                "source": "preregistered_pathway",
+                "set": set_name,
+                "query": "",
+                "ensembl_gene_id": "",
+                "status": "missing_gene_set",
+                "in_panel": False,
+            }]))
+            continue
+        symbols = _flatten_gene_symbols(cfg[set_name].get("genes", []))
+        resolved = resolve_configured_genes(symbols, id_map, panel_genes=expression_genes)
+        resolved["source"] = "preregistered_pathway"
+        resolved["set"] = set_name
+        reports.append(resolved)
+        present = sorted(set(resolved.loc[
+            (resolved["status"] == "mapped") &
+            (resolved["ensembl_gene_id"] != "") &
+            (resolved["in_panel"] == True),
+            "ensembl_gene_id",
+        ]))
+        force_ids.update(present)
+        for a, b in combinations(present, 2):
+            rows.append({
+                "gene_i": min(a, b),
+                "gene_j": max(a, b),
+                "edge_origin": "preregistered_pathway",
+                "edge_source_detail": set_name,
+                "is_fixed_prior": True,
+            })
+    report = pd.concat(reports, ignore_index=True) if reports else pd.DataFrame()
+    return pd.DataFrame(rows).drop_duplicates(), report, sorted(force_ids)
+
+
+def external_prior_edges(
+    paths: list[str],
+    id_map: str | Path,
+    expression_genes: set[str],
+) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    """Load external/prior edge tables and resolve gene symbols/IDs to Ensembl IDs."""
+    rows: list[dict[str, object]] = []
+    reports: list[dict[str, object]] = []
+    force_ids: set[str] = set()
+    for raw_path in paths:
+        path = Path(raw_path)
+        if not path.exists():
+            reports.append({
+                "source": "external_prior",
+                "edge_source_detail": str(path),
+                "query_i": "",
+                "query_j": "",
+                "gene_i": "",
+                "gene_j": "",
+                "status": "missing_file",
+            })
+            continue
+        sep = "\t" if path.suffix.lower() in {".tsv", ".txt"} else ","
+        table = pd.read_csv(path, sep=sep)
+        lower = {c.lower(): c for c in table.columns}
+        gi_col = lower.get("gene_i") or lower.get("source") or lower.get("gene1")
+        gj_col = lower.get("gene_j") or lower.get("target") or lower.get("gene2")
+        if gi_col is None or gj_col is None:
+            raise ValueError(f"{path} must contain gene_i/gene_j columns")
+        detail_col = lower.get("edge_source_detail") or lower.get("source_detail") or lower.get("evidence")
+        for _, row in table.iterrows():
+            qi = str(row[gi_col]).strip()
+            qj = str(row[gj_col]).strip()
+            ri = resolve_configured_genes([qi], id_map, panel_genes=expression_genes)
+            rj = resolve_configured_genes([qj], id_map, panel_genes=expression_genes)
+            ids_i = sorted(set(ri.loc[
+                (ri["status"] == "mapped") & (ri["ensembl_gene_id"] != "") & (ri["in_panel"] == True),
+                "ensembl_gene_id",
+            ]))
+            ids_j = sorted(set(rj.loc[
+                (rj["status"] == "mapped") & (rj["ensembl_gene_id"] != "") & (rj["in_panel"] == True),
+                "ensembl_gene_id",
+            ]))
+            detail = str(row[detail_col]).strip() if detail_col else path.name
+            if not ids_i or not ids_j:
+                reports.append({
+                    "source": "external_prior",
+                    "edge_source_detail": detail,
+                    "query_i": qi,
+                    "query_j": qj,
+                    "gene_i": ",".join(ids_i),
+                    "gene_j": ",".join(ids_j),
+                    "status": "unresolved_or_absent_from_expression",
+                })
+                continue
+            for a in ids_i:
+                for b in ids_j:
+                    if a == b:
+                        continue
+                    force_ids.update([a, b])
+                    rows.append({
+                        "gene_i": min(a, b),
+                        "gene_j": max(a, b),
+                        "edge_origin": "external_prior",
+                        "edge_source_detail": detail,
+                        "is_fixed_prior": True,
+                    })
+                    reports.append({
+                        "source": "external_prior",
+                        "edge_source_detail": detail,
+                        "query_i": qi,
+                        "query_j": qj,
+                        "gene_i": min(a, b),
+                        "gene_j": max(a, b),
+                        "status": "mapped",
+                    })
+    edge_df = pd.DataFrame(rows).drop_duplicates() if rows else pd.DataFrame()
+    report_df = pd.DataFrame(reports)
+    return edge_df, report_df, sorted(force_ids)
+
+
+def union_skeleton_with_priors(
+    genes: list[str],
+    pc: np.ndarray,
+    ii: np.ndarray,
+    jj: np.ndarray,
+    prior_edges: pd.DataFrame | None = None,
+) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
+    """Return a provenance-aware union skeleton and aligned edge index arrays."""
+    gene_to_idx = {g: i for i, g in enumerate(genes)}
+    records: dict[tuple[int, int], dict[str, object]] = {}
+
+    for a, b in zip(ii.tolist(), jj.tolist()):
+        key = (min(a, b), max(a, b))
+        records[key] = {
+            "gene_i": genes[key[0]],
+            "gene_j": genes[key[1]],
+            "pcorr": float(pc[key[0], key[1]]),
+            "abs_pcorr": float(abs(pc[key[0], key[1]])),
+            "i": key[0],
+            "j": key[1],
+            "edge_origin": "osd771_data",
+            "edge_source_detail": "topk_partial_correlation",
+            "is_fixed_prior": False,
+        }
+
+    if prior_edges is not None and not prior_edges.empty:
+        for _, row in prior_edges.iterrows():
+            gi = str(row["gene_i"])
+            gj = str(row["gene_j"])
+            if gi not in gene_to_idx or gj not in gene_to_idx or gi == gj:
+                continue
+            a, b = sorted([gene_to_idx[gi], gene_to_idx[gj]])
+            key = (a, b)
+            origin = str(row.get("edge_origin", "external_prior"))
+            detail = str(row.get("edge_source_detail", ""))
+            if key in records:
+                existing_origin = set(str(records[key]["edge_origin"]).split("|"))
+                existing_origin.add(origin)
+                existing_detail = set(str(records[key]["edge_source_detail"]).split("|"))
+                if detail:
+                    existing_detail.add(detail)
+                records[key]["edge_origin"] = "|".join(sorted(existing_origin))
+                records[key]["edge_source_detail"] = "|".join(sorted(existing_detail))
+                records[key]["is_fixed_prior"] = True
+            else:
+                records[key] = {
+                    "gene_i": genes[a],
+                    "gene_j": genes[b],
+                    "pcorr": float(pc[a, b]),
+                    "abs_pcorr": float(abs(pc[a, b])),
+                    "i": a,
+                    "j": b,
+                    "edge_origin": origin,
+                    "edge_source_detail": detail,
+                    "is_fixed_prior": True,
+                }
+
+    edge_df = pd.DataFrame(records.values()).sort_values(["i", "j"]).reset_index(drop=True)
+    out_i = edge_df["i"].to_numpy(np.int32)
+    out_j = edge_df["j"].to_numpy(np.int32)
+    return edge_df, out_i, out_j
+
+
 def main():
     ap = argparse.ArgumentParser(description="Build Phase 2 shared skeleton E")
     ap.add_argument("--rtech", default="data/processed/phase1_residuals/Rtech.tsv.gz",
@@ -318,6 +535,13 @@ def main():
                     help="Disable configured-anchor force inclusion (not recommended; for diagnostics only)")
     ap.add_argument("--anchor_report", default="anchor_force_include_report.tsv",
                     help="Filename under outdir for configured-anchor mapping report")
+    ap.add_argument("--edge_priors", default="",
+                    help="Comma-separated external/prior kidney coexpression edge tables with gene_i/gene_j columns")
+    ap.add_argument("--gene_sets", default=str(REPO_ROOT / "config/gene_sets.yaml"),
+                    help="Configured gene-set YAML used to create pre-registered pathway prior edges")
+    ap.add_argument("--pathway_prior_sets", default="dct_ncc_wnk,ion_transport,calcium_handling",
+                    help="Comma-separated gene-set keys to turn into pre-registered pairwise prior edges. "
+                         "Set to 'none' to disable.")
     args = ap.parse_args()
 
     outdir = Path(args.outdir)
@@ -377,6 +601,53 @@ def main():
         else:
             print(f"\n  WARNING: id_map not found at {id_map_path}, "
                   f"skipping biotype filter. Run build_id_map.py first.")
+
+    prior_edge_tables: list[pd.DataFrame] = []
+    prior_reports: list[pd.DataFrame] = []
+    prior_force_ids: list[str] = []
+    id_map_for_priors = Path(args.id_map)
+    if not id_map_for_priors.is_absolute():
+        id_map_for_priors = REPO_ROOT / id_map_for_priors
+    expression_genes = set(rtech.index)
+
+    if id_map_for_priors.exists():
+        pathway_sets = [
+            s.strip() for s in args.pathway_prior_sets.split(",")
+            if s.strip() and s.strip().lower() != "none"
+        ]
+        if pathway_sets:
+            p_edges, p_report, p_force = pathway_prior_edges(
+                gene_sets_yaml=args.gene_sets,
+                selected_sets=pathway_sets,
+                id_map=id_map_for_priors,
+                expression_genes=expression_genes,
+            )
+            if not p_edges.empty:
+                prior_edge_tables.append(p_edges)
+            if not p_report.empty:
+                prior_reports.append(p_report)
+            prior_force_ids.extend(p_force)
+            print(f"\nPre-registered pathway prior edges: {len(p_edges)} from sets {pathway_sets}")
+
+        prior_paths = [p.strip() for p in args.edge_priors.split(",") if p.strip()]
+        if prior_paths:
+            e_edges, e_report, e_force = external_prior_edges(
+                paths=prior_paths,
+                id_map=id_map_for_priors,
+                expression_genes=expression_genes,
+            )
+            if not e_edges.empty:
+                prior_edge_tables.append(e_edges)
+            if not e_report.empty:
+                prior_reports.append(e_report)
+            prior_force_ids.extend(e_force)
+            print(f"External/prior kidney edges: {len(e_edges)} from {len(prior_paths)} table(s)")
+    else:
+        print(f"\n  WARNING: id_map not found at {id_map_for_priors}; skipping prior-edge resolution")
+
+    if prior_force_ids:
+        force_include.extend(prior_force_ids)
+        print(f"  Prior-edge force-include genes present in expression: {len(set(prior_force_ids))}")
 
     if not args.no_anchor_force_include:
         anchor_config = Path(args.anchor_config)
@@ -441,35 +712,49 @@ def main():
         print("  Warning: added tiny ridge for inversion")
     pc = partial_corr_from_precision(prec)
     
-    # Build skeleton
+    # Build data-driven skeleton
     print(f"\nBuilding skeleton with top-k={args.topk} neighbors per gene...")
-    ii, jj = topk_skeleton(pc, k=args.topk)
-    
+    ii_data, jj_data = topk_skeleton(pc, k=args.topk)
+
+    prior_edges = pd.concat(prior_edge_tables, ignore_index=True).drop_duplicates() if prior_edge_tables else pd.DataFrame()
+    if prior_reports:
+        prior_report = pd.concat(prior_reports, ignore_index=True)
+        prior_report.to_csv(outdir / "edge_prior_resolution_report.tsv", sep="\t", index=False)
+        print(f"  Edge prior resolution report: {outdir / 'edge_prior_resolution_report.tsv'}")
+
+    edge_df, ii, jj = union_skeleton_with_priors(
+        genes=genes,
+        pc=pc,
+        ii=ii_data,
+        jj=jj_data,
+        prior_edges=prior_edges,
+    )
+
     # Save edge indices for downstream determinism
     np.save(outdir / "edge_i.npy", ii)
     np.save(outdir / "edge_j.npy", jj)
-    
-    # Save edge dataframe with partial correlation weights
-    w = pc[ii, jj]
-    edge_df = pd.DataFrame({
-        "gene_i": [genes[i] for i in ii],
-        "gene_j": [genes[j] for j in jj],
-        "pcorr": w,
-        "abs_pcorr": np.abs(w),
-        "i": ii,
-        "j": jj,
-    })
+
     edge_df.to_csv(outdir / "skeleton_edges.tsv", sep="\t", index=False)
+    provenance_summary = (
+        edge_df.groupby(["edge_origin", "is_fixed_prior"], dropna=False)
+        .size()
+        .reset_index(name="n_edges")
+        .sort_values("n_edges", ascending=False)
+    )
+    provenance_summary.to_csv(outdir / "skeleton_edge_provenance_summary.tsv", sep="\t", index=False)
 
     print(f"\n{'=' * 60}")
     print("Skeleton E built successfully")
     print(f"{'=' * 60}")
     print(f"  Genes: {len(genes)}")
-    print(f"  Edges: {len(edge_df)} (target: ~{len(genes)*args.topk//2} to ~{len(genes)*args.topk})")
+    print(f"  Edges: {len(edge_df)} (data-driven target: ~{len(genes)*args.topk//2} to ~{len(genes)*args.topk})")
+    if not prior_edges.empty:
+        print(f"  Prior edges requested: {len(prior_edges)}; fixed-prior edges in skeleton: {int(edge_df['is_fixed_prior'].sum())}")
     print(f"\nOutputs in {outdir}:")
     print(f"  - phase2_genes.txt")
-    print(f"  - skeleton_edges.tsv (with pcorr weights)")
+    print(f"  - skeleton_edges.tsv (with pcorr weights + provenance)")
     print(f"  - edge_i.npy, edge_j.npy (indices)")
+    print(f"  - skeleton_edge_provenance_summary.tsv")
 
 
 if __name__ == "__main__":

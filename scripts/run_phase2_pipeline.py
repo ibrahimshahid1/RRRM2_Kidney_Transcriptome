@@ -4,7 +4,7 @@ Phase 2 Unified Pipeline: Cell-Standardized Shared Skeleton Construction
 
 Runs all Phase 2 steps in sequence:
   1. Build skeleton E (cell-standardized partial correlation)
-  2. Compute LIONESS Fisher-z weights on E
+  2. Compute raw/rank-normalized LIONESS weights on E
   3. Edge-wise regression + predicted networks (requires rpy2/limma)
 
 Usage:
@@ -70,8 +70,16 @@ Examples:
     ap.add_argument("--no_noise_symbol_filter", action="store_true",
                     help="Disable Gm-prefix / Rik / unmapped symbol filter")
     
-    # Regression params
-    ap.add_argument("--add_covariates", default="LibraryBatch,SeqInstr,ReadDepth,rRNA")
+    # Corrected methodology params
+    ap.add_argument("--lioness-transform", default="raw_ranknorm",
+                    choices=["raw_ranknorm", "raw_robust", "raw", "z_contribution"])
+    ap.add_argument("--expression-source", choices=["residualized", "non_residualized"],
+                    default="residualized")
+    ap.add_argument("--add_covariates", default="",
+                    help="Allowed only with --expression-source=non_residualized")
+    ap.add_argument("--edge_priors", default="")
+    ap.add_argument("--gene_sets", default="config/gene_sets.yaml")
+    ap.add_argument("--pathway_prior_sets", default="dct_ncc_wnk,ion_transport,calcium_handling")
     
     # Control flags
     ap.add_argument("--skip_skeleton", action="store_true", help="Skip skeleton building")
@@ -90,20 +98,22 @@ Examples:
     print(f"  cell_cols    = {args.cell_cols}")
     print(f"  outdir       = {args.outdir}")
 
-    scripts_dir = Path(__file__).parent
     success = True
 
     # Step 1: Build Skeleton E
     cmd = [
-        sys.executable, str(scripts_dir / "build_phase2_skeleton.py"),
-        "--rtech", args.rtech,
-        "--meta", args.meta,
-        "--outdir", args.outdir,
-        "--max_genes", str(args.max_genes),
-        "--topk", str(args.topk),
-        "--cell_cols", args.cell_cols,
-        "--id_map", args.id_map,
-        "--biotype_filter", args.biotype_filter,
+        sys.executable, "-m", "src.networks.shared_topology",
+        f"--rtech={args.rtech}",
+        f"--meta={args.meta}",
+        f"--outdir={args.outdir}",
+        f"--max_genes={args.max_genes}",
+        f"--topk={args.topk}",
+        f"--cell_cols={args.cell_cols}",
+        f"--id_map={args.id_map}",
+        f"--biotype_filter={args.biotype_filter}",
+        f"--edge_priors={args.edge_priors}",
+        f"--gene_sets={args.gene_sets}",
+        f"--pathway_prior_sets={args.pathway_prior_sets}",
     ]
     if args.no_noise_symbol_filter:
         cmd.append("--no_noise_symbol_filter")
@@ -113,22 +123,27 @@ Examples:
 
     # Step 2: Compute LIONESS on Skeleton
     cmd = [
-        sys.executable, str(scripts_dir / "compute_phase2_lioness_on_skeleton.py"),
-        "--rtech", args.rtech,
-        "--meta", args.meta,
-        "--phase2_dir", args.outdir,
+        sys.executable, "-m", "src.networks.lioness",
+        f"--rtech={args.rtech}",
+        f"--meta={args.meta}",
+        f"--phase2_dir={args.outdir}",
+        f"--lioness-transform={args.lioness_transform}",
+        "--out=lioness_edges.npy",
     ]
-    if not run_step("LIONESS Fisher-z Weights (Step A1)", cmd, skip=args.skip_lioness):
+    if not run_step("LIONESS Edge Weights (Step A1)", cmd, skip=args.skip_lioness):
         print("\n[PIPELINE FAILED] LIONESS computation failed")
         return 1
 
     # Step 3: Edge-wise Regression
     cmd = [
-        sys.executable, str(scripts_dir / "phase2_edge_regression.py"),
-        "--meta", args.meta,
-        "--phase2_dir", args.outdir,
-        "--add_covariates", args.add_covariates,
+        sys.executable, "-m", "src.networks.edge_regression",
+        f"--meta={args.meta}",
+        f"--phase2_dir={args.outdir}",
+        "--edge-weights=lioness_edges.npy",
+        f"--expression-source={args.expression_source}",
     ]
+    if args.add_covariates:
+        cmd.append(f"--add_covariates={args.add_covariates}")
     if not run_step("Edge-wise Regression (Step A2-A3)", cmd, skip=args.skip_regression):
         if not args.skip_regression:
             print("\n[WARNING] Edge regression failed (likely missing rpy2/limma)")
@@ -148,7 +163,7 @@ Examples:
         "phase2_genes.txt",
         "skeleton_edges.tsv",
         "edge_i.npy", "edge_j.npy",
-        "lioness_z_edges.npy",
+        "lioness_edges.npy",
         "lioness_samples.txt",
         "edge_index.tsv",
     ]

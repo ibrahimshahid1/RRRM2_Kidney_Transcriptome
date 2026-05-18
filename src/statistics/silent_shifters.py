@@ -5,8 +5,9 @@ Phase 5: DE-aware silent shifter generation.
 Definitions:
   * candidate rewired genes: top rewiring quantile, regardless of DE.
   * DE-supported genes: high rewiring with differential-expression support.
-  * strict silent shifters: high rewiring and DE-null
-    (|log2FC| < threshold and DE FDR > threshold).
+  * strict silent shifters: high rewiring and bounded/small mean-expression
+    change (shrunken |log2FC| < threshold, most of the 95% CI lies inside a
+    small-effect interval, and DE FDR is not significant).
   * supported strict subset: strict silent shifters with Phase 6 support.
 
 Missing DE is an error by default. Older rewiring-only behavior can be requested
@@ -66,16 +67,54 @@ def load_de_table(path: Path) -> pd.DataFrame:
         "adj.P.Val": "FDR",
         "padj": "FDR",
         "qvalue": "FDR",
+        "log2FC_shrunk": "log2FC_shrunken",
         "log2FoldChange": "log2FC",
         "logFC": "log2FC",
+        "lfcSE_shrunken": "lfcSE",
+        "ci_low": "lfc_ci_low",
+        "ci_high": "lfc_ci_high",
     })
-    required = {"gene", "log2FC", "FDR"}
+    if "log2FC_shrunken" not in de.columns and "log2FC" in de.columns:
+        de["log2FC_shrunken"] = de["log2FC"]
+    required = {"gene", "log2FC_shrunken", "FDR", "lfc_ci_low", "lfc_ci_high"}
     missing = required - set(de.columns)
     if missing:
-        raise ValueError(f"{path} missing required DE columns: {sorted(missing)}")
-    out = de[["gene", "log2FC", "FDR"]].drop_duplicates("gene").copy()
-    out["log2FC"] = pd.to_numeric(out["log2FC"], errors="coerce")
+        raise ValueError(
+            f"{path} missing required DE columns for bounded silent shifters: {sorted(missing)}"
+        )
+    cols = ["gene", "log2FC_shrunken", "FDR", "lfc_ci_low", "lfc_ci_high"]
+    if "lfcSE" in de.columns:
+        cols.append("lfcSE")
+    out = de[cols].drop_duplicates("gene").copy()
+    out["log2FC_shrunken"] = pd.to_numeric(out["log2FC_shrunken"], errors="coerce")
     out["FDR"] = pd.to_numeric(out["FDR"], errors="coerce")
+    out["lfc_ci_low"] = pd.to_numeric(out["lfc_ci_low"], errors="coerce")
+    out["lfc_ci_high"] = pd.to_numeric(out["lfc_ci_high"], errors="coerce")
+    if "lfcSE" in out.columns:
+        out["lfcSE"] = pd.to_numeric(out["lfcSE"], errors="coerce")
+    out["log2FC"] = out["log2FC_shrunken"]
+    return out
+
+
+def ci_inside_fraction(
+    low: pd.Series | np.ndarray,
+    high: pd.Series | np.ndarray,
+    interval_low: float,
+    interval_high: float,
+) -> np.ndarray:
+    """Fraction of each CI width that lies inside the small-effect interval."""
+    low = np.asarray(low, dtype=float)
+    high = np.asarray(high, dtype=float)
+    lo = np.minimum(low, high)
+    hi = np.maximum(low, high)
+    width = hi - lo
+    overlap = np.maximum(0.0, np.minimum(hi, interval_high) - np.maximum(lo, interval_low))
+    out = np.zeros_like(width, dtype=float)
+    nonzero = width > 0
+    out[nonzero] = overlap[nonzero] / width[nonzero]
+    degenerate = ~nonzero & np.isfinite(lo) & np.isfinite(hi)
+    out[degenerate] = ((lo[degenerate] >= interval_low) & (hi[degenerate] <= interval_high)).astype(float)
+    out[~np.isfinite(out)] = 0.0
     return out
 
 
@@ -120,16 +159,25 @@ def hypergeom_upper_tail(population: int, successes: int, draws: int, observed: 
 
 def build_silent_shifter_tables(
     rw: pd.DataFrame,
-    fdr_min: float = 0.2,
+    de_fdr_alpha: float = 0.05,
     lfc_max: float = 0.3,
+    ci_inside_min: float = 0.80,
     top_quantile: float = 0.9,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
     """Return annotated all genes, high-rewiring candidates, strict silent table, summary."""
     rw = rw.copy()
     thr = rw["rewiring_mean"].quantile(top_quantile)
     rw["high_rewiring"] = rw["rewiring_mean"] >= thr
-    rw["de_null"] = (rw["FDR"] > fdr_min) & (rw["log2FC"].abs() < lfc_max)
-    rw["de_supported"] = (rw["FDR"] <= fdr_min) | (rw["log2FC"].abs() >= lfc_max)
+    rw["lfc_ci_inside_fraction"] = ci_inside_fraction(
+        rw["lfc_ci_low"], rw["lfc_ci_high"], -lfc_max, lfc_max
+    )
+    rw["bounded_lfc"] = (
+        (rw["log2FC_shrunken"].abs() < lfc_max) &
+        (rw["lfc_ci_inside_fraction"] >= ci_inside_min)
+    )
+    rw["not_de_significant"] = rw["FDR"] >= de_fdr_alpha
+    rw["de_null"] = rw["bounded_lfc"] & rw["not_de_significant"]
+    rw["de_supported"] = (rw["FDR"] < de_fdr_alpha) | (~rw["bounded_lfc"])
     rw["strict_silent_shifter"] = rw["high_rewiring"] & rw["de_null"]
 
     candidates = rw[rw["high_rewiring"]].sort_values("rewiring_mean", ascending=False).reset_index(drop=True)
@@ -153,8 +201,12 @@ def build_silent_shifter_tables(
         "n_total_genes": total,
         "top_quantile": top_quantile,
         "rewiring_threshold": float(thr),
+        "small_effect_interval_low": -lfc_max,
+        "small_effect_interval_high": lfc_max,
+        "ci_inside_min": ci_inside_min,
+        "de_fdr_alpha": de_fdr_alpha,
         "n_candidate_rewired": high,
-        "n_de_null": low_de,
+        "n_bounded_small_expression_change": low_de,
         "n_de_supported_high_rewiring": len(de_supported),
         "n_strict_silent_shifters": observed,
         "n_supported_strict_silent_shifters": supported_strict,
@@ -174,8 +226,11 @@ def main() -> None:
     ap.add_argument("--regression_results", default="", help="Optional Phase 6 regression support table")
     ap.add_argument("--outdir", default=str(REPO_ROOT / "data/results/phase5_silent_shifters_strict"))
     ap.add_argument("--top_quantile", type=float, default=0.9)
-    ap.add_argument("--fdr_min", type=float, default=0.2)
+    ap.add_argument("--de_fdr_alpha", type=float, default=0.05)
+    ap.add_argument("--fdr_min", type=float, default=None,
+                    help="Deprecated alias for --de_fdr_alpha")
     ap.add_argument("--lfc_max", type=float, default=0.3)
+    ap.add_argument("--ci_inside_min", type=float, default=0.80)
     ap.add_argument("--support_q", type=float, default=0.1)
     ap.add_argument("--allow_missing_de", action="store_true",
                     help="Exploratory rewiring-only mode; strict silent shifters are not emitted.")
@@ -202,7 +257,9 @@ def main() -> None:
             print(f"[WARN] {missing_de} rewiring genes lack DE rows in {de_path.name}; they cannot be DE-null.")
         print(f"Loaded DE for {de['gene'].nunique()} genes from {de_path}")
     elif args.allow_missing_de:
-        rw["log2FC"] = np.nan
+        rw["log2FC_shrunken"] = np.nan
+        rw["lfc_ci_low"] = np.nan
+        rw["lfc_ci_high"] = np.nan
         rw["FDR"] = np.nan
         rw["de_null"] = False
         print("[WARN] Missing DE allowed: output is exploratory and no strict silent shifters will be called.")
@@ -219,10 +276,12 @@ def main() -> None:
         support_path = Path(args.perm)
     rw = attach_support(rw, support_path, args.support_q)
 
+    de_fdr_alpha = args.de_fdr_alpha if args.fdr_min is None else args.fdr_min
     annotated, candidates, strict, summary = build_silent_shifter_tables(
         rw,
-        fdr_min=args.fdr_min,
+        de_fdr_alpha=de_fdr_alpha,
         lfc_max=args.lfc_max,
+        ci_inside_min=args.ci_inside_min,
         top_quantile=args.top_quantile,
     )
 

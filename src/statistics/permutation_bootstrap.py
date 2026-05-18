@@ -189,7 +189,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Permutation/bootstrap tests for edge-sum node rewiring")
     ap.add_argument("--phase2_dir", default=str(REPO_ROOT / "data/processed/networks/phase2"))
     ap.add_argument("--meta", default=str(REPO_ROOT / "data/processed/phase1_residuals/meta_phase1.tsv.gz"))
-    ap.add_argument("--z", default="lioness_z_edges.npy")
+    ap.add_argument("--edge-weights", "--z", dest="edge_weights", default="lioness_edges.npy")
     ap.add_argument("--outdir", default=str(REPO_ROOT / "data/results/phase6_uncertainty"))
     ap.add_argument("--K_perm", type=int, default=DEFAULT_K_PERM)
     ap.add_argument("--B_boot", type=int, default=DEFAULT_B_BOOT)
@@ -246,7 +246,12 @@ def main() -> None:
     edge_j = np.load(phase2 / "edge_j.npy")
     print(f"Loaded {len(edge_i)} edges")
 
-    z_path = phase2 / args.z
+    z_path = phase2 / args.edge_weights
+    if not z_path.exists() and args.edge_weights == "lioness_edges.npy":
+        legacy = phase2 / "lioness_z_edges.npy"
+        if legacy.exists():
+            z_path = legacy
+            print("  WARNING: using legacy lioness_z_edges.npy. Prefer lioness_edges.npy for corrected defaults.")
     if not z_path.exists():
         raise FileNotFoundError(f"Missing Z matrix: {z_path}")
     z = np.load(z_path)

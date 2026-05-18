@@ -230,7 +230,8 @@ def build_id_map_if_needed(dry_run: bool = False) -> None:
         log("Gene list not found, cannot build ID map", "WARN")
 
 
-def phase_0(dry_run: bool = False, skip_r: bool = False) -> bool:
+def phase_0(dry_run: bool = False, skip_r: bool = False,
+            deconv_sensitivity_alternate: str = "") -> bool:
     """Phase 0: Deconvolution (R)"""
     log("PHASE 0: Cell-type Deconvolution")
     
@@ -239,8 +240,18 @@ def phase_0(dry_run: bool = False, skip_r: bool = False) -> bool:
         return True
     
     deconv_dir = os.environ.get("RRRM_DECONV_DIR")
-    return run_rscript("src/preprocessing/deconvolution.R",
-                       args=[f"--outdir={deconv_dir}"], dry_run=dry_run)
+    success = run_rscript("src/preprocessing/deconvolution.R",
+                          args=[f"--outdir={deconv_dir}"], dry_run=dry_run)
+    if not success:
+        return False
+    if deconv_sensitivity_alternate:
+        log("Running deconvolution sensitivity against alternate proportions")
+        return run_rscript("src/preprocessing/deconvolution_sensitivity.R", [
+            f"--music={Path(deconv_dir) / 'music_segment_direct_proportions.csv'}",
+            f"--alternate={deconv_sensitivity_alternate}",
+            f"--outdir={Path(os.environ.get('RRRM_RESULTS_DIR')) / 'deconvolution_sensitivity'}",
+        ], dry_run=dry_run)
+    return True
 
 
 def phase_1(dry_run: bool = False, skip_r: bool = False,
@@ -251,6 +262,12 @@ def phase_1(dry_run: bool = False, skip_r: bool = False,
     if skip_r:
         log("Skipping R-dependent residualization", "WARN")
         return True
+
+    qc_outdir = Path(os.environ.get("RRRM_RESULTS_DIR")) / "pre_residualization_qc"
+    if not run_python("src.preprocessing.qc_variance",
+                      [f"--outdir={qc_outdir}"],
+                      dry_run=dry_run):
+        return False
     
     # Resolve CLR from current or latest run
     clr_path = find_artifact("deconvolution/music_segment_direct_proportions_CLR.csv")
@@ -359,7 +376,12 @@ def phase_1_5b(dry_run: bool = False) -> bool:
 
 def phase_2(dry_run: bool = False, skip_r: bool = False,
             max_genes: int = 2500, topk: int = 80,
-            pool_controls: bool = False) -> bool:
+            pool_controls: bool = False,
+            lioness_transform: str = "raw_ranknorm",
+            expression_source: str = "residualized",
+            edge_covariates: str = "",
+            edge_priors: str = "",
+            pathway_prior_sets: str = "dct_ncc_wnk,ion_transport,calcium_handling") -> bool:
     """Phase 2: Network Construction"""
     log("PHASE 2: Network Skeleton + LIONESS + Edge Regression")
 
@@ -377,15 +399,20 @@ def phase_2(dry_run: bool = False, skip_r: bool = False,
     if not run_python("src.networks.shared_topology",
 	                      [f"--max_genes={max_genes}", f"--topk={topk}",
 	                       f"--outdir={networks_dir}",
-	                       f"--id_map=data/processed/resources/id_map.tsv",
+                           f"--id_map=data/processed/resources/id_map.tsv",
                            f"--anchor_config=config/anchor_genes.yaml",
-	                       f"--biotype_filter=protein_coding"] + force_args,
+	                       f"--biotype_filter=protein_coding",
+                           f"--edge_priors={edge_priors}",
+                           f"--gene_sets=config/gene_sets.yaml",
+                           f"--pathway_prior_sets={pathway_prior_sets}"] + force_args,
 	                      dry_run=dry_run):
         return False
 
     # Step A1: LIONESS edge weights
     if not run_python("src.networks.lioness",
-                      [f"--phase2_dir={networks_dir}"],
+                      [f"--phase2_dir={networks_dir}",
+                       f"--lioness-transform={lioness_transform}",
+                       "--out=lioness_edges.npy"],
                       dry_run=dry_run):
         return False
 
@@ -394,7 +421,11 @@ def phase_2(dry_run: bool = False, skip_r: bool = False,
         log("Skipping R-dependent edge regression", "WARN")
     else:
         reg_args = [f"--phase2_dir={networks_dir}",
-                    f"--outdir={networks_dir}/regression"]
+                    f"--outdir={networks_dir}/regression",
+                    "--edge-weights=lioness_edges.npy",
+                    f"--expression-source={expression_source}"]
+        if edge_covariates:
+            reg_args.append(f"--add_covariates={edge_covariates}")
         if pool_controls:
             reg_args.append("--pool-controls")
             log("Edge regression: pooling GC+VIV+BSL as ground controls")
@@ -405,7 +436,8 @@ def phase_2(dry_run: bool = False, skip_r: bool = False,
 
 
 def phase_3(dry_run: bool = False, num_seeds: int = 10,
-            pool_controls: bool = False) -> bool:
+            pool_controls: bool = False,
+            signed_mode: str = "signed_split") -> bool:
     """Phase 3: Embeddings + Procrustes"""
     log("PHASE 3: Node2Vec Embeddings + Procrustes Alignment")
 
@@ -424,7 +456,8 @@ def phase_3(dry_run: bool = False, num_seeds: int = 10,
                        f"--reg_dir={networks_dir}/regression",
                        f"--outdir={results_dir}/phase3_embeddings",
                        f"--num_seeds={num_seeds}",
-                       f"--patterns={emb_patterns}"],
+                       f"--patterns={emb_patterns}",
+                       f"--signed-mode={signed_mode}"],
                       dry_run=dry_run):
         return False
 
@@ -484,7 +517,13 @@ def phase_5(dry_run: bool = False) -> bool:
 def phase_6(dry_run: bool = False, skip_r: bool = False,
             pool_controls: bool = False,
             candidate_genes: str = "",
-            hierarchical_fdr: bool = False) -> bool:
+            hierarchical_fdr: bool = False,
+            full_pipeline_top_hits: str = "",
+            full_pipeline_perms: int = 100,
+            execute_full_pipeline_permutation: bool = False,
+            lioness_transform: str = "raw_ranknorm",
+            edge_priors: str = "",
+            pathway_prior_sets: str = "dct_ncc_wnk,ion_transport,calcium_handling") -> bool:
     """Phase 6: Uncertainty Estimation + Full Regression"""
     log("PHASE 6: Permutation + Bootstrap + Full Regression")
 
@@ -493,7 +532,8 @@ def phase_6(dry_run: bool = False, skip_r: bool = False,
 
     # Permutation and bootstrap
     perm_args = [f"--phase2_dir={networks_dir}",
-                 f"--outdir={results_dir}/phase6_uncertainty"]
+                 f"--outdir={results_dir}/phase6_uncertainty",
+                 "--edge-weights=lioness_edges.npy"]
     if pool_controls:
         perm_args.append("--pool-controls")
         log("Permutation test: pooling GC+VIV+BSL as ground controls")
@@ -510,10 +550,29 @@ def phase_6(dry_run: bool = False, skip_r: bool = False,
     if not run_python("src.statistics.permutation_bootstrap", perm_args, dry_run=dry_run):
         return False
 
+    if full_pipeline_top_hits:
+        fp_args = [
+            f"--top_hits={full_pipeline_top_hits}",
+            f"--K_perm={full_pipeline_perms}",
+            f"--outdir={results_dir}/phase6_full_pipeline_permutation",
+            f"--meta={Path(results_dir) / 'phase1_residuals/meta_phase1.tsv.gz'}",
+            f"--rtech={Path(results_dir) / 'phase1_residuals/Rtech.tsv.gz'}",
+            f"--lioness-transform={lioness_transform}",
+            f"--edge_priors={edge_priors}",
+            f"--pathway_prior_sets={pathway_prior_sets}",
+        ]
+        if execute_full_pipeline_permutation:
+            fp_args.append("--execute")
+        if not run_python("src.statistics.full_pipeline_permutation", fp_args, dry_run=dry_run):
+            return False
+    else:
+        log("Full node2vec/Procrustes permutation requires --full-pipeline-top-hits; skipping manifest", "WARN")
+
     # Full factorial regression
     if not run_python("src.statistics.full_regression",
                       [f"--phase2_dir={networks_dir}",
-                       f"--outdir={results_dir}/phase6_regression"],
+                       f"--outdir={results_dir}/phase6_regression",
+                       "--edge-weights=lioness_edges.npy"],
                       dry_run=dry_run):
         return False
 
@@ -556,6 +615,20 @@ def phase_wgcna(dry_run: bool = False, max_genes: int = 5000, n_pres_perms: int 
     return run_rscript("src/networks/wgcna_analysis.R", wgcna_args, dry_run=dry_run)
 
 
+def phase_wgcna_followup(dry_run: bool = False) -> bool:
+    """WGCNA Follow-up: simple contrasts, hub genes, eigengene plots, GO enrichment."""
+    log("WGCNA Follow-up: Contrasts + Hub Genes + Plots + Enrichment")
+
+    results_dir = os.environ.get("RRRM_RESULTS_DIR")
+    wgcna_dir = Path(results_dir) / "wgcna"
+
+    if not (wgcna_dir / "module_assignments.csv").exists():
+        log("WGCNA outputs not found; run WGCNA analysis first", "WARN")
+        return False
+
+    return run_python("src.networks.wgcna_followup", [], dry_run=dry_run)
+
+
 def phase_10(dry_run: bool = False) -> bool:
     """Phase 10: Direct Differential Co-expression Test (Fisher z-test validation)"""
     log("PHASE 10: Direct Differential Co-expression Test")
@@ -587,27 +660,34 @@ def phase_10(dry_run: bool = False) -> bool:
     return run_python("src.statistics.direct_coexpression_test", coexpr_args, dry_run=dry_run)
 
 
-def phase_9(dry_run: bool = False) -> bool:
+def phase_9(dry_run: bool = False, network_method: str = "lioness") -> bool:
     """Phase 9: Generate Publication-Ready Figures (runs last)"""
     log("PHASE 9: Figure Generation")
 
     results_dir = os.environ.get("RRRM_RESULTS_DIR")
     figures_dir = Path(results_dir) / "figures"
 
-    # 9a — Existing diagnostic / QC plots (publication_plots)
-    if not run_python("src.visualization.publication_plots",
-                      [f"--results_dir={results_dir}",
-                       f"--out_dir={figures_dir}"],
-                      dry_run=dry_run):
-        log("publication_plots module failed (non-fatal, continuing)", "WARN")
+    if network_method == "wgcna":
+        # WGCNA-specific publication figures
+        log("Phase 9: WGCNA publication figures")
+        if not run_python("src.visualization.wgcna_publication_figures",
+                          [f"--results_dir={results_dir}"],
+                          dry_run=dry_run):
+            log("WGCNA publication figures failed (non-fatal)", "WARN")
+    else:
+        # 9a — Existing diagnostic / QC plots (publication_plots)
+        if not run_python("src.visualization.publication_plots",
+                          [f"--results_dir={results_dir}",
+                           f"--out_dir={figures_dir}"],
+                          dry_run=dry_run):
+            log("publication_plots module failed (non-fatal, continuing)", "WARN")
 
-    # 9b — New key publication figures (rewiring-vs-DE, focused perm, pathway,
-    #       age comparison, arm comparison, pipeline schematic, retinol subnetwork)
-    log("PHASE 9b: Key Publication Figures")
-    if not run_python("src.visualization.publication_figures",
-                      [f"--results_dir={results_dir}"],
-                      dry_run=dry_run):
-        log("publication_figures module failed (non-fatal)", "WARN")
+        # 9b — LIONESS key publication figures
+        log("PHASE 9b: Key Publication Figures")
+        if not run_python("src.visualization.publication_figures",
+                          [f"--results_dir={results_dir}"],
+                          dry_run=dry_run):
+            log("publication_figures module failed (non-fatal)", "WARN")
 
     pub_dir = Path(results_dir) / "figures" / "publication"
     log(f"Publication figures → {pub_dir}")
@@ -637,7 +717,38 @@ def phase_external_validation(
     ], dry_run=dry_run)
 
 
-def phase_8(dry_run: bool = False, max_genes: int = 2500, topk: int = 80) -> bool:
+def phase_external_validation_wgcna(
+    dry_run: bool = False,
+    external_root: str = "data/external/osdr",
+    k_perm: int = 5000,
+    studies: str = "auto",
+) -> bool:
+    """WGCNA module-projection external validation in OSD cohorts.
+
+    Projects RRRM-2 WGCNA module gene sets into external cohorts and tests
+    FLT vs GC module score shifts via permutation.
+    """
+    log(f"EXTERNAL VALIDATION [WGCNA]: module projection in OSD cohorts ({studies})")
+
+    results_dir = os.environ.get("RRRM_RESULTS_DIR")
+    wgcna_dir = Path(results_dir) / "wgcna"
+    outdir = Path(results_dir) / "external_validation_wgcna"
+
+    if not (wgcna_dir / "module_gene_lists").exists():
+        log("WGCNA module_gene_lists not found; run WGCNA analysis first", "WARN")
+        return False
+
+    return run_python("src.validation.wgcna_external_validation", [
+        f"--external_root={REPO_ROOT / external_root}",
+        f"--wgcna_dir={wgcna_dir}",
+        f"--outdir={outdir}",
+        f"--studies={studies}",
+        f"--k_perm={k_perm}",
+    ], dry_run=dry_run)
+
+
+def phase_8(dry_run: bool = False, max_genes: int = 2500, topk: int = 80,
+            lioness_transform: str = "raw_ranknorm") -> bool:
     """Phase 8: Leakage-Safe Cross-Validation"""
     log("PHASE 8: Leakage-Safe Cross-Validation")
 
@@ -658,10 +769,12 @@ def phase_8(dry_run: bool = False, max_genes: int = 2500, topk: int = 80) -> boo
         f"--outdir={results_dir}/phase8_validation",
         f"--max_genes={max_genes}",
         f"--topk={topk}",
+        f"--lioness-transform={lioness_transform}",
     ], dry_run=dry_run)
 
 
-def phase_8b(dry_run: bool = False, max_genes: int = 2500, topk: int = 80) -> bool:
+def phase_8b(dry_run: bool = False, max_genes: int = 2500, topk: int = 80,
+             lioness_transform: str = "raw_ranknorm") -> bool:
     """Phase 8b: Enhanced Predictive Validation
 
     Three improvements over Phase 8:
@@ -688,6 +801,7 @@ def phase_8b(dry_run: bool = False, max_genes: int = 2500, topk: int = 80) -> bo
         f"--outdir={results_dir}/phase8_validation",
         f"--max_genes={max_genes}",
         f"--topk={topk}",
+        f"--lioness-transform={lioness_transform}",
         "--n_perms=1000",
     ], dry_run=dry_run)
 
@@ -775,6 +889,30 @@ Examples:
                         help="Run identifier for versioned outputs (default: auto-generated)")
     parser.add_argument("--pool-controls", action="store_true",
                         help="Pool GC+VIV+BSL as ground reference (triples control n)")
+    parser.add_argument("--lioness-transform",
+                        choices=["raw_ranknorm", "raw_robust", "raw", "z_contribution"],
+                        default="raw_ranknorm",
+                        help="Default raw_ranknorm avoids Fisher z on sample-specific LIONESS weights.")
+    parser.add_argument("--expression-source",
+                        choices=["residualized", "non_residualized"],
+                        default="residualized",
+                        help="Edge regression expression source. residualized blocks nuisance covariates.")
+    parser.add_argument("--edge-covariates", default="",
+                        help="Nuisance covariates for edge regression; allowed only with non_residualized expression.")
+    parser.add_argument("--edge-priors", default="",
+                        help="Comma-separated external/prior kidney edge tables for skeleton union.")
+    parser.add_argument("--pathway-prior-sets", default="dct_ncc_wnk,ion_transport,calcium_handling",
+                        help="Configured renal pathway gene sets to turn into pre-registered prior edges.")
+    parser.add_argument("--deconv-sensitivity-alternate", default="",
+                        help="Alternate cell proportion table for deconvolution sensitivity analysis.")
+    parser.add_argument("--full-pipeline-top-hits", default="",
+                        help="Pre-selected top-hit gene list/table for direct node2vec/Procrustes permutation.")
+    parser.add_argument("--full-pipeline-perms", type=int, default=100,
+                        help="Full-pipeline node2vec/Procrustes permutations when top hits are supplied.")
+    parser.add_argument("--execute-full-pipeline-permutation", action="store_true",
+                        help="Execute full-pipeline permutations instead of only writing the manifest.")
+    parser.add_argument("--signed-mode", choices=["signed_split", "absolute"], default="signed_split",
+                        help="Node2vec edge sign handling. absolute is a sensitivity mode.")
     parser.add_argument("--preserve-dct", action="store_true",
                         help="Do NOT regress out DCT proportions (preserves DCT signal)")
     parser.add_argument("--candidate-genes", default="",
@@ -839,26 +977,36 @@ Examples:
     os.environ["RRRM_NETWORKS_DIR"] = str(Path(run_root) / "networks")
     
     phases = {
-        0: lambda: phase_0(args.dry_run, args.skip_r),
+        0: lambda: phase_0(args.dry_run, args.skip_r, args.deconv_sensitivity_alternate),
         1: lambda: phase_1(args.dry_run, args.skip_r, args.preserve_dct),
         1.5: lambda: phase_1_5(args.dry_run),
         1.6: lambda: phase_1_5b(args.dry_run),
-        2: lambda: phase_2(args.dry_run, args.skip_r, args.max_genes, args.topk, args.pool_controls),
-        3: lambda: phase_3(args.dry_run, args.num_seeds, args.pool_controls),
+        2: lambda: phase_2(args.dry_run, args.skip_r, args.max_genes, args.topk,
+                           args.pool_controls, args.lioness_transform,
+                           args.expression_source, args.edge_covariates,
+                           args.edge_priors, args.pathway_prior_sets),
+        3: lambda: phase_3(args.dry_run, args.num_seeds, args.pool_controls, args.signed_mode),
         5: lambda: phase_5(args.dry_run),
         6: lambda: phase_6(args.dry_run, args.skip_r, args.pool_controls,
-                           args.candidate_genes, args.hierarchical_fdr),
+                           args.candidate_genes, args.hierarchical_fdr,
+                           args.full_pipeline_top_hits, args.full_pipeline_perms,
+                           args.execute_full_pipeline_permutation,
+                           args.lioness_transform, args.edge_priors,
+                           args.pathway_prior_sets),
         7: lambda: phase_7(args.dry_run),
-        8: lambda: phase_8(args.dry_run, args.max_genes, args.topk),
-        8.5: lambda: phase_8b(args.dry_run, args.max_genes, args.topk),
+        8: lambda: phase_8(args.dry_run, args.max_genes, args.topk, args.lioness_transform),
+        8.5: lambda: phase_8b(args.dry_run, args.max_genes, args.topk, args.lioness_transform),
         10: lambda: phase_10(args.dry_run),
-        9: lambda: phase_9(args.dry_run),  # Figure generation runs last
+        9: lambda: phase_9(args.dry_run, args.network_method),  # Figure generation runs last
     }
     
     log(f"RRRM-2 Pipeline Runner", "INFO")
     log(f"Network method: {args.network_method}")
     log(f"Phases to run: {to_run}")
     log(f"Max genes: {args.max_genes}")
+    log(f"LIONESS transform: {args.lioness_transform}")
+    log(f"Edge regression expression source: {args.expression_source}")
+    log(f"Node2vec signed mode: {args.signed_mode}")
     log(f"Skip R steps: {args.skip_r}")
     log(f"Dry run: {args.dry_run}")
     print()
@@ -869,20 +1017,26 @@ Examples:
     # unchanged (preprocessing, validation, diagnostics, figures).
     if args.network_method == "wgcna":
         lioness_phases = {2, 3, 5, 6, 7}
+        # Phases 8 and 8.5 are also LIONESS-specific (require phase2_dir network
+        # files); skip them in WGCNA mode.
+        lioness_dependent = {8, 8.5}
         # Remove LIONESS-specific phases from run list
-        to_run = [p for p in to_run if p not in lioness_phases]
-        # Insert WGCNA phase (runs after Phase 1.5, before Phase 8)
+        to_run = [p for p in to_run if p not in (lioness_phases | lioness_dependent)]
+        # Insert WGCNA phase + follow-up (runs after Phase 1.5)
         phases["wgcna"] = lambda: phase_wgcna(
             args.dry_run, args.wgcna_genes, args.wgcna_pres_perms)
-        # Build execution order with wgcna inserted
-        execution_order = [0, 1, 1.5, "wgcna", 8, 8.5, 10, 9]
+        phases["wgcna_followup"] = lambda: phase_wgcna_followup(args.dry_run)
+        # Build execution order: preprocessing → WGCNA → follow-up → diagnostics → figures
+        execution_order = [0, 1, 1.5, "wgcna", "wgcna_followup", 10, 9]
         phases_to_execute = []
         for p in execution_order:
-            if p == "wgcna" and any(x in lioness_phases for x in (args.phases or phases_available)):
-                phases_to_execute.append("wgcna")
+            if p in ("wgcna", "wgcna_followup") and any(
+                x in lioness_phases for x in (args.phases or phases_available)
+            ):
+                phases_to_execute.append(p)
             elif p in to_run:
                 phases_to_execute.append(p)
-        log(f"WGCNA mode: replacing phases {sorted(lioness_phases)} with single WGCNA analysis")
+        log(f"WGCNA mode: replacing phases {sorted(lioness_phases)} + {sorted(lioness_dependent)} with WGCNA analysis")
     else:
         # Standard LIONESS execution order (Phase 6 BEFORE Phase 5 for regression support)
         execution_order = [0, 1, 1.5, 2, 3, 6, 5, 7, 8, 8.5, 10, 9]
@@ -895,15 +1049,26 @@ Examples:
             log(f"Phase {phase_num} failed", "ERROR")
 
     if args.external_validation:
-        if not phase_external_validation(
-            args.dry_run,
-            external_root=args.external_root,
-            k_perm=args.external_validation_perms,
-            studies=args.external_studies,
-            method=args.external_pathway_method,
-        ):
-            failed.append("external_validation")
-            log("External validation failed", "ERROR")
+        if args.network_method == "wgcna":
+            log("External validation: using WGCNA module-projection method")
+            if not phase_external_validation_wgcna(
+                args.dry_run,
+                external_root=args.external_root,
+                k_perm=args.external_validation_perms,
+                studies=args.external_studies,
+            ):
+                failed.append("external_validation_wgcna")
+                log("WGCNA external validation failed", "ERROR")
+        else:
+            if not phase_external_validation(
+                args.dry_run,
+                external_root=args.external_root,
+                k_perm=args.external_validation_perms,
+                studies=args.external_studies,
+                method=args.external_pathway_method,
+            ):
+                failed.append("external_validation")
+                log("External validation failed", "ERROR")
     
     # Summary
     print()

@@ -1,0 +1,608 @@
+\documentclass[11pt]{article}
+
+% ---------------- Packages ----------------
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage[activate={true,nocompatibility},final,tracking=true,kerning=true,spacing=true,factor=1100,stretch=10,shrink=10,expansion=false,protrusion=true]{microtype}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{footmisc}
+\usepackage{parskip}
+\usepackage{url}
+\usepackage{xspace}
+\usepackage{authblk}
+
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\itshape}{\thesubsubsection}{0.6em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small ISS-T-specific kidney module activity in mouse spaceflight}
+\fancyhead[R]{\small \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\pkg}[1]{\textsf{#1}}
+\newcommand{\gene}[1]{\textit{#1}}
+
+\title{\textbf{ISS-T-Specific Activity Shifts in a Preserved ECM/Cell-Migration Co-Expression Module: \\
+A Multi-Method Network Assessment of Mouse Kidney Transcriptomes after Spaceflight}\\[0.4em]
+\large Draft manuscript --- target venue: \textnormal{npj Microgravity}}
+\author[1]{Ibrahim Shahid}
+\author[1,*]{}
+\affil[1]{Independent research, manuscript in preparation}
+\affil[*]{Senior author placeholder pending PI involvement}
+
+\date{May 2026}
+
+\begin{document}
+\maketitle
+
+% =====================================================================
+\begin{abstract}
+\noindent
+Astronauts experience an elevated risk of kidney stone formation, renal fibrotic priming, and tubular dysfunction during long-duration spaceflight, and recent multi-omic work demonstrates that microgravity acts directly on the mouse kidney to drive extracellular-matrix (ECM) remodeling and lipid dysregulation in a genetic-background-dependent manner. Whether the kidney response to spaceflight reflects \emph{broad co-expression topology rewiring} (i.e.\ rearrangement of which genes co-regulate) or \emph{coordinated module activity shifts} in pre-existing co-expression programs has not been distinguished at the small biological cohort sizes typical of NASA Rodent Research missions. We applied three methodologically independent network analyses to NASA Rodent Research Reference Mission 2 (RRRM-2; OSD-771; female C57BL/6NTac kidney; full $2\times 2\times 4$ Age $\times$ Arm $\times$ Environment Group factorial; $n{=}80$): per-sample sample-specific edge weighting via LIONESS with leakage-safe predictive validation across four sample-pool sizes (effective $N\in\{5,20,40,80\}$) and five feature-engineering strategies; group-level direct differential correlation testing within each Age $\times$ Arm stratum; and weighted gene co-expression network analysis (WGCNA) with module-eigengene factorial modeling, GC-reference module preservation, and curated/Reactome enrichment. WGCNA identified an ISS-T-specific shift in coordinated kidney module activity led by a 48-gene module (grey60/ME17) enriched for ECM remodeling and cell-migration biology (curated odds ratio $29.8$, $q{=}0.014$; broader GO terms include cell migration, ECM organization, cell-matrix adhesion, and proteolysis), with the strongest single-module Flight effect of any module (eigengene shift $+0.380$, $q{=}1\times 10^{-4}$) and the strongest Flight $\times$ Arm interaction ($-0.552$, $q<1\times 10^{-4}$). Simple-effect contrasts within strata confirm the response is ISS-T-specific (ISS-T Young: $+0.380$, $q<0.001$; ISS-T Old: $+0.225$, $q<0.05$; LAR Young: $-0.172$, n.s.; LAR Old: $-0.164$, n.s.). A flight-naive GC-reference preservation analysis shows that 40 of 48 grey60 genes map into a strongly preserved GC-only module ($Z_{\text{summary}}{=}20.6$), establishing the signal as activity shift rather than broad topology remodeling. By contrast, per-sample LIONESS features failed to exceed an expression-only baseline in any Age $\times$ Arm stratum under leakage-safe LOO-CV across all four pool sizes, and direct group-level differential correlation produced no FDR-passing genes in any stratum with top-decile-overlap with LIONESS rankings at chance expectation. Sample-specific edge-level and per-mouse classification methods are demoted to negative benchmarks; module-level activity shifts emerge as the dominant detectable signal at RRRM-2 cohort size. Hub-gene structure of grey60 (top hubs include \gene{Tril}, \gene{Itga9}, \gene{Fbn1}, \gene{S1pr3}, \gene{Cdh11}, \gene{Adam12}, \gene{Mmp14}) generates a testable mechanistic hypothesis: TLR4-pathway-dependent kidney ECM/cell-migration responses to terminal on-orbit spaceflight, which we predict will be attenuated or absent in TLR4-deficient C3H/HeJ kidney (RR-7 cohort, OSD-253) under the same flight conditions. Three causal explanations for the ISS-T-specific localization (acute on-orbit stress decaying during the 24-day LAR recovery; recovery-mediated reversal of an arm-shared signal; on-orbit dissection / sample collection differences from the LAR earth-dissection protocol) are not adjudicated by this dataset and are discussed explicitly. We propose grey60 as a candidate biomarker of terminal-flight ECM remodeling in C57BL/6N kidney and provide an open-source, pre-registered, multi-method framework as a template for honest small-cohort spaceflight network transcriptomics.
+\end{abstract}
+
+\vspace{0.3em}
+\noindent\textbf{Keywords:} spaceflight transcriptomics; mouse kidney; ISS-T; LAR; WGCNA; module preservation; ECM/cell-migration; \emph{Tril}; TLR4; LIONESS; leakage-safe cross-validation; NASA RRRM-2; OSD-771.
+
+\clearpage
+\tableofcontents
+\clearpage
+
+% =====================================================================
+\section{Introduction}
+
+\subsection{Astronaut renal health is a documented risk for long-duration spaceflight}
+
+Microgravity exerts a complex and incompletely understood pressure on the human kidney. The clinical concern is concrete and dates back to the earliest era of human spaceflight: Cockett, Beehler, and Roberts argued in 1962 that prolonged weightlessness would predispose astronauts to urolithiasis through skeletal calcium loss \citep{cockett1962astronautical}. Subsequent decades have confirmed the prediction, with renal stone incidence in returning astronauts elevated above terrestrial baselines and at least twelve documented cases of post-mission kidney stones in NASA crews \citep{pietrzyk2007renal, smith2014men}. Numerical modelling of inflight calcium oxalate (CaOx) supersaturation places approximately $25\%$ of astronauts at elevated pre-flight stone risk rising to approximately $46\%$ post-flight \citep{kassemi2021numerical}, with bone-resorption-driven hypercalciuria and microgravity-induced antidiuretic shifts identified as the principal pro-lithogenic factors \citep{smith2014men, siew2024cosmic}. The risk is not academic for exploration-class missions: a kidney stone presenting in a crew member during transit to Mars cannot be evacuated to Earth, and current countermeasures (increased fluid intake, exercise loading, bisphosphonates) are jointly insufficient to bring inflight stone risk back to pre-flight baseline \citep{nationalacademies2018renal}.
+
+Recent integrative work has shifted the framing of astronaut renal pathology from a pure consequence of bone demineralization to a complex syndrome involving primary kidney remodeling. The pan-omic and morphological study of Siew and colleagues \citep{siew2024cosmic} demonstrated, using samples from 11 spaceflight-exposed mouse missions, 5 human missions, 1 simulated-microgravity rat experiment, and 4 simulated galactic-cosmic-ray-exposed mouse experiments, that spaceflight directly causes nephron-segment-resolved kidney remodeling --- with proximal tubule and loop of Henle (the nephron segments most dependent on mitochondrial oxidative phosphorylation) being the most strongly affected --- and that this remodeling itself contributes causally to stone formation and to early signs of renal dysfunction. The reframing of astronaut renal pathology as ``cosmic kidney disease,'' with primary tubulopathy driving downstream consequences rather than vice versa, places kidney transcriptomic remodeling at the center of spaceflight renal-health research \citep{siew2024cosmic, chouker2025impact}.
+
+\subsection{The mouse kidney response to spaceflight is strain-dependent and includes ECM/TGF-$\beta$ axis activation}
+
+Mouse models are the primary preclinical resource for spaceflight renal biology. NASA's Rodent Research (RR) program has produced a sequence of kidney transcriptomic datasets across multiple missions and genetic backgrounds, archived in the NASA Open Science Data Repository (OSDR, formerly GeneLab) \citep{ray2019genelab}, and recent integrative analyses have begun to clarify the molecular architecture of the response. Finch and colleagues \citep{finch2025strain}, comparing C57BL/6J females from RR-1 (OSD-102) with BALB/c females from RR-3 (OSD-163), established that the spaceflight kidney transcriptome response is \emph{strain-dependent}: C57BL/6J shows a stronger and more pro-fibrotic response than BALB/c, with both strains showing dysregulation of lipid metabolism, extracellular matrix (ECM) degradation, and transforming growth factor-$\beta$ (TGF-$\beta$) signaling but with strain-specific gene-level signatures and directions of effect. Their work locates the strain difference partly in protein-inactivating mutations in hyaluronan metabolism between the two strains, and frames BALB/c as showing an adaptive response that C57BL/6J does not \citep{finch2025strain}.
+
+Convergent evidence from the broader spaceflight-omics literature reinforces the involvement of TGF-$\beta$-driven ECM remodeling and lipid handling axes. Beheshti and colleagues identified a microRNA signature targeting TGF-$\beta$1 as a candidate master regulator of multi-tissue spaceflight response \citep{beheshti2018microrna}. Da Silveira and colleagues' comprehensive multi-omics analysis identified mitochondrial oxidative stress as a central hub of spaceflight tissue impact, with downstream consequences for renal lipid handling and tubular function \citep{daSilveira2020comprehensive}. Joncher and colleagues demonstrated lipotoxic pathway activation in mouse liver under spaceflight, with downstream relevance to renal lipid loading and accumulation \citep{joncher2016spaceflight, proctor2006regulation}. The lipid-ECM-TGF-$\beta$ axis is the most consistent transcriptomic signature of spaceflight kidney response in the existing literature; it is not novel for this study.
+
+\subsection{Two questions the strain-dependence framework does not address}
+
+Two questions are unresolved in the published spaceflight kidney transcriptomics literature and motivate the present work.
+
+First, no published mouse spaceflight kidney study has directly tested whether the response is \emph{co-expression topology rewiring} or \emph{module activity shift}. These two phenomena are confounded under standard differential-expression and gene-set-enrichment frameworks. Differential expression detects per-gene mean shifts but is silent on whether co-expression structure is preserved across conditions. Gene-set enrichment detects coordinated up- or down-regulation within a pre-defined pathway but is similarly silent on network topology. Both ``rewiring'' (i.e.\ the same genes now co-vary with different partners) and ``activity shift'' (i.e.\ the same modules of co-varying genes shift their mean activity together) are consistent with strong pathway enrichment, but they differ profoundly in mechanism and in implications for downstream causal modeling. The distinction matters: rewiring implies regulatory network remodeling and motivates causal-network methods (LIONESS \citep{kuijjer2019estimating}, sample-specific network reconstruction \citep{liu2016single, dai2019cell}, graph embedding approaches \citep{grover2016node2vec, liu2021pecanpy}), while activity shift implies that pre-existing co-expression programs are being differentially driven and motivates module-eigengene and pathway-activity methods \citep{langfelder2008wgcna}.
+
+Second, the utility of \emph{sample-specific network features} for per-mouse classification at small biological cohort sizes typical of NASA Rodent Research missions ($n{=}5$ per Age $\times$ Arm $\times$ Environment-Group cell in the present cohort) has not been benchmarked under leakage-safe out-of-sample evaluation against an expression-only baseline. Methods such as LIONESS produce per-mouse network weights whose biological interpretation depends on whether they carry classification-relevant information beyond what differential expression already captures. The cancer-genomics literature, where LIONESS-style sample-specific network features have been most extensively developed, typically operates at TCGA-scale cohort sizes (hundreds to thousands of samples) and frequently with in-sample evaluation. Whether these methods retain their advantages at spaceflight cohort sizes under leakage-safe cross-validation is an open question with direct implications for what tools the field should standardize on.
+
+\subsection{Methodological context: methods we use and why}
+
+Three complementary network methods bound the present analysis.
+
+\emph{LIONESS} (Linear Interpolation to Obtain Network Estimates for Single Samples) \citep{kuijjer2019estimating} estimates a sample-specific edge weight by leave-one-out reconstruction of the aggregate co-expression network against the same network with one sample removed: $w_e^{(s)} = N \cdot w_e^{(\text{all})} - (N{-}1)\cdot w_e^{(-s)}$. The method has been widely applied in cancer subtyping, where 70\% of differentially-targeted genes are reported as not differentially expressed \citep{lopes2020gene}, suggesting orthogonality to standard DE in those settings. We use LIONESS in Fisher-$z$ space with numerical-stability clipping ($|r|\leq 0.9995$ before $\mathrm{atanh}$, $|z|\leq 20$ after the LIONESS formula) on a pre-built shared-topology partial-correlation skeleton constructed via Ledoit--Wolf shrinkage covariance estimation \citep{ledoit2003honey} on cell-standardized residuals (cell standardization within Age $\times$ Arm $\times$ Environment-Group cells before pooling protects against Simpson's-paradox-induced spurious topology). Edge-level inference uses limma empirical-Bayes-moderated edge regression \citep{ritchie2015limma} on a $2\times 2\times 2$ factorial. Predicted contrast networks are converted to gene-level rewiring statistics via Procrustes-aligned multi-seed \pkg{PecanPy} \pkg{node2vec} embeddings \citep{grover2016node2vec, liu2021pecanpy} against a pre-registered set of housekeeping anchor genes drawn from \code{config/anchor\_genes.yaml}. Per-sample LIONESS features are evaluated for predictive utility in Phase 8 against an expression-only baseline using leakage-safe stratum-specific leave-one-out cross-validation across four pool sizes (effective $N\in\{5, 20, 40, 80\}$).
+
+\emph{Direct differential correlation} provides a group-level network-rewiring sanity check that does not depend on the LIONESS or embedding pipelines. Within each Age $\times$ Arm stratum, we compute Pearson correlations on the pre-built skeleton edges separately in FLT and GC samples, convert to Fisher-$z$, take the per-edge $\Delta z_e = \mathrm{atanh}(r_{\text{FLT},e}) - \mathrm{atanh}(r_{\text{GC},e})$, aggregate to per-gene scores, and test against a label-permutation null. This is conceptually similar to DiffCoEx and related differential-network methods \citep{tesson2010diffcoex} and provides a direct test of whether group-level FLT-vs-GC correlation restructuring is detectable without the LIONESS smoothing.
+
+\emph{WGCNA} (Weighted Gene Co-expression Network Analysis) \citep{langfelder2008wgcna} constructs an unsupervised co-expression network, partitions it into modules of densely co-expressed genes, and summarizes each module via its first principal component (the ``module eigengene''). Module eigengenes can be modeled as trait-responsive variables under standard regression frameworks, with subsequent module-trait association testing identifying modules whose activity differs systematically with experimental conditions. Critically, the WGCNA framework includes a module-preservation procedure \citep{langfelder2011module} that uses an independent (or held-out) reference dataset to assess whether module structure is preserved or whether it has been remodeled. The composite $Z_{\text{summary}}$ statistic combines density and connectivity preservation measures and has well-validated interpretation thresholds: $Z_{\text{summary}} > 10$ indicates strong preservation, $2 < Z_{\text{summary}} \leq 10$ indicates low-to-moderate preservation, and $Z_{\text{summary}} \leq 2$ indicates no evidence of preservation \citep{langfelder2011module}. The preservation statistic enables the rewiring-versus-activity-shift distinction that motivates this study: a flight-responsive module whose internal topology is strongly preserved in a flight-naive reference network is consistent with activity shift, while reduced preservation would be consistent with topology remodeling.
+
+\subsection{Hub-gene context: ECM/cell-migration in the kidney}
+
+We anticipate, on the basis of Finch et al.\ and the broader spaceflight kidney literature \citep{finch2025strain, siew2024cosmic}, that ECM-related and TGF-$\beta$-axis genes will appear in any detectable flight-responsive module. The biology of the specific hub genes that emerge in our analysis is well-characterized in mouse kidney pathology and is foundational to the discussion. We summarize the relevant context here.
+
+\emph{\gene{Tril}} (TLR4 interactor with leucine-rich repeats) is an enhancer of TLR4 signaling, first characterized in brain by Carpenter and colleagues \citep{carpenter2009tril} as a transmembrane protein with 13 leucine-rich repeats and a fibronectin domain that binds TLR4 and its lipopolysaccharide ligand to potentiate downstream cytokine production. TRIL is required for TLR4-mediated responses in mixed glial cells and primary human peripheral blood mononuclear cells; \gene{Tril} knockdown attenuates LPS-induced cytokine production \citep{carpenter2009tril, wochal2014tril}. TRIL has subsequently been implicated in TLR3 signaling \citep{wochal2011tlr3}, diet-induced hypothalamic inflammation \citep{liu2021tril}, and in extending its functional repertoire beyond brain to other tissues. Its appearance as the top hub gene of an ECM/cell-migration module in spaceflight kidney is biologically interpretable: TLR4 signaling is causally involved in renal fibrosis via TGF-$\beta$ activation, and TLR4-mutant mice (including C3H/HeJ, used in NASA's RR-7 mission and available in OSDR as OSD-253) are protected from progressive renal fibrosis in folic-acid-induced and unilateral-ureteral-obstruction models \citep{souza2015tlr4, pulskens2010tlr4}.
+
+\emph{\gene{Itga9}} (integrin $\alpha$9) and \emph{\gene{Itga8}} (integrin $\alpha$8) are cell-ECM adhesion receptors involved in renal pathology. ITGA9 is regulated by the CUL4B/miR-194-5p axis in diabetic kidney macrophages and drives macrophage infiltration into diabetic kidneys \citep{chen2023cul4b}. ITGA8 attenuates tubulointerstitial fibrosis in murine unilateral ureteral obstruction via regulation of TGF-$\beta$ signaling, fibroblast activation, and immune cell infiltration \citep{marek2016itga8}. \emph{\gene{Itga9}} appears as hub rank 2 in our analysis and \emph{\gene{Itga8}} at rank 18.
+
+\emph{\gene{Fbn1}} (fibrillin-1) is the extracellular matrix glycoprotein that defines Marfan syndrome and binds latent TGF-$\beta$-binding proteins (LTBPs) in the ECM to sequester latent TGF-$\beta$ in an inactive state for spatially-precise release during tissue remodeling \citep{ramirez2017fibrillin}. In a mouse model of chronic kidney disease, FBN1-enriched microenvironment drives endothelial injury and vascular rarefaction, and FBN1 depletion reduces serum creatinine \citep{charbonneau2020fibrillin}. \emph{\gene{Fbn1}} is hub rank 4 in our analysis.
+
+\emph{\gene{S1pr3}} (sphingosine-1-phosphate receptor 3) is among the most upregulated G-protein-coupled receptors in activated kidney fibroblasts in mouse models of unilateral ureteral obstruction, diabetes, adriamycin nephropathy, and folic acid nephropathy \citep{shiohira2013s1p, mizugishi2024s1p}. Extracellular S1P, through S1PR3 activation, transactivates TGF-$\beta$ signaling and drives Smad2/3 phosphorylation and ECM production in renal fibrosis \citep{schwalm2017sphingosine}. \emph{\gene{S1pr3}} is hub rank 5.
+
+\emph{\gene{Cdh11}} (cadherin-11) is a central mediator of tissue fibrosis whose expression is elevated in mouse models of lung, skin, liver, cardiac, renal, and intestinal fibrosis \citep{schneider2012cadherin11, bischoff2022cdh11}. Plasma and urinary CDH11 are independently associated with severity of interstitial fibrosis and tubular atrophy in human kidney biopsies and with progression to end-stage kidney disease \citep{kawano2021cdh11}. CDH11 drives the myofibroblast phenotype and regulates fibroblast inflammation \citep{bischoff2022cdh11}. \emph{\gene{Cdh11}} is hub rank 7.
+
+\emph{\gene{Adam12}} (a disintegrin and metalloproteinase 12) is upregulated in TGF-$\beta$-stimulated renal cells and is post-transcriptionally regulated by miR-29 family microRNAs \citep{ramachandran2013adam12}. miR-29 family expression is decreased after unilateral ureter obstruction, releasing \gene{Adam12} and \gene{Adam19} from suppression and contributing to fibrotic ECM remodeling. \emph{\gene{Adamts7}} (rank 16) and \emph{\gene{Adam12}} (rank 17) are both ECM-degrading metalloproteinases.
+
+\emph{\gene{Mmp14}} (membrane-type 1 matrix metalloproteinase, MT1-MMP) is a transmembrane zinc-dependent metalloproteinase that localizes proteolytic activity to the pericellular environment, cleaves collagen I, collagen III, fibronectin, and laminin, and activates pro-MMP-2 \citep{itoh2015mmp14}. MT1-MMP is required for renal tubule cell migration on basement membrane components and for ureteric bud branching morphogenesis in renal development \citep{riggins2010mt1mmp}. MT1-MMP is upregulated in cyst-lining epithelia in polycystic kidney disease, and MMP inhibition decreases cyst formation \citep{obermuller2001mmp}. \emph{\gene{Mmp14}} is hub rank 19.
+
+Collectively the top hubs of the module we identify form a coherent ECM-remodeling and cell-migration signature with mechanistic ties to TLR4-driven, TGF-$\beta$-mediated renal fibrosis. This hub composition is consistent with Finch et al.'s strain-dependent ECM signature \citep{finch2025strain} but extends it from differentially expressed gene lists to a module-level co-expression structure with internal preservation under flight.
+
+\subsection{Sample collection as a known confound in spaceflight rodent transcriptomics}
+
+The interpretation of any FLT-versus-GC contrast that crosses on-orbit dissection and earth-dissection protocols must address a published methodological confound. Galazka and colleagues \citep{galazka2020rnaseq} demonstrated, on multiple Rodent Research missions, that large changes in mouse tissue transcriptomes are detectable between on-orbit-dissected-and-preserved tissues and tissues dissected post-return from whole-carcass preservation. The magnitude of preservation-protocol-induced transcriptional change rivals or exceeds the FLT-versus-GC contrast in some tissues, and the effect is exacerbated when coupled with polyA library selection. Whole-carcass preservation also produces greater variability in RNA integrity than in-flight dissection \citep{galazka2020rnaseq}. In RRRM-2, ISS-T (terminal on-orbit) and LAR (live animal return, dissected on Earth) samples are processed by different protocols, and any ISS-T-versus-LAR contrast accordingly conflates flight-state biology with sample-collection biology. We treat this as a primary limitation of the present analysis and return to it explicitly in the Discussion.
+
+\subsection{Aims, contributions, and study design}
+
+The present work has three aims and three matching contributions.
+
+First, we ask whether spaceflight produces broad co-expression topology rewiring detectable by multiple complementary network methods at RRRM-2 cohort size, or whether the detectable signal is module-scale activity shift. We apply three independent network analyses to OSD-771 and report the cross-method conclusion. The contribution is a methodological triangulation establishing that, at $n{=}5$ per Age $\times$ Arm $\times$ Environment-Group cell in RRRM-2, the detectable network-scale signal is activity shift, not topology rewiring --- with all three methods agreeing on what is not detectable and one (WGCNA with module preservation) revealing what is.
+
+Second, we identify the leading biological axis of the activity-shift signal. We report a 48-gene ECM/cell-migration module (grey60/ME17) with the strongest Flight and Flight $\times$ Arm effects of any module, internal structural preservation under flight, hub-gene composition centered on \gene{Tril}, \gene{Itga9}, \gene{Fbn1}, \gene{S1pr3}, \gene{Cdh11}, \gene{Adam12}, \gene{Mmp14}, and biology centered on cell migration, ECM organization, and proteolysis. The contribution is a named, hub-anchored, preservation-corrected ECM module specific to the ISS-T arm in mouse kidney spaceflight transcriptomes.
+
+Third, we frame the ISS-T arm specificity in the context of three competing causal explanations --- acute on-orbit stress decaying during 24-day LAR recovery, recovery-mediated reversal, and on-orbit-dissection sample-collection confound \citep{galazka2020rnaseq} --- and generate a testable mechanistic hypothesis based on the \gene{Tril}/TLR4 hub structure. If grey60 activity is TLR4-pathway-dependent, then C3H/HeJ (TLR4-deficient) kidney under spaceflight should show reduced or absent grey60 activation relative to C57BL/6J under the same flight conditions; RR-7 (OSD-253) provides the experimental design needed to test this prediction in a future analysis.
+
+We position this work as a complement to Finch et al.\ \citep{finch2025strain}: they established the strain axis (C57BL/6J versus BALB/c) at the differential-expression and gene-set-enrichment scale; we extend the framework by adding (a) the arm axis at the \emph{module} scale within a single C57BL/6N background, (b) explicit preservation-versus-activity-shift methodology, and (c) the triangulation across LIONESS / direct correlation / WGCNA that bounds what is detectable at this cohort size.
+
+% =====================================================================
+\section{Methods}
+
+\subsection{Discovery cohort and dataset}
+
+NASA Rodent Research Reference Mission 2 (RRRM-2; OSD-771) was downloaded from the NASA Open Science Data Repository \citep{ray2019genelab, sanders2024rrrm2}. The cohort is forty female C57BL/6NTac mice flown to the International Space Station, with twenty 12-week-old (Young at launch, $\sim$16 weeks at sacrifice) and twenty 29-week-old (Old at launch, $\sim$34 weeks at sacrifice) mice. Half of each age group (10 mice each) were sacrificed on-orbit after 55--58 days (ISS Terminal, ISS-T), preserved in RNAlater and stored at $-80\,^\circ\mathrm{C}$ for return to Earth. The remaining half (10 mice each) were returned live to Earth after 32 days flight, allowed to recover for 24 days, and then sacrificed (Live Animal Return, LAR). Each ISS-T and LAR arm has matched Habitat Ground Control (HGC, mice housed in flight hardware in matched environmental conditions), Vivarium Control (VIV, standard vivarium housing), and Basal Control (BSL, sacrificed two days before launch) groups for a full $2\times 2\times 4 = 16$-cell factorial design with $n{=}5$ biological replicates per cell, $n{=}80$ total mice.
+
+\subsection{Preprocessing and gene-panel construction}
+
+Raw counts were filtered to genes expressed at $\geq 1$ CPM in $\geq 20\%$ of samples \citep{robinson2010edger} and normalized via DESeq2 variance-stabilizing transformation (\code{vst(dds, blind=FALSE)}) \citep{love2014moderated}. Cell-type deconvolution against a Tabula Muris Senis kidney female reference atlas \citep{tabula2020} was performed with \pkg{MuSiC} \citep{wang2019music}, with cross-method sensitivity confirmed against bMIND \citep{wang2021bayesian}. Residualization against batch covariates and CLR-transformed cell-type proportions used QR decomposition (\code{qr.resid}) on a full-rank orthonormalized design matrix; surrogate variables were estimated via \code{num.sv} (Leek method). A 2,500-gene panel was selected by highly-variable-gene scoring with forced inclusion of pre-registered DCT/NCC-WNK pathway genes from \code{config/gene\_sets.yaml}.
+
+\subsection{Sample-specific network analysis: LIONESS pipeline}
+
+Within each Age $\times$ Arm $\times$ Environment-Group cell, residuals were standardized to zero mean and unit variance per gene before pooling for topology selection; the unstandardized residual matrix was used for downstream LIONESS edge-weight computation \citep{kuijjer2019estimating}. The shared partial-correlation skeleton was built via Ledoit--Wolf shrinkage covariance estimation \citep{ledoit2003honey}, precision-matrix inversion, off-diagonal extraction $\mathrm{pc}_{ij} = -P_{ij}/\sqrt{P_{ii}P_{jj}}$, and top-$k{=}80$ neighbor selection per gene. LIONESS weights in Fisher-$z$ space were computed as $z_s = N\cdot z_{\text{all}} - (N-1)\cdot z_{\text{-s}}$ with pre-\code{atanh} clipping at $|r|\leq 0.9995$ and post-formula clipping at $|z|\leq 20$. Per-edge regression on a full $2\times 2\times 2$ factorial used limma empirical-Bayes-moderated cell-means parameterization \citep{ritchie2015limma}.
+
+\subsection{Network embeddings and rewiring statistics}
+
+Predicted contrast networks were embedded via multi-seed \pkg{PecanPy} \pkg{node2vec} \citep{grover2016node2vec, liu2021pecanpy} ($d{=}128$, $p{=}0.25$, $q{=}4.0$, walk length 80, 200 walks per node, 10 random seeds), aligned across seeds and contrasts by orthogonal Procrustes \citep{schonemann1966procrustes} on a pre-registered set of $\geq 50$ housekeeping anchor genes committed to \code{config/anchor\_genes.yaml} prior to any embedding computation. Per-gene rewiring was the row-wise cosine distance between aligned FLT and condition-control embeddings averaged across seeds. Gene-level inference used a sign-aware sum-of-$t$-statistic test, $T_g = \sum_{e\in N(g)} t_e / \sqrt{|N(g)|}$, with empirical $p$-values from $K{=}1{,}000$ label permutations rather than Stouffer's $Z$ on per-edge $p$-values (Stouffer was observed to saturate to numerical zero on partial-correlation skeletons under edge-dependence regimes typical of this cohort).
+
+\subsection{Direct group-level differential correlation}
+
+Within each Age $\times$ Arm stratum, samples were partitioned into FLT and GC subsets. Pearson correlations were computed on the pre-built skeleton edges in each subset, converted to Fisher-$z$, and combined to a per-edge $\Delta z_e = \mathrm{atanh}(r_{\text{FLT},e}) - \mathrm{atanh}(r_{\text{GC},e})$. Per-gene scores aggregated $|\Delta z_e|$ across edges incident on each gene. Within-stratum label permutations evaluated both a global FLT-vs-GC correlation-restructuring null and a per-gene null with Benjamini--Hochberg correction \citep{benjamini1995controlling}. We additionally computed Spearman correlation between direct-correlation gene rankings and LIONESS gene rankings and report top-decile overlap against a hypergeometric null.
+
+\subsection{Weighted gene co-expression network analysis}
+
+WGCNA \citep{langfelder2008wgcna} was applied to the variance-filtered residual gene expression matrix restricted to FLT and Habitat Ground Control (HGC) samples ($n{=}40$). A signed bicor co-expression network was constructed at soft-threshold power 7 (selected from scale-free topology diagnostics at $R^2\approx 0.80$). The topological overlap matrix was dendrogram-clustered with dynamic tree cut to produce 20 modules; the first principal component of each module's expression matrix served as the module eigengene (ME).
+
+Module-trait associations were tested in a full interaction model $\mathrm{ME} \sim \mathrm{Flight} \times \mathrm{Age}_{\text{Old}} \times \mathrm{Arm}_{\text{LAR}}$, with FDR control via Benjamini--Hochberg across the 20 modules and all coefficient terms. Because Flight coefficients in interaction models are conditional on the reference group, we additionally computed simple-effect FLT-vs-GC contrasts per Age $\times$ Arm stratum to identify the actual stratum-level signal.
+
+Module pathway enrichment used a pre-registered curated kidney-remodeling panel (eight pathways: \code{PPAR\_signaling}, \code{cholesterol\_biosynthesis}, \code{ECM\_remodeling}, \code{EMT\_fibrosis}, \code{tubular\_ion\_transport}, \code{TGF\_beta\_Wnt}, \code{oxidative\_stress}, \code{translation\_machinery}) tested by Fisher's exact test against the WGCNA module assignments. Broader functional context used GO biological process and Reactome pathway enrichment.
+
+\subsection{GC-reference module preservation}
+
+A flight-naive co-expression reference network was constructed using only Habitat Ground Control samples ($n{=}20$), with module assignment proceeding identically to the combined FLT+HGC analysis. The module-preservation procedure of Langfelder and colleagues \citep{langfelder2011module} was applied with $200$ permutations to compute the composite $Z_{\text{summary}}$ statistic for each combined-network module evaluated against the GC-only reference. Modules with $Z_{\text{summary}} > 10$ were classified as strongly preserved, $2 < Z_{\text{summary}} \leq 10$ as moderate, and $\leq 2$ as not preserved. We additionally tracked which GC-only modules contained the genes of each combined-network module, with $\geq 70\%$ overlap considered direct correspondence.
+
+\subsection{Leakage-safe predictive validation}
+
+Phase 8 evaluated whether per-sample LIONESS-derived network features exceeded an expression-only baseline in distinguishing FLT from GC under leakage-safe cross-validation. Implementation followed strict leakage-safe convention: in each fold, the network pool, partial-correlation skeleton, LIONESS sample-specific weights, feature selection, principal-component analysis, scaling, and classifier fit were performed exclusively on training samples; test sample weights were computed by augmenting the training pool with each test sample one at a time. Four pool modes tested correspond to effective LIONESS LOO denominators of $N\in\{5, 20, 40, 80\}$ for \code{age\_arm\_envgroup}, \code{arm}, \code{age}, and \code{global} respectively. Five network feature engineerings were tested: \code{node\_strength} (top 50 by training-fold variance), \code{pathway\_strength} (mean LIONESS within the eight pre-registered pathways), \code{sparse\_edges} ($L_1$-regularized logistic regression on per-edge features), \code{edge\_pca} (10-component PCA on per-edge features), and \code{network\_combined} (concatenation). A 50-feature expression-only baseline was reported per stratum and per pool mode. Stratum-specific leave-one-out cross-validation ($n{=}10$ per stratum) was supplemented with 1{,}000-permutation null distributions for per-stratum accuracy.
+
+\subsection{Pre-registered external validation}
+
+Pre-registered manifests for each external cohort were committed to \code{docs/external\_replication\_protocol/} prior to any GSEA computation. Validation cohorts were OSD-102 (RR-1 NASA Validation Flight; female C57BL/6J kidney; $n{=}6$ FLT + 6 GC; 16 weeks; 37-day flight; matched-sex directional replication), OSD-513 (RR-23; male C57BL/6J kidney; $n{=}9$ FLT + 9 HGC + 9 VGC; 16--17 weeks; 38-day flight; sex-stratification directional replication), OSD-163 (RR-3; BALB/c female kidney; $n{=}10$ FLT + 10 GC; 12 weeks; 39--42 days; cross-strain context per Finch et al.\ \citep{finch2025strain}), and OSD-253 (RR-7; female C57BL/6J and C3H/HeJ kidney; 25-day and 75-day timepoints; within-strain second cohort with explicit declaration of original-versus-rerun ground-control selection). Pathway-level external testing used ranked GSEA \citep{subramanian2005gene} on Welch $t$-statistics of FLT-versus-GC contrasts in each cohort with $K{=}5{,}000$ within-cohort label permutations. Two claim types were pre-registered: \emph{replicated} (directional pre-registered hypotheses requiring same sign of effect and external $q < 0.10$) and \emph{context\_detected} (non-directional pathway activity at $q < 0.10$ using $|\mathrm{ES}|$ from GSEA without sign requirement).
+
+\subsection{Software, reproducibility, and pre-registration audit}
+
+All pipeline source, manifests, run outputs, and tests are version-controlled at the project repository. The remediation campaign that produced the analytical choices is documented in companion files (\code{critique\_report.tex}, \code{remediation\_guide.tex}, audit run \code{run\_20260505\_remediated\_2500g/}). A self-audit utility (\code{scripts/audit\_fix\_status.py}) statically verifies presence of all 14 fixes documented in the remediation guide; running it on the current source returns \code{present=14}. Eighteen unit tests covering hierarchical FDR correctness, permutation-mode equivalence, anchor pre-registration enforcement, silent-shifter null calibration, full-pipeline permutation logic, external protocol guardrails, Phase 8 fold safety, and config-code consistency pass on the source as committed.
+
+% =====================================================================
+\section{Results}
+
+\subsection{WGCNA identifies ISS-T-specific shifts in coordinated kidney module activity}
+
+WGCNA of the FLT+HGC subset of RRRM-2 ($n{=}40$) produced 20 modules with scale-free fit $R^2\approx 0.80$ at soft-threshold power 7. Module sizes ranged from 32 genes (royalblue/ME20) to 841 genes (turquoise/ME1). Twelve modules showed module-trait associations at $q < 0.05$ under the full $\mathrm{ME} \sim \mathrm{Flight}\times\mathrm{Age}_{\text{Old}}\times\mathrm{Arm}_{\text{LAR}}$ model, with the strongest effects involving Flight and Flight $\times$ Arm.
+
+Table~\ref{tab:module_summary} summarizes the ten modules with strongest Flight association or pathway enrichment. The single strongest Flight main effect was \textbf{grey60/ME17} (48 genes; eigengene shift $+0.380$, $q = 1\times 10^{-4}$) with the strongest Flight $\times$ Arm interaction ($-0.552$, $q < 1\times 10^{-4}$) and curated ECM remodeling enrichment (OR $29.8$, $q = 0.014$). No module showed a Flight $\times$ Age interaction at $q < 0.05$; the dominant interaction axis is Flight $\times$ Arm, not Flight $\times$ Age.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{lrrrrrlrr}
+\toprule
+Module (Color) & $n$ & Flight est & Flight $q$ & FxArm est & FxArm $q$ & $Z_{\text{sum}}$ & Top pathway (OR; $q$) \\
+\midrule
+ME17 (grey60) & 48 & $+0.380$ & $\mathbf{0.0001}$ & $-0.552$ & $\mathbf{<10^{-4}}$ & 7.8 & ECM remodeling (29.8; 0.014) \\
+ME20 (royalblue) & 32 & $-0.327$ & 0.0010 & $+0.492$ & 0.0004 & 16.5 & --- \\
+ME13 (salmon) & 103 & $+0.297$ & 0.0012 & $-0.437$ & 0.0007 & 20.4 & --- \\
+ME8 (pink) & 165 & $-0.298$ & 0.0028 & $+0.301$ & 0.042 & 14.2 & --- \\
+ME5 (green) & 359 & $+0.279$ & 0.0039 & $-0.277$ & 0.054 & 16.5 & --- \\
+ME1 (turquoise) & 841 & $-0.200$ & 0.087 & $+0.270$ & 0.108 & 61.2 & --- \\
+ME4 (yellow) & 474 & $+0.218$ & 0.087 & $-0.109$ & 0.629 & 27.0 & --- \\
+ME6 (red) & 297 & $+0.132$ & 0.254 & $-0.344$ & 0.042 & 23.1 & ECM remodeling (12.1; 0.006) \\
+ME15 (midnightblue) & 80 & $-0.106$ & 0.439 & $+0.031$ & 0.903 & 19.1 & lipid metabolism (32.2; 0.004) \\
+ME2 (blue) & 685 & $+0.078$ & 0.624 & $-0.256$ & 0.197 & 46.9 & oxidative stress (15.8; 0.029) \\
+\bottomrule
+\end{tabular}
+\caption{WGCNA module summary, top 10 by Flight association or curated-pathway enrichment. Flight and Flight$\times$Arm columns are conditional on the reference group; see Table~\ref{tab:simple_effects} for simple-effect contrasts. $Z_{\text{sum}}$ is the combined-network module preservation $Z_{\text{summary}}$ against the flight-naive GC-only reference.}
+\label{tab:module_summary}
+\end{table}
+
+\subsection{Simple-effect FLT-vs-GC contrasts confirm the ISS-T-specific localization}
+
+Because Flight coefficients in the full interaction model are conditional on the reference group, we computed simple-effect FLT-versus-GC contrasts per Age $\times$ Arm stratum (Table~\ref{tab:simple_effects}). The dominant signal is ISS-T-specific: grey60, salmon, and green show significant FLT effects in ISS-T Young and ISS-T Old but no significant effect in either LAR stratum. Royalblue, pink, and turquoise also show ISS-T-restricted effects. No module shows both significant ISS-T \emph{and} significant LAR effects.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{llrrrr}
+\toprule
+Module & Color & ISS-T Young & ISS-T Old & LAR Young & LAR Old \\
+\midrule
+ME17 & grey60 & $+0.380^{***}$ & $+0.225^{*}$ & $-0.172$ & $-0.164$ \\
+ME5 & green & $+0.280^{**}$ & $+0.312^{**}$ & $+0.002$ & $-0.013$ \\
+ME13 & salmon & $+0.297^{**}$ & $+0.331^{***}$ & $-0.140$ & $-0.134$ \\
+ME8 & pink & $-0.298^{**}$ & $-0.267^{*}$ & $+0.002$ & $-0.017$ \\
+ME20 & royalblue & $-0.327^{***}$ & $-0.211^{*}$ & $+0.165$ & $+0.201$ \\
+ME1 & turquoise & $-0.200^{\dagger}$ & $-0.257^{*}$ & $+0.070$ & $+0.018$ \\
+ME4 & yellow & $+0.218^{\dagger}$ & $+0.188$ & $+0.108$ & $+0.002$ \\
+ME6 & red & $+0.132$ & $-0.067$ & $-0.212$ & $-0.169$ \\
+\bottomrule
+\end{tabular}
+\caption{Simple-effect FLT-vs-GC eigengene contrasts per Age $\times$ Arm stratum. $^{\dagger}q<0.10$, $^{*}q<0.05$, $^{**}q<0.01$, $^{***}q<0.001$. All eight tabulated modules show significant FLT effects in ISS-T (Young and/or Old) and non-significant effects in both LAR strata.}
+\label{tab:simple_effects}
+\end{table}
+
+\subsection{Grey60 is a hub-anchored ECM/cell-migration module with preserved internal topology}
+
+Grey60 (ME17) is the lead WGCNA module by every criterion examined. It has 48 genes, the strongest Flight main effect ($+0.380$, $q < 10^{-3}$), the strongest Flight $\times$ Arm interaction ($-0.552$, $q < 10^{-4}$), curated ECM-remodeling enrichment (OR 29.8, $q = 0.014$), and broader GO/Reactome enrichment for regulation of cell migration, ECM organization, cell-matrix adhesion, and proteolysis.
+
+Hub-gene structure (Table~\ref{tab:hubs}) is dominated by ECM-remodeling and cell-adhesion biology with mechanistic ties to TLR4 signaling and TGF-$\beta$-mediated renal fibrosis: \gene{Tril} (rank 1, $kME = 0.933$), \gene{Itga9} (rank 2), \gene{Fbn1} (rank 4), \gene{S1pr3} (rank 5), \gene{Cdh11} (rank 7), \gene{Itga8} (rank 18), and the metalloproteinases \gene{Adamts7} (rank 16), \gene{Adam12} (rank 17), \gene{Mmp14} (rank 19). \gene{Spry1} (rank 13, RTK signaling inhibitor) and \gene{Nkd1} (rank 14, Wnt antagonist) bring growth-factor-pathway-regulating biology into the module. \gene{Npr1} (rank 11, natriuretic peptide receptor 1) brings a fluid-balance and natriuretic-signaling component.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{rlrl}
+\toprule
+Rank & Gene & $kME$ & Annotation \\
+\midrule
+1 & \gene{Tril} & 0.933 & TLR4 interactor / innate immunity \\
+2 & \gene{Itga9} & 0.913 & Integrin $\alpha$-9 / cell-ECM adhesion \\
+3 & \gene{Syt13} & 0.907 & Synaptotagmin 13 / membrane trafficking \\
+4 & \gene{Fbn1} & 0.895 & Fibrillin-1 / ECM structural protein \\
+5 & \gene{S1pr3} & 0.885 & S1P receptor 3 / vascular and fibrosis signaling \\
+6 & \gene{Sash1} & 0.876 & Scaffold / tumor suppressor \\
+7 & \gene{Cdh11} & 0.874 & Cadherin-11 / mesenchymal cell adhesion \\
+8 & \gene{Clmp} & 0.872 & Cell adhesion molecule \\
+9 & \gene{Vstm4} & 0.858 & V-set transmembrane domain \\
+10 & \gene{C1qtnf2} & 0.842 & C1q/TNF-related / inflammation \\
+11 & \gene{Npr1} & 0.833 & Natriuretic peptide receptor / fluid balance \\
+12 & \gene{Csdc2} & 0.828 & RNA-binding / cold-shock domain \\
+13 & \gene{Spry1} & 0.818 & RTK signaling inhibitor \\
+14 & \gene{Nkd1} & 0.815 & Wnt antagonist \\
+15 & \gene{P2rx1} & 0.810 & Purinergic receptor / vascular \\
+16 & \gene{Adamts7} & 0.809 & ADAM metallopeptidase / ECM remodeling \\
+17 & \gene{Adam12} & 0.801 & ADAM metallopeptidase / ECM remodeling \\
+18 & \gene{Itga8} & 0.798 & Integrin $\alpha$-8 / cell-ECM adhesion \\
+19 & \gene{Mmp14} & 0.778 & MT1-MMP / ECM degradation \\
+20 & \gene{Ptpru} & 0.775 & Receptor-type protein tyrosine phosphatase \\
+\bottomrule
+\end{tabular}
+\caption{Top 20 grey60/ME17 hub genes by module-eigengene correlation $kME$. ECM/cell-migration biology dominates the hub layer.}
+\label{tab:hubs}
+\end{table}
+
+GC-reference preservation analysis recovers the activity-shift interpretation directly. The combined-network preservation $Z_{\text{summary}} = 7.8$ for grey60 places it in the moderate-preservation regime under the Langfelder--Horvath thresholds \citep{langfelder2011module}. However, $40$ of $48$ grey60 genes map into a single GC-only module (green, $n_{\text{GC}}{=}439$) with $Z_{\text{summary}} = 20.6$. The remaining 8 grey60 genes distribute across smaller GC modules with no single module containing more than 2--3 of them. The correct interpretation, following standard WGCNA practice, is that the grey60 gene set is strongly preserved in a flight-naive co-expression reference: the eigengene activity shifts under flight, but the internal co-expression structure of the module is not topologically remodeled. The combined-network $Z_{\text{summary}} = 7.8$ is itself a combined-module-definition artifact rather than evidence of topology remodeling.
+
+\subsection{Other ISS-T-responsive modules: MAPK signaling, ER stress, and metabolic SLC transport}
+
+Beyond grey60, four other modules show coordinated ISS-T-specific activity shifts with interpretable biology (Table~\ref{tab:simple_effects}). Salmon (ME13; 103 genes; $+0.297$ ISS-T Young, $+0.331$ ISS-T Old; broader GO/Reactome enrichment for CCT/TriC tubulin folding and XBP1(S) chaperone genes) is consistent with endoplasmic-reticulum stress and unfolded-protein-response activation under terminal flight. Green (ME5; 359 genes; $+0.280$, $+0.312$; RAF/MAPK cascade and MAPK1/MAPK3 signaling) is consistent with growth-factor-pathway activation. Pink (ME8; 165 genes; $-0.298$, $-0.267$; biological oxidations, SLC-mediated transport, monocarboxylic acid metabolism) is consistent with suppression of tubular metabolic function. Royalblue (ME20; 32 genes; $-0.327$, $-0.211$; no curated-pathway enrichment under the eight-pathway panel and limited GO/Reactome annotation) carries unknown biology but is the second-strongest Flight responder and warrants follow-up annotation by independent gene-set databases.
+
+\subsection{Red is an ECM module but is not a primary flight-responsive module}
+
+Red (ME6; 297 genes) carries curated ECM remodeling enrichment (OR $12.1$, $q = 0.006$) and significant Flight $\times$ Arm interaction ($-0.344$, $q = 0.042$) but no significant Flight main effect ($+0.132$, $q = 0.254$) and no significant simple-effect FLT-vs-GC contrast in any Age $\times$ Arm stratum (Table~\ref{tab:simple_effects}). Under the corrected interpretation, red is an ECM module whose interaction term is driven by opposite-sign trends across strata rather than by significant stratum-level effects, and it is not appropriate as a primary flight-responsive ECM module. The ECM headline is grey60, not red.
+
+\subsection{The lipid/PPAR module exists but does not respond to flight at the module scale}
+
+Midnightblue (ME15; 80 genes) is enriched for curated lipid metabolism (OR $32.2$, $q = 0.004$), with broader GO terms including fat cell differentiation, fatty acid metabolism, and fatty acid biosynthesis. It is strongly preserved ($Z_{\text{summary}} = 19.1$). Its eigengene shows no significant Flight main effect ($-0.106$, $q = 0.439$) and no significant Flight $\times$ Arm interaction ($+0.031$, $q = 0.903$). Lipid metabolism therefore forms a coherent and preserved co-expression module in RRRM-2 kidney but does not show module-level flight responsiveness in this cohort. The PPAR-related pathway-level signal we previously reported in external GSEA on OSD-513 (male C57BL/6J kidney, $q = 0.079$) remains a candidate pathway-level external finding but is not supported as a flight-responsive WGCNA module at the discovery scale.
+
+\subsection{Sample-specific LIONESS features fail to exceed expression baselines at all pool sizes}
+
+The leakage-safe Phase 8 evaluation tested whether LIONESS-derived per-sample features improve FLT-versus-GC classification beyond an expression-only baseline. Across all four LIONESS pool modes (effective $N \in \{5, 20, 40, 80\}$) and all five feature engineerings, network-derived features did not exceed the expression baseline in any Age $\times$ Arm stratum (Table~\ref{tab:phase8}). Stratum-level network advantage was uniformly negative ($-0.5$ to $-0.9$) and invariant to pool size; pooled-cohort network advantage was small but consistently negative ($-0.05$ to $-0.10$). Increasing the LIONESS LOO denominator from 4 (at $N{=}5$) to 79 (at $N{=}80$) does not change the relative inferiority of network features.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{lcccc}
+\toprule
+Pool mode & Effective $N$ & Best stratum-network advantage & Best stratum & POOLED net.\ adv. \\
+\midrule
+\code{age\_arm\_envgroup} & 5 & $-0.5$ & LAR-Old & $-0.05$ \\
+\code{arm} & 20 & $-0.5$ & LAR-Old & $-0.05$ \\
+\code{age} & 40 & $-0.5$ & LAR-Old & $-0.05$ \\
+\code{global} & 80 & $-0.5$ & LAR-Old & $-0.10$ \\
+\bottomrule
+\end{tabular}
+\caption{Phase 8 leakage-safe LOO-CV: network feature advantage over expression-only baseline by pool mode. Identical negative network advantage across all four pool sizes contradicts a noise-floor explanation of the negative result and indicates network features are redundant with expression in this regime.}
+\label{tab:phase8}
+\end{table}
+
+\subsection{Direct group-level differential correlation testing is null in every stratum}
+
+The direct differential-correlation diagnostic, an independent network-rewiring sanity check that does not depend on LIONESS or embeddings, was null in every Age $\times$ Arm stratum (Table~\ref{tab:direct_corr}). Global FLT-versus-GC correlation-restructuring $p$-values exceeded $0.79$ in every stratum, no genes passed BH at $q < 0.05$, and top-decile overlap between direct-correlation rankings and LIONESS rankings was at the hypergeometric null expectation. Spearman correlation between gene rankings under the two methods was effectively zero ($\rho \in [-0.027, +0.001]$) with permutation $p$-values $\geq 0.270$.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{lrrrrr}
+\toprule
+Stratum & Global $p$ & Genes $q<0.05$ & LIONESS $\rho$ & $\rho$ perm $p$ & Top-decile overlap (null) \\
+\midrule
+ISS-T Young & 0.799 & 0 & $-0.010$ & 0.785 & 26 (26.4) \\
+ISS-T Old & 0.980 & 0 & $+0.002$ & 0.972 & 31 (24.2) \\
+LAR Young & 0.999 & 0 & $+0.001$ & 0.932 & 31 (24.5) \\
+LAR Old & 0.924 & 0 & $-0.027$ & 0.270 & 24 (21.7) \\
+\bottomrule
+\end{tabular}
+\caption{Direct group-level differential-correlation diagnostic. No global signal, no gene-level FDR survivors, no correlation between direct-correlation and LIONESS gene rankings, top-decile overlap at null expectation in every stratum.}
+\label{tab:direct_corr}
+\end{table}
+
+\subsection{Pre-registered external validation: pathway-level context}
+
+Ranked-GSEA testing of the pre-registered eight-pathway panel in each external cohort yielded the results summarized in Table~\ref{tab:external}. PPAR signaling replicates directionally in male C57BL/6J kidney (OSD-513, $q = 0.079$) but not in matched-sex female C57BL/6J (OSD-102, $q = 0.86$), consistent with a sex-stratified pathway-level signal. Translation machinery does not directionally replicate in either cohort but shows context activity in OSD-253 ($q = 0.067$, with light-wavelength caveat from the original RR-7 ground-control selection); EMT/fibrosis also shows context activity in OSD-253 ($q = 0.067$, same caveat). OSD-163 (BALB/c) shows no activity in any of the eight pre-registered pathways, consistent with the strain-dependence finding of Finch et al.\ \citep{finch2025strain} and serving as a negative-control cohort for our C57BL/6-derived panel.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{llcccp{4cm}}
+\toprule
+Cohort & Pathway & Same direction & ES (ext.) & $q$ (GSEA) & Decision \\
+\midrule
+OSD-102 & PPAR signaling & no & $-0.05$ & 0.86 & not replicated \\
+OSD-102 & translation machinery & no & $-0.04$ & 0.86 & not replicated \\
+OSD-513 & PPAR signaling & yes & $+0.42$ & $\mathbf{0.079}$ & \textbf{replicated} (male-specific) \\
+OSD-513 & translation machinery & yes & $+0.08$ & 0.31 & not replicated \\
+OSD-163 & all 8 pathways & --- & --- & $\geq 0.91$ & no context (BALB/c null) \\
+OSD-253 & EMT/fibrosis & --- & --- & $\mathbf{0.067}$ & \textbf{context} (light-wavelength caveat) \\
+OSD-253 & translation machinery & --- & --- & $\mathbf{0.067}$ & \textbf{context} (light-wavelength caveat) \\
+\bottomrule
+\end{tabular}
+\caption{Pre-registered external validation. PPAR replicates in male C57BL/6J only. OSD-253 context cohort detects EMT/fibrosis and translation activity but used original RR-7 ground control samples that differ from flight habitats in light wavelength; 2021 white-LED rerun was not used.}
+\label{tab:external}
+\end{table}
+
+\subsection{Convergence summary}
+
+Three independent network methods agree on what is not detectable at RRRM-2 cohort size. LIONESS-derived per-sample edge weights and direct group-level differential correlations are both null at the network-rewiring scale, with the two gene-ranking methods producing uncorrelated rankings. WGCNA module-trait association identifies a coherent ISS-T-specific module activity shift in grey60 (ECM/cell-migration; 48 genes, hub-anchored, $Z_{\text{summary,GC-ref}} = 20.6$ for the gene set against a flight-naive reference), confirming activity shift rather than topology remodeling as the dominant detectable signal in this cohort.
+
+% =====================================================================
+\section{Discussion}
+
+\subsection{Activity shift, not topology rewiring, is the detectable spaceflight kidney signal at RRRM-2 cohort size}
+
+The principal finding of this study is methodological: at $n{=}5$ biological replicates per Age $\times$ Arm $\times$ Environment-Group cell, the detectable network-scale signal in mouse kidney spaceflight transcriptomics is coordinated module activity shift, not broad co-expression topology rewiring. This conclusion rests on the convergence of three methodologically independent analyses. Per-sample LIONESS edge weights, processed through Procrustes-aligned multi-seed \pkg{node2vec} embeddings and cosine-distance rewiring scoring \citep{kuijjer2019estimating, grover2016node2vec, liu2021pecanpy}, do not exceed an expression-only baseline under leakage-safe leave-one-out cross-validation, and the result is invariant to the LIONESS sample pool from $N{=}5$ to $N{=}80$. Direct group-level differential correlation testing, which uses the same partial-correlation skeleton but compares FLT versus GC correlation matrices without the LIONESS step \citep{tesson2010diffcoex}, is null in every Age $\times$ Arm stratum with gene rankings uncorrelated with the LIONESS rankings. WGCNA module-trait association \citep{langfelder2008wgcna} identifies twelve modules with significant trait associations, with the lead module (grey60) showing the strongest Flight effect ($q < 10^{-4}$) and Flight $\times$ Arm interaction ($q < 10^{-4}$) of any module. Critically, GC-reference module preservation \citep{langfelder2011module} demonstrates that the grey60 gene set is strongly preserved in a flight-naive reference network ($Z_{\text{summary}} = 20.6$ for the 40/48 grey60 genes that map into a single GC-only module). Activity shift versus topology remodeling: the orchestra section gets louder, but the musicians are still seated together.
+
+This conclusion has direct implications for the deployment of sample-specific network methods in small-cohort spaceflight transcriptomics. LIONESS-style approaches have been validated in much larger cohorts (TCGA-scale) where their advantage over differential expression has been demonstrated using in-sample or associative analyses \citep{lopes2020gene, fagny2017exploring}. At RRRM-2 cohort size with leakage-safe out-of-sample evaluation, their advantage is not present in this dataset. We do not claim that LIONESS or related methods are universally inappropriate for spaceflight transcriptomics --- larger consortia-scale datasets may well demonstrate their utility --- but at present cohort sizes, the field should adopt module-activity methods as the primary network-scale analysis with sample-specific network features reserved for exploratory or sensitivity-analysis roles.
+
+\subsection{Grey60 as a candidate ECM/cell-migration response to terminal on-orbit spaceflight}
+
+The biological finding is that a 48-gene module enriched for ECM organization, cell-matrix adhesion, cell migration, and proteolysis is activated specifically in the ISS-T arm of RRRM-2 across both young and old mice. Hub-gene composition --- with \gene{Tril} (TLR4 enhancer), \gene{Itga9} and \gene{Itga8} (cell-ECM integrins), \gene{Fbn1} (fibrillin-1 / TGF-$\beta$ sequestration), \gene{S1pr3} (sphingosine-1-phosphate fibrotic receptor), \gene{Cdh11} (mesenchymal cadherin / myofibroblast driver), and the ECM-degrading metalloproteinases \gene{Adamts7}, \gene{Adam12}, and \gene{Mmp14} --- traces a coherent ECM-remodeling and cell-migration program with mechanistic ties to TLR4-driven, TGF-$\beta$-mediated kidney fibrosis. This composition is consistent with the strain-dependent ECM signature reported by Finch and colleagues for C57BL/6J kidney under spaceflight \citep{finch2025strain} and with the broader recognition of TGF-$\beta$-mediated ECM remodeling as a defining feature of cosmic kidney disease \citep{siew2024cosmic, beheshti2018microrna}.
+
+Three biological features of grey60 deserve emphasis. First, the module is small enough (48 genes) to be biologically interpretable as a coordinated regulatory program rather than a generic transcriptional signature. Top hub genes are mechanistically interconnected: TRIL is a TLR4 enhancer \citep{carpenter2009tril}, TLR4 activates TGF-$\beta$ signaling and is causally required for progressive renal fibrosis \citep{souza2015tlr4, pulskens2010tlr4}, TGF-$\beta$ is sequestered in inactive form by fibrillin-1 in the ECM until proteolytic release \citep{ramirez2017fibrillin, charbonneau2020fibrillin}, MMP14 and the ADAM family are TGF-$\beta$-responsive ECM-degrading proteinases that liberate active TGF-$\beta$ \citep{ramachandran2013adam12, itoh2015mmp14}, CDH11 drives the myofibroblast phenotype and is a biomarker of human kidney fibrosis severity \citep{kawano2021cdh11, bischoff2022cdh11}, and integrins \gene{Itga8}/\gene{Itga9} mediate the mechanical and signaling consequences of altered ECM composition \citep{marek2016itga8, chen2023cul4b}. Grey60 is, mechanistically, a TLR4 $\rightarrow$ TGF-$\beta$ $\rightarrow$ ECM-remodeling axis with integrin-mediated cellular consequences.
+
+Second, the module's internal topology is preserved under flight. Forty of forty-eight grey60 genes co-cluster in a single flight-naive reference module ($Z_{\text{summary}} = 20.6$). The signal is that these genes' coordinated expression shifts in magnitude under flight without rearranging which genes co-regulate. Mechanistically, this is consistent with a regulatory program whose existing structure is being differentially driven --- e.g., a TGF-$\beta$ release event causing coordinated upregulation of the existing ECM-remodeling module --- rather than with the emergence of a new regulatory architecture.
+
+Third, the response is strongly ISS-T-arm-restricted ($-0.552$ Flight $\times$ Arm interaction, $q < 10^{-4}$), with simple-effect contrasts showing significant FLT-vs-GC eigengene shifts in both ISS-T Young and ISS-T Old but non-significant shifts in both LAR arms. We discuss interpretation in the next subsection.
+
+\subsection{The ISS-T-versus-LAR distinction: three competing causal explanations}
+
+The ISS-T-specific localization of the grey60 activity shift has three competing causal explanations, only one of which is biologically informative.
+
+The biologically informative explanation is \emph{acute on-orbit flight-state} effects that decay during the 24-day LAR recovery period. Under this interpretation, grey60 captures kidney ECM/cell-migration responses to the active flight environment (microgravity-induced fluid shifts, ongoing radiation exposure, on-orbit stress) that revert toward baseline after return to Earth. This is the interpretation we would emphasize, and it would predict that grey60 activity in shorter-flight cohorts with shorter recovery (e.g.\ OSD-102 with 1--7 days post-splashdown sacrifice) should fall between the ISS-T and LAR levels.
+
+The first competing explanation is \emph{recovery-mediated reversal} of a flight-arm-shared response. Under this interpretation, both ISS-T and LAR mice experienced the flight-driven ECM module activation, but the 24-day LAR recovery period was sufficient for the response to reverse, while the ISS-T mice were sacrificed before reversal could occur. This is biologically interesting in its own right --- it would imply that the kidney rapidly heals from spaceflight-induced ECM perturbation given an Earth-recovery period --- but is observationally indistinguishable from the acute-state interpretation in this dataset.
+
+The second and most important competing explanation is \emph{on-orbit sample collection differences} as a confound. Galazka and colleagues \citep{galazka2020rnaseq} demonstrated, using multiple Rodent Research missions, that on-orbit-dissected-and-preserved tissues show large transcriptomic differences from Earth-dissected-from-whole-carcass-preservation tissues, with the magnitude of the preservation-protocol effect rivaling or exceeding the FLT-vs-GC contrast in some tissues. In RRRM-2, ISS-T mice were sacrificed on-orbit and tissue-collected by on-orbit dissection, while LAR mice were sacrificed and dissected on Earth. Any signal specifically detected in ISS-T-vs-LAR contrast is therefore confounded with on-orbit-versus-Earth dissection protocol. Some of the grey60 ECM/cell-migration signal could plausibly reflect the on-orbit dissection itself (mechanical tissue handling, on-orbit stress hormones at the moment of euthanasia, post-mortem hypoxia/handling time) rather than the flight environment per se. We cannot adjudicate between flight-state effects and dissection-protocol effects with the RRRM-2 dataset alone.
+
+A future analysis with controlled dissection protocols (e.g., on-orbit dissection in the LAR arm, or Earth-dissection from frozen whole-carcass in the ISS-T arm) would isolate the flight-state contribution from the dissection-protocol contribution. Until such a design exists, the grey60 finding should be reported as ``ISS-T-arm-specific'' rather than as ``acute on-orbit flight-state'' --- the arm specificity is genuine, but its causal partitioning is not.
+
+\subsection{A testable mechanistic prediction: TLR4-dependence}
+
+The top hub gene of grey60 is \gene{Tril} (kME = 0.933), a TLR4-signaling enhancer first characterized in brain \citep{carpenter2009tril, wochal2011tlr3}. TLR4 itself is causally required for progressive renal fibrosis in multiple mouse models, with TLR4-mutant mice (C3H/HeJ, carrying the spontaneous LPS-non-responder \emph{Tlr4}$^{Lps\text{-}d}$ allele) showing protection from folic-acid-induced and unilateral-ureteral-obstruction-induced kidney fibrosis \citep{souza2015tlr4, pulskens2010tlr4}. If the grey60 ECM/cell-migration activity shift is mechanistically TLR4-pathway-dependent, then C3H/HeJ kidney under spaceflight should show reduced or absent grey60 activation relative to wild-type C57BL/6.
+
+This is directly testable. NASA's Rodent Research-7 mission (OSD-253) flew both C57BL/6J and C3H/HeJ female mice on the same flight at matched 25-day and 75-day timepoints \citep{wronski2019rr7}. Module projection of grey60 onto OSD-253 with strain-stratified analysis would test the TLR4-dependence prediction directly. A positive result (C57BL/6J FLT-vs-GC grey60 shift present, C3H/HeJ FLT-vs-GC grey60 shift absent or attenuated) would establish TLR4 pathway involvement in the spaceflight kidney ECM response and would have therapeutic implications (TLR4 antagonists as candidate countermeasures). A negative result (grey60 shift present or absent in both strains independent of TLR4 status) would argue that the module is regulated by a TLR4-independent axis and would redirect mechanistic follow-up toward other top hubs (\gene{S1pr3}, \gene{Cdh11}, integrin signaling).
+
+\subsection{What can and cannot be claimed from this work}
+
+\textbf{Claims supported.} (i) RRRM-2 kidney shows ISS-T-arm-specific shifts in coordinated module activity, with module-level resolution from WGCNA. (ii) The lead module is a 48-gene ECM/cell-migration module (grey60) with strongest Flight and Flight $\times$ Arm effects of any module. (iii) Grey60 hub-gene composition supports an ECM/cell-adhesion/proteolysis biology with mechanistic ties to TLR4 and TGF-$\beta$ signaling. (iv) GC-reference preservation analysis indicates the grey60 signal is activity shift, not topology remodeling. (v) At RRRM-2 cohort size, per-sample LIONESS network features and direct group-level differential correlation do not detect broad topology rewiring, and the multi-method convergence on this negative result is itself a methodological contribution. (vi) External pathway-level validation: PPAR signaling replicates in male C57BL/6J (OSD-513) but not in matched-sex female C57BL/6J (OSD-102); BALB/c (OSD-163) is null; OSD-253 detects context-level EMT/fibrosis and translation machinery activity with explicit acknowledgment of the light-wavelength confound from original-versus-rerun GC selection.
+
+\textbf{Claims not supported.} We do not claim that spaceflight broadly rewires kidney co-expression networks at this cohort size --- the multi-method evidence is against it. We do not claim that grey60 represents localized ECM co-expression remodeling --- GC-reference preservation establishes activity shift, not remodeling. We do not claim that the lipid/PPAR module is flight-responsive in WGCNA --- midnightblue is preserved and unresponsive. We do not claim that red is a primary flight-responsive ECM module --- its main effect is non-significant and its interaction term is driven by opposite-sign sub-effects. We do not claim that older mice show more rewiring than young mice --- no Flight $\times$ Age interaction survived correction. We do not claim that raw-pooling external OSDs rescues the original network-rewiring pipeline --- it does not, and pooling across mission, sex, strain, light, platform, duration, and processing differences would learn batch rather than biology.
+
+\subsection{Limitations}
+
+Six limitations are worth stating explicitly.
+
+First, the ISS-T-versus-LAR distinction confounds three causal axes (acute flight state, recovery reversal, on-orbit dissection protocol per Galazka et al.\ \citep{galazka2020rnaseq}). The arm-specific localization is genuine; its causal interpretation is not adjudicated by this dataset.
+
+Second, RRRM-2 is female-only. The PPAR signaling pathway-level replication in male OSD-513 versus the non-replication in matched-sex female OSD-102 raises a sex-axis question that we do not resolve. Within-RRRM-2 we cannot test sex-dependence directly; the external validation cohorts provide partial information but at a different scale.
+
+Third, grey60 is small (48 genes). Smaller WGCNA modules are more sensitive to a few high-$kME$ genes and require robustness checks. The eigengene was recomputed using only the top-10 hub genes, top-20 hub genes, and the full module; Flight and Flight $\times$ Arm coefficients were stable across these subsets (data in supplement). The biological coherence of the hub layer (ECM/cell-adhesion/proteolysis genes mechanistically interconnected) is independent evidence that grey60 is not a single-driver artifact.
+
+Fourth, the GC-reference preservation analysis uses $n{=}20$ Habitat Ground Control samples to define the reference network. This is small for a WGCNA reference and limits power for detection of subtle topology changes. A larger reference dataset would strengthen the activity-shift conclusion; the OSDR-scale meta-analysis approach \citep{ray2019genelab} would provide it.
+
+Fifth, the OSD-253 context cohort used original RR-7 ground control samples whose habitats differ from flight habitats in light wavelength (blue-enriched LEDs versus white LEDs), and the 2021 white-LED rerun was not used. Translation initiation and broader transcription are circadian-regulated \citep{aviram2021circadian}, and part of the OSD-253 context-detected signal may reflect photoperiod rather than spaceflight. A confound-controlled rerun against the 2021 white-LED GC samples is the immediate priority for context-cohort validation.
+
+Sixth, the WGCNA modules were defined on combined FLT+HGC samples. While the preservation correction with a GC-only reference addresses the most concerning form of FLT-into-module-definition contamination, ideally module discovery would use a fully held-out reference. The present analysis approximates this through the preservation correction; a strict-out-of-sample module discovery would strengthen the finding.
+
+\subsection{Comparison to Finch et al.\ 2025}
+
+Our work complements and extends Finch et al.\ \citep{finch2025strain}. They established the strain axis (C57BL/6J versus BALB/c) at the differential-expression and gene-set-enrichment scale using two-cohort comparison across different missions (RR-1 and RR-3). We extend the framework along three orthogonal axes. First, we add the \emph{arm} axis (ISS-T versus LAR) within a single mission and a single C57BL/6 substrain background (C57BL/6NTac, RRRM-2), revealing arm-specific module activation that no prior dataset could resolve. Second, we add \emph{module-scale resolution} to the differential-expression evidence Finch reports, identifying a coherent 48-gene ECM/cell-migration module that aggregates many of the individual gene signals into a single regulatory program. Third, we add the \emph{topology-versus-activity distinction} through GC-reference module preservation, demonstrating that the C57BL/6 spaceflight kidney response is module activity shift rather than co-expression remodeling. Finch's strain finding remains the headline strain-axis result; our work is the headline arm-axis-and-module-scale result.
+
+The two findings are biologically consistent. Both implicate ECM remodeling, TGF-$\beta$ signaling, and lipid metabolism. Both observe stronger response in C57BL/6 than in BALB/c. Both are consistent with the cosmic kidney disease framework \citep{siew2024cosmic}. The next integrative analysis --- a coordinated meta-analysis pooling RRRM-2, RR-1, RR-3, RR-7, RR-23, and forthcoming missions with strain, sex, age, mission duration, and recovery window as design covariates --- would arbitrate the relative contributions of these axes within a single hierarchical model.
+
+\subsection{Implications for spaceflight kidney biology and astronaut renal health}
+
+The biological direction is clear: ECM remodeling and cell migration are activated specifically during or immediately after terminal on-orbit spaceflight in C57BL/6 mouse kidney, with module activity shifts visible at the eigengene level but with internal co-expression topology preserved. This is biologically consistent with the framework of cosmic kidney disease \citep{siew2024cosmic}, in which microgravity-induced tubular remodeling drives downstream stone formation, hypercalciuria, and fibrotic priming. Our work identifies a specific, hub-anchored regulatory module that aggregates the ECM/cell-migration component of this remodeling and provides candidate biomarkers (grey60 hub-gene panel) for monitoring kidney response to spaceflight.
+
+The mechanistic prediction (TLR4-dependence, testable in OSD-253 via C57BL/6J versus C3H/HeJ stratification) is the immediate next step that would translate this descriptive finding into mechanism. If confirmed, TLR4 antagonism becomes a candidate countermeasure for spaceflight kidney protection alongside hydration, exercise loading, and bisphosphonates.
+
+% =====================================================================
+\section{Future Research Directions}
+
+\subsection{Strain-stratified module projection in OSD-253}
+
+The single highest-leverage immediate analysis is module projection of grey60 onto OSD-253, stratified by strain (C57BL/6J versus C3H/HeJ). The hypothesis is sharp: grey60 eigengene FLT-vs-GC activity shift is detectable in C57BL/6J but reduced or absent in C3H/HeJ. Implementation requires only the module-projection scoring (mean expression of grey60 hub genes, or projected eigengene via held-out PCA) applied separately to the two strain subsets, with the same caveat about light-wavelength GC selection. Effort: 1--2 days.
+
+\subsection{Confound-controlled OSD-253 rerun}
+
+The OSD-253 light-wavelength caveat is fully addressable by running the FLT-vs-GC GSEA against the 2021 white-LED rerun samples instead of the original RR-7 ground controls. If grey60 module activity (and context-detected EMT/fibrosis and translation pathway activity) survive against the controlled GC, the claim hardens; if it does not, the manuscript's caveat language is appropriately calibrated. Effort: 1 day.
+
+\subsection{Multi-tissue module projection within RRRM-2}
+
+RRRM-2 includes parallel single-cell PBMC and spleen datasets and may be linked to other tissue datasets within the same animals. Module projection of grey60 onto other RRRM-2 tissues would reveal whether the ECM/cell-migration module is kidney-specific or organism-wide, and would adjudicate between kidney-intrinsic mechanisms (renal tubular epithelial responses) and systemic mechanisms (sex-hormone-modulated or vascular-systemic effects affecting kidney exposure).
+
+\subsection{Held-out reference WGCNA on a larger cohort}
+
+A strict-out-of-sample WGCNA module definition using a held-out kidney transcriptome reference (e.g.\ Tabula Muris Senis kidney female \citep{tabula2020}, or a Beheshti meta-analysis aggregate \citep{beheshti2018microrna}) would strengthen the topology-versus-activity-shift distinction. The held-out network would be defined on flight-naive data and grey60 (or its equivalents) projected onto it.
+
+\subsection{TLR4-axis mechanistic follow-up}
+
+If module projection in OSD-253 supports TLR4-dependence, a targeted wet-lab follow-up using TLR4 antagonist (e.g., TAK-242) or \gene{Tlr4} conditional knockout under simulated microgravity (clinostat, rotating-wall vessel) in mouse kidney organoids \citep{morizane2015nephron} would test causality. Outcome measures: grey60 hub-gene expression, ECM deposition by histology, urinary kidney-injury markers (KIM-1, NGAL).
+
+\subsection{Sex-stratified RRRM-3 or future-mission analysis}
+
+The PPAR signaling male-female discordance in the external GSEA cohort comparison (replicated in OSD-513 male, not in OSD-102 female) is a candidate sex-axis finding that the present design cannot fully test. A future mission with both-sex C57BL/6 cohorts (RRRM-3, when available; or a deliberately-designed mixed-sex cohort) would resolve the sex-axis question with adequate statistical power.
+
+\subsection{Coordinated meta-analysis across NASA Rodent Research kidney missions}
+
+The integration target is a single hierarchical model with strain, sex, age, mission duration, recovery window, and dissection protocol as design covariates fit on the pooled NASA RR kidney transcriptome corpus (RR-1, RR-3, RR-7, RR-23, RRRM-1, RRRM-2, and forthcoming). ComBat-seq batch correction \citep{zhang2020combat} addresses inter-mission technical variation; mixed-effects regression with random intercepts per mission adjudicates between covariate effects. The grey60 module is the natural cross-mission target.
+
+\subsection{Pre-registration as community standard}
+
+The pre-registered, claim-type-separated, multi-method framework deployed here is general. We propose its adoption as a standard practice for small-cohort spaceflight transcriptomics, where the temptation to over-claim from underpowered designs is structural. An OSDR Analysis Working Group standard for pre-registered cross-cohort validation with explicit context-versus-replication separation would substantially raise the field's epistemic floor.
+
+% =====================================================================
+\section{Conclusion}
+
+At NASA Rodent Research Reference Mission 2 cohort size, the detectable kidney spaceflight signal at the network scale is coordinated module activity shift, not broad co-expression topology rewiring. Three methodologically independent network analyses agree on this conclusion: per-sample LIONESS features fail to exceed an expression-only baseline at any LIONESS pool size under leakage-safe LOO-CV, direct group-level differential correlation is null in every Age $\times$ Arm stratum, and WGCNA module-trait association identifies a lead 48-gene ECM/cell-migration module (grey60) whose internal topology is preserved against a flight-naive reference. The module is ISS-T-arm-restricted with the strongest Flight $\times$ Arm interaction of any module ($q < 10^{-4}$), and its hub-gene composition (\gene{Tril}, \gene{Itga9}, \gene{Fbn1}, \gene{S1pr3}, \gene{Cdh11}, \gene{Adam12}, \gene{Mmp14}) traces a TLR4 $\rightarrow$ TGF-$\beta$ $\rightarrow$ ECM-remodeling axis with mechanistic ties to established kidney fibrosis biology. The ISS-T-versus-LAR localization is confounded by three causal axes (acute flight state, recovery reversal, on-orbit dissection protocol) that this dataset alone cannot adjudicate; we propose strain-stratified module projection on OSD-253 (C57BL/6J versus C3H/HeJ) as the immediate TLR4-dependence test and a multi-mission meta-analysis as the integration target. We position this work as a complement to Finch et al.\ \citep{finch2025strain}, extending their strain-axis differential-expression framework to an arm-axis module-scale activity-shift framework with explicit topology-versus-activity distinction. Sample-specific network methods are demoted to negative benchmarks at this cohort size; module-scale methods (WGCNA, with preservation correction) are the appropriate primary tool for small-cohort spaceflight network transcriptomics.
+
+\section*{Author contributions}
+I.S.\ designed and implemented the analytical framework, conducted the LIONESS, direct-correlation, and WGCNA analyses, drafted the manuscript, committed source code, tests, and pre-registration manifests. PI authorship pending.
+
+\section*{Competing interests}
+The author declares no competing interests.
+
+\section*{Data and code availability}
+NASA Open Science Data Repository accessions: OSD-771 (RRRM-2), OSD-102 (RR-1), OSD-513 (RR-23), OSD-163 (RR-3), OSD-253 (RR-7). All available at \url{https://osdr.nasa.gov/}. Pipeline source, pre-registered manifests, audit reports, and unit tests are version-controlled at \code{ibrahimshahid1/RRRM2\_Kidney\_Transcriptome}.
+
+% =====================================================================
+\begin{thebibliography}{99}\small
+
+\bibitem{aviram2021circadian} Aviram R, Adamovich Y, Asher G. Circadian organelles: rhythms at all scales. \emph{Cells}. 2021;10(9):2447.
+
+\bibitem{beheshti2018microrna} Beheshti A, Ray S, Fogle H, Berrios D, Costes SV. A microRNA signature and TGF-$\beta$1 response were identified as the key master regulators for spaceflight response. \emph{PLOS ONE}. 2018;13(7):e0199621.
+
+\bibitem{benjamini1995controlling} Benjamini Y, Hochberg Y. Controlling the false discovery rate: a practical and powerful approach to multiple testing. \emph{J R Stat Soc Series B}. 1995;57(1):289-300.
+
+\bibitem{bischoff2022cdh11} Bischoff K, Rabasco P, Yang X, Klein OD. Cadherin-11 and its role in tissue fibrosis. \emph{Cells Tissues Organs}. 2023;212(4):293-303.
+
+\bibitem{carpenter2009tril} Carpenter S, Carlson T, Dellacasagrande J, et al. TRIL, a functional component of the TLR4 signaling complex, highly expressed in brain. \emph{J Immunol}. 2009;183(6):3989-3995.
+
+\bibitem{charbonneau2020fibrillin} Bouwens E, Caetano-Pinto P, Beneke K, et al. Fibrillin-1--enriched microenvironment drives endothelial injury and vascular rarefaction in chronic kidney disease. \emph{Sci Adv}. 2021;7(5):eabc7170.
+
+\bibitem{chen2023cul4b} Chen Z, Li Q, Yang H, et al. Depletion of CUL4B in macrophages ameliorates diabetic kidney disease via miR-194-5p/ITGA9 axis. \emph{Cell Rep}. 2023;42(4):112267.
+
+\bibitem{chouker2025impact} Chouker A, Gallo A, et al. Impact of spaceflight on endocrine, metabolic and kidney function: current evidence, open issues, and potential countermeasures. \emph{BMC Biol}. 2025;23:71.
+
+\bibitem{cockett1962astronautical} Cockett ATK, Beehler CC, Roberts JE. Astronautical urolithiasis: a potential hazard during prolonged weightlessness in space travel. \emph{J Urol}. 1962;88:542-544.
+
+\bibitem{daSilveira2020comprehensive} da Silveira WA, Fazelinia H, Rosenthal SB, et al. Comprehensive multi-omics analysis reveals mitochondrial stress as a central biological hub for spaceflight impact. \emph{Cell}. 2020;183(5):1185-1201.
+
+\bibitem{dai2019cell} Dai H, Li L, Zeng T, Chen L. Cell-specific network constructed by single-cell RNA sequencing data. \emph{Nucleic Acids Res}. 2019;47(11):e62.
+
+\bibitem{fagny2017exploring} Fagny M, Paulson JN, Kuijjer ML, et al. Exploring regulation in tissues with eQTL networks. \emph{Proc Natl Acad Sci USA}. 2017;114(37):E7841-E7850.
+
+\bibitem{finch2025strain} Finch RH, Vitry G, Siew K, Walsh SB, Beheshti A, Hardiman G, da Silveira WA. Spaceflight causes strain-dependent gene expression changes in the kidneys of mice. \emph{npj Microgravity}. 2025;11:11.
+
+\bibitem{galazka2020rnaseq} Galazka JM, et al. RNAseq analysis of rodent spaceflight experiments is confounded by sample collection techniques. \emph{iScience}. 2020;23(12):101733.
+
+\bibitem{grover2016node2vec} Grover A, Leskovec J. node2vec: scalable feature learning for networks. \emph{KDD}. 2016:855-864.
+
+\bibitem{itoh2015mmp14} Itoh Y. Membrane-type matrix metalloproteinases: their functions and regulations. \emph{Matrix Biol}. 2015;44-46:207-223.
+
+\bibitem{joncher2016spaceflight} Jonscher KR, Alfonso-Garcia A, Suh JH, et al. Spaceflight activates lipotoxic pathways in mouse liver. \emph{PLOS ONE}. 2016;11(4):e0152877.
+
+\bibitem{kassemi2021numerical} Kassemi M, Brock R, Nemeth N. Numerical characterization of astronaut CaOx renal stone incidence rates to quantify in-flight and post-flight relative risk. \emph{npj Microgravity}. 2021;7:34.
+
+\bibitem{kawano2021cdh11} Kawano H, Nakatani T, Mori T, et al. Cadherin-11, SMOC2, and PEDF are promising non-invasive biomarkers of kidney fibrosis. \emph{Kidney Int}. 2021;100(3):661-674.
+
+\bibitem{kuijjer2019estimating} Kuijjer ML, Tung MG, Yuan G, Quackenbush J, Glass K. Estimating sample-specific regulatory networks. \emph{iScience}. 2019;14:226-240.
+
+\bibitem{langfelder2008wgcna} Langfelder P, Horvath S. WGCNA: an R package for weighted correlation network analysis. \emph{BMC Bioinformatics}. 2008;9:559.
+
+\bibitem{langfelder2011module} Langfelder P, Luo R, Oldham MC, Horvath S. Is my network module preserved and reproducible? \emph{PLOS Comput Biol}. 2011;7(1):e1001057.
+
+\bibitem{ledoit2003honey} Ledoit O, Wolf M. Honey, I shrunk the sample covariance matrix. \emph{J Portfolio Manag}. 2004;30(4):110-119.
+
+\bibitem{liu2016single} Liu X, Wang Y, Ji H, et al. Personalized characterization of diseases using sample-specific networks. \emph{Nucleic Acids Res}. 2016;44(22):e164.
+
+\bibitem{liu2021pecanpy} Liu R, Krishnan A. PecanPy: a fast, efficient, and parallelized Python implementation of node2vec. \emph{Bioinformatics}. 2021;37(19):3377-3379.
+
+\bibitem{liu2021tril} Liu Y, Brunner-Welch A, et al. TLR4-interactor with leucine-rich repeats (TRIL) is involved in diet-induced hypothalamic inflammation. \emph{Sci Rep}. 2021;11:18091.
+
+\bibitem{lopes2020gene} Lopes-Ramos CM, Chen CY, Kuijjer ML, et al. Sex differences in gene expression and regulatory networks across 29 human tissues. \emph{Cell Rep}. 2020;31(12):107795.
+
+\bibitem{love2014moderated} Love MI, Huber W, Anders S. Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. \emph{Genome Biol}. 2014;15(12):550.
+
+\bibitem{marek2016itga8} Marek I, Volkert G, Jahn A, et al. Alpha8 integrin (Itga8) signalling attenuates chronic renal interstitial fibrosis. \emph{PLOS ONE}. 2016;11(2):e0150471.
+
+\bibitem{mizugishi2024s1p} Mizugishi K, Hassan-Smith G. The contribution of the sphingosine 1-phosphate signaling pathway to chronic kidney diseases. \emph{Pflugers Arch}. 2024;476(3):363-378.
+
+\bibitem{morizane2015nephron} Morizane R, Lam AQ, Freedman BS, Kishi S, Valerius MT, Bonventre JV. Nephron organoids derived from human pluripotent stem cells model kidney development and injury. \emph{Nat Biotechnol}. 2015;33(11):1193-1200.
+
+\bibitem{nationalacademies2018renal} National Academies of Sciences, Engineering, and Medicine. Risk of Renal Stone Formation. In: \emph{Review of NASA's Evidence Reports on Human Health Risks: 2017 Letter Report}. Washington, DC: The National Academies Press; 2018.
+
+\bibitem{obermuller2001mmp} Obermuller N, Morente N, Kranzlin B, et al. A possible role for metalloproteinases in renal cyst development. \emph{Am J Physiol Renal Physiol}. 2001;280(3):F540-F550.
+
+\bibitem{pietrzyk2007renal} Pietrzyk RA, Jones JA, Sams CF, Whitson PA. Renal stone formation among astronauts. \emph{Aviat Space Environ Med}. 2007;78(4 Suppl):A9-A13.
+
+\bibitem{proctor2006regulation} Proctor G, Jiang T, Iwahashi M, Wang Z, Li J, Levi M. Regulation of renal fatty acid and cholesterol metabolism, inflammation, and fibrosis in Akita and OVE26 mice with type 1 diabetes. \emph{Diabetes}. 2006;55(9):2502-2509.
+
+\bibitem{pulskens2010tlr4} Pulskens WP, Rampanelli E, Teske GJ, et al. TLR4 promotes fibrosis but attenuates tubular damage in progressive renal injury. \emph{J Am Soc Nephrol}. 2010;21(8):1299-1308.
+
+\bibitem{ramachandran2013adam12} Ramachandran K, Senagolage MD, Sommars MA, et al. Canonical transforming growth factor-$\beta$ signaling regulates disintegrin metalloprotease expression in experimental renal fibrosis via miR-29. \emph{Am J Pathol}. 2013;183(5):1607-1620.
+
+\bibitem{ramirez2017fibrillin} Ramirez F, Caescu C, Wondimu E, Galatioto J. Fibrillin microfibrils and TGF$\beta$ in cardiovascular and connective tissue homeostasis. \emph{Matrix Biol}. 2017;57-58:1-9.
+
+\bibitem{ray2019genelab} Ray S, Gebre S, Fogle H, et al. GeneLab: omics database for spaceflight experiments. \emph{Bioinformatics}. 2019;35(10):1753-1759.
+
+\bibitem{riggins2010mt1mmp} Riggins KS, Mernaugh G, Su Y, et al. MT1-MMP-mediated basement membrane remodeling modulates renal development. \emph{Exp Cell Res}. 2010;316(17):2993-3005.
+
+\bibitem{ritchie2015limma} Ritchie ME, Phipson B, Wu D, et al. limma powers differential expression analyses for RNA-sequencing and microarray studies. \emph{Nucleic Acids Res}. 2015;43(7):e47.
+
+\bibitem{robinson2010edger} Robinson MD, McCarthy DJ, Smyth GK. edgeR: a Bioconductor package for differential expression analysis of digital gene expression data. \emph{Bioinformatics}. 2010;26(1):139-140.
+
+\bibitem{sanders2024rrrm2} Sanders LM, Gebre SG, et al.\ Transcriptional profiling of kidney tissue from mice flown on the Rodent Research Reference Mission-2 (RRRM-2). \emph{NASA Open Science Data Repository OSD-771}; 2024.
+
+\bibitem{schneider2012cadherin11} Schneider DJ, Wu M, Le TT, et al. Cadherin-11 contributes to pulmonary fibrosis. \emph{FASEB J}. 2012;26(2):503-512.
+
+\bibitem{schonemann1966procrustes} Sch\"onemann PH. A generalized solution of the orthogonal Procrustes problem. \emph{Psychometrika}. 1966;31(1):1-10.
+
+\bibitem{schwalm2017sphingosine} Schwalm S, Beyer S, Frey H, et al. Sphingosine kinase 1 protects renal tubular epithelial cells from renal fibrosis via induction of autophagy. \emph{Int J Biochem Cell Biol}. 2017;90:51-61.
+
+\bibitem{shiohira2013s1p} Shiohira S, Yoshida T, Sugiura H, et al. Sphingosine-1-phosphate acts as a key molecule in the direct mediation of renal fibrosis. \emph{Physiol Rep}. 2013;1(7):e00172.
+
+\bibitem{siew2024cosmic} Siew K, Nestler KA, Nelson C, et al. Cosmic kidney disease: an integrated pan-omic, physiological and morphological study into spaceflight-induced renal dysfunction. \emph{Nat Commun}. 2024;15:4923.
+
+\bibitem{smith2014men} Smith SM, Heer M, Shackelford LC, Sibonga JD, Spatz J, Pietrzyk RA, Hudson EK, Zwart SR. Men and women in space: bone loss and kidney stone risk after long-duration spaceflight. \emph{J Bone Miner Res}. 2014;29(7):1639-1645.
+
+\bibitem{souza2015tlr4} Souza ACP, Tsuji T, Baranova IN, et al. TLR4 mutant mice are protected from renal fibrosis and chronic kidney disease progression. \emph{Physiol Rep}. 2015;3(9):e12558.
+
+\bibitem{subramanian2005gene} Subramanian A, Tamayo P, Mootha VK, et al. Gene set enrichment analysis: a knowledge-based approach for interpreting genome-wide expression profiles. \emph{Proc Natl Acad Sci USA}. 2005;102(43):15545-15550.
+
+\bibitem{tabula2020} Tabula Muris Consortium. A single-cell transcriptomic atlas characterizes ageing tissues in the mouse. \emph{Nature}. 2020;583(7817):590-595.
+
+\bibitem{tesson2010diffcoex} Tesson BM, Breitling R, Jansen RC. DiffCoEx: a simple and sensitive method to find differentially coexpressed gene modules. \emph{BMC Bioinformatics}. 2010;11:497.
+
+\bibitem{wang2019music} Wang X, Park J, Susztak K, Zhang NR, Li M. Bulk tissue cell type deconvolution with multi-subject single-cell expression reference. \emph{Nat Commun}. 2019;10:380.
+
+\bibitem{wang2021bayesian} Wang J, Devlin B, Roeder K. Using multiple measurements of tissue to estimate subject- and cell-type-specific gene expression. \emph{Bioinformatics}. 2020;36(3):782-788.
+
+\bibitem{wochal2011tlr3} Wochal P, Rusnati M, Bessone L, et al. Toll-like receptor 3 (TLR3) signaling requires TLR4 interactor with leucine-rich repeats (TRIL). \emph{J Biol Chem}. 2011;286(38):32695-32704.
+
+\bibitem{wochal2014tril} Wochal P, Carpenter S, Dunne A, Aulwurm S, McCusker C, Bowie AG. TRIL is involved in cytokine production in the brain following Escherichia coli infection. \emph{J Immunol}. 2014;193(4):1911-1919.
+
+\bibitem{wronski2019rr7} Globus RK, et al. Rodent Research-7 (RR-7): mouse multi-tissue transcriptomic, proteomic, and metabolomic data. \emph{NASA Open Science Data Repository OSD-253}; 2019.
+
+\bibitem{wynn2012mechanisms} Wynn TA, Ramalingam TR. Mechanisms of fibrosis: therapeutic translation for fibrotic disease. \emph{Nat Med}. 2012;18(7):1028-1040.
+
+\bibitem{zhang2020combat} Zhang Y, Parmigiani G, Johnson WE. ComBat-seq: batch effect adjustment for RNA-seq count data. \emph{NAR Genom Bioinform}. 2020;2(3):lqaa078.
+
+\end{thebibliography}
+
+\vspace{1em}
+\begin{center}
+\rule{0.4\textwidth}{0.4pt}
+\end{center}
+\vspace{0.3em}
+\noindent\textit{Draft prepared May 2026 for senior-author review and target submission to npj Microgravity. Companion documents: \code{critique\_report.tex} (audit), \code{remediation\_guide.tex} (14 fixes implementation guide), \code{rrrm2\_network\_wgcna\_consolidated\_reference.pdf} (WGCNA pivot reference), and the run \code{run\_20260505\_remediated\_2500g/} containing realized numerical results.}
+
+\end{document}

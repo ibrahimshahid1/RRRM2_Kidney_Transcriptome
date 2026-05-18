@@ -209,10 +209,12 @@ def plot_network_subgraph(genes: list[str], edges: pd.DataFrame, degrees: list[i
 
 
 def plot_lioness_statistics(phase2_dir: Path, outdir: Path):
-    """Plot LIONESS z-score statistics."""
-    lioness_path = phase2_dir / "lioness_z_edges.npy"
+    """Plot LIONESS edge-weight statistics."""
+    lioness_path = phase2_dir / "lioness_edges.npy"
     if not lioness_path.exists():
-        print("  [SKIP] No LIONESS z-scores found")
+        lioness_path = phase2_dir / "lioness_z_edges.npy"
+    if not lioness_path.exists():
+        print("  [SKIP] No LIONESS edge weights found")
         return
     
     Z = np.load(lioness_path)
@@ -220,16 +222,16 @@ def plot_lioness_statistics(phase2_dir: Path, outdir: Path):
     
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     
-    # 1. Overall z-score distribution
+    # 1. Overall edge-weight distribution
     ax1 = axes[0, 0]
     z_flat = Z.flatten()
     sample_idx = np.random.choice(len(z_flat), size=min(500000, len(z_flat)), replace=False)
     z_sample = z_flat[sample_idx]
     ax1.hist(z_sample, bins=100, color="#3498db", edgecolor="white", alpha=0.8)
     ax1.axvline(0, color="red", linestyle="--", linewidth=1)
-    ax1.set_xlabel("Fisher z-score", fontsize=11)
+    ax1.set_xlabel("LIONESS edge weight", fontsize=11)
     ax1.set_ylabel("Count", fontsize=11)
-    ax1.set_title(f"LIONESS z-Distribution (sampled)", fontsize=12, fontweight="bold")
+    ax1.set_title(f"LIONESS Edge-Weight Distribution (sampled)", fontsize=12, fontweight="bold")
     ax1.spines["top"].set_visible(False)
     ax1.spines["right"].set_visible(False)
     

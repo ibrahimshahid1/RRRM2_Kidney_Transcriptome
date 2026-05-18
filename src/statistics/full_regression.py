@@ -20,7 +20,7 @@ combination is not used for primary inference because unsigned edge p-values
 discard direction and edge dependence is substantial on a shared skeleton.
 
 Inputs:
-  - data/processed/networks/phase2/lioness_z_edges.npy (N × E edges)
+  - data/processed/networks/phase2/lioness_edges.npy (N × E edge weights)
   - data/processed/networks/phase2/edge_i.npy, edge_j.npy
   - data/processed/networks/phase2/phase2_genes.txt
   - data/processed/networks/phase2/lioness_samples.txt
@@ -251,6 +251,8 @@ def main():
     ap.add_argument("--phase2_dir",
                     default=str(REPO_ROOT / "data/processed/networks/phase2"),
                     help="Directory with LIONESS edge weights")
+    ap.add_argument("--edge-weights", "--z", dest="edge_weights", default="lioness_edges.npy",
+                    help="LIONESS edge-weight matrix filename under phase2_dir")
     ap.add_argument("--meta",
                     default=str(REPO_ROOT / "data/processed/phase1_residuals/meta_phase1.tsv.gz"),
                     help="Metadata file")
@@ -273,7 +275,12 @@ def main():
     # 1. Load edge weight matrix
     print("Loading edge weight matrix...")
     
-    z_path = phase2 / "lioness_z_edges.npy"
+    z_path = phase2 / args.edge_weights
+    if not z_path.exists() and args.edge_weights == "lioness_edges.npy":
+        legacy = phase2 / "lioness_z_edges.npy"
+        if legacy.exists():
+            z_path = legacy
+            print("  WARNING: using legacy lioness_z_edges.npy. Prefer lioness_edges.npy for corrected defaults.")
     if not z_path.exists():
         raise FileNotFoundError(f"Edge weight matrix not found: {z_path}")
     
