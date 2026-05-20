@@ -115,7 +115,44 @@ statistics:
       - candidate_genes_bh
       - hierarchical_benjamini_bogomolov
     strict_fdr: null  # Westfall-Young is not implemented in this repository
-    
+
+# Cross-OSDR Network-Contrast Framework
+# Canonical source: config/contrast_vector_framework.yaml and agents_instruction.md.
+# This mirrored section lets legacy config readers discover the pre-registered
+# guardrails without hard-coding them in Python.
+contrast_vector_framework:
+  config: "config/contrast_vector_framework.yaml"
+  stability_gates:
+    edge:
+      median: 0.30
+      lower: 0.10
+    gene:
+      median: 0.40
+      lower: 0.20
+    lioness_node:
+      median: 0.40
+      lower: 0.20
+    pathway:
+      median: 0.60
+      lower: 0.40
+    module:
+      median: 0.60
+      lower: 0.40
+  bootstrap:
+    n_iterations: 2000
+    ci_alpha: 0.05
+  permutation:
+    n_iterations: 5000
+  phases:
+    default: "stability,decomposition,cross-osdr,external-axis,mechanism-axis,decision"
+  resolutions:
+    default: "module,pathway,gene,lioness_node"
+  interpretation_categories:
+    amplify_min_beta: 1.0
+    redirect_abs_beta_max: 0.10
+    redirect_rho_min: 0.50
+    headline_assignment_fraction: 0.70
+
 # Cross-Validation (Phase 7)
 cross_validation:
   n_folds: 5

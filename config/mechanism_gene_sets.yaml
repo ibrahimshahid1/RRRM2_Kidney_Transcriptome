@@ -1,0 +1,272 @@
+# Candidate mechanism signatures for the recurrent ISS-T remodeling axis.
+#
+# These sets are intentionally compact, curated mouse-compatible symbols.  The
+# runner resolves symbols case-insensitively through data/processed/resources/id_map.tsv.
+# role:
+#   outcome_anchor       = biology used to define/check the remodeling axis
+#   candidate_upstream  = candidate upstream mechanism/context score
+#   candidate_context   = secondary contextual program
+
+ecm_organization:
+  role: outcome_anchor
+  description: "Extracellular matrix organization and matrix deposition"
+  genes:
+    - COL1A1
+    - COL1A2
+    - COL3A1
+    - COL4A1
+    - COL4A2
+    - COL5A1
+    - COL5A2
+    - FN1
+    - FBN1
+    - LAMA1
+    - LAMA2
+    - LAMB1
+    - LAMB2
+    - SPARC
+    - LOX
+    - POSTN
+    - TNC
+
+fibrosis_tgfb_emt:
+  role: candidate_upstream
+  description: "TGF-beta, myofibroblast, and EMT-like fibrotic remodeling"
+  protected_genes:
+    - TGFB1
+    - TGFBR1
+    - TGFBR2
+    - SMAD2
+    - SMAD3
+  genes:
+    - TGFB1
+    - TGFB2
+    - TGFB3
+    - TGFBR1
+    - TGFBR2
+    - SMAD2
+    - SMAD3
+    - SMAD4
+    - SMAD7
+    - CTGF
+    - SERPINE1
+    - ACTA2
+    - VIM
+    - SNAI1
+    - SNAI2
+    - TWIST1
+    - ZEB1
+    - ZEB2
+    - CDH2
+    - CDH11
+
+tlr4_innate:
+  role: candidate_upstream
+  description: "TLR4 and innate immune signal transduction"
+  protected_genes:
+    - TLR4
+    - TRIL
+    - MYD88
+    - TICAM1
+  genes:
+    - TLR4
+    - TRIL
+    - LY96
+    - CD14
+    - MYD88
+    - TIRAP
+    - TICAM1
+    - TICAM2
+    - IRAK1
+    - IRAK4
+    - TRAF6
+    - NFKB1
+    - NFKB2
+    - RELA
+    - IRF3
+    - IRF7
+    - TNF
+    - IL1B
+    - IL6
+    - CXCL1
+    - CCL2
+
+integrin_cell_adhesion:
+  role: candidate_upstream
+  description: "Integrin and focal adhesion remodeling"
+  protected_genes:
+    - ITGA9
+    - ITGB1
+  genes:
+    - ITGA1
+    - ITGA2
+    - ITGA5
+    - ITGA6
+    - ITGA8
+    - ITGA9
+    - ITGAV
+    - ITGB1
+    - ITGB3
+    - ITGB5
+    - TLN1
+    - VCL
+    - PXN
+    - PTK2
+    - FERMT2
+    - CAV1
+    - CAV2
+
+s1p_s1pr3:
+  role: candidate_upstream
+  description: "Sphingosine-1-phosphate signaling with S1pr3 emphasis"
+  protected_genes:
+    - S1PR3
+  genes:
+    - SPHK1
+    - SPHK2
+    - SGPL1
+    - SGPP1
+    - SGPP2
+    - S1PR1
+    - S1PR2
+    - S1PR3
+    - S1PR4
+    - S1PR5
+    - PLPP1
+    - PLPP2
+    - PLPP3
+    - RHOA
+    - RAC1
+
+mmp_adam_proteolysis:
+  role: candidate_upstream
+  description: "Matrix proteolysis through MMP, ADAM, and TIMP genes"
+  protected_genes:
+    - MMP14
+    - ADAM12
+  genes:
+    - MMP2
+    - MMP3
+    - MMP7
+    - MMP9
+    - MMP12
+    - MMP13
+    - MMP14
+    - ADAM8
+    - ADAM10
+    - ADAM12
+    - ADAM17
+    - ADAMTS1
+    - ADAMTS2
+    - ADAMTS4
+    - ADAMTS5
+    - TIMP1
+    - TIMP2
+    - TIMP3
+
+dct_ncc_wnk_transport:
+  role: outcome_anchor
+  description: "Distal convoluted tubule NCC/WNK transport regulation"
+  genes:
+    - WNK1
+    - WNK4
+    - STK39
+    - OXSR1
+    - SLC12A3
+    - KCNJ10
+    - KCNJ16
+    - SCNN1A
+    - SCNN1B
+    - SCNN1G
+    - NEDD4L
+    - SGK1
+    - KLHL3
+    - CUL3
+    - CALB1
+
+tubular_transport_broad:
+  role: outcome_anchor
+  description: "Broader tubular solute and ion transport"
+  genes:
+    - SLC12A3
+    - SLC12A1
+    - SLC4A1
+    - SLC9A3
+    - SLC22A6
+    - SLC22A8
+    - SLC22A12
+    - SLC34A1
+    - SLC2A2
+    - SLC2A9
+    - ATP1A1
+    - ATP1B1
+    - KCNJ1
+    - KCNJ10
+    - KCNJ16
+
+oxidative_stress_nrf2:
+  role: candidate_context
+  description: "Oxidative stress and NRF2 response"
+  protected_genes:
+    - NFE2L2
+    - KEAP1
+  genes:
+    - NFE2L2
+    - KEAP1
+    - HMOX1
+    - NQO1
+    - GCLC
+    - GCLM
+    - GSTA1
+    - GSTM1
+    - SOD1
+    - SOD2
+    - SOD3
+    - CAT
+    - GPX1
+    - GPX3
+    - GPX4
+    - PRDX1
+    - PRDX2
+
+macrophage_inflammation:
+  role: candidate_context
+  description: "Macrophage and inflammatory-cell activation context"
+  genes:
+    - ADGRE1
+    - ITGAM
+    - LYZ2
+    - CSF1R
+    - CD68
+    - CD14
+    - FCGR1
+    - FCGR3
+    - AIF1
+    - CCL2
+    - CCR2
+    - CX3CR1
+    - MRC1
+    - ARG1
+    - NOS2
+    - IL1B
+    - TNF
+
+preservation_stress_response:
+  role: candidate_context
+  description: "Sample collection, ischemia, heat shock, and immediate stress-response context"
+  genes:
+    - FOS
+    - JUN
+    - EGR1
+    - ATF3
+    - DUSP1
+    - HSPA1A
+    - HSPA1B
+    - HSP90AA1
+    - HSP90AB1
+    - DNAJB1
+    - HIF1A
+    - VEGFA
+    - ADM
+    - BTG2
+    - ZFP36

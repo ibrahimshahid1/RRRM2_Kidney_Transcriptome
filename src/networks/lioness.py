@@ -36,7 +36,7 @@ def pearson_from_sums(N, Sx, Sy, Sxx, Syy, Sxy, eps=1e-12):
     denx = N * Sxx - Sx * Sx
     deny = N * Syy - Sy * Sy
     den = np.sqrt(np.maximum(denx, 0.0) * np.maximum(deny, 0.0))
-    r = np.where(den > eps, num / den, 0.0)
+    r = np.divide(num, den, out=np.zeros_like(num, dtype=np.float64), where=den > eps)
     return np.clip(r, -1.0, 1.0)
 
 

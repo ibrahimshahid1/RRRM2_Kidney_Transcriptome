@@ -1,0 +1,36 @@
+# External aging reference — Tabula Muris Senis kidney (female).
+# Drives Guardrail E (§2.5) and Phase 7 (§5.7) of the Cross-OSDR framework.
+
+tms_kidney_female:
+  description: |
+    Per-gene aging effect estimates from Tabula Muris Senis kidney female bulk
+    (or pseudobulked single-cell) data. Used as the external aging axis A^ext_age
+    in Guardrail E.
+  path: "data/external/aging_reference/tms_kidney_female_aging_axis.tsv"
+  source_h5ad: "data/external/single_cell_atlases/tms_kidney_female_ALLDATASETS_counts_innerGenes.h5ad"
+  columns:
+    gene_id: "ensembl_gene_id"
+    effect: "old_vs_young_logfc"
+    se: "se"
+    p_value: "p_value"
+    fdr: "fdr"
+  expected_samples_min: 6
+  age_contrast:
+    young_months: [3]
+    old_months: [18]
+  alternative_age_contrast:
+    description: "Broader aging sensitivity including 1m and oldest available donors."
+    young_months: [1, 3]
+    old_months: [18, 24]  # inclusive range; local TMS 21m donors are included
+  preprocessing:
+    log_normalize: true
+    drop_mitochondrial: true
+    drop_ribosomal: true
+
+projection:
+  pool_rrrm2_age_within_arm: true
+  bootstrap_with_tms_samples: true
+
+artifacts:
+  axis_table: "data/external/aging_reference/tms_kidney_aging_axis.tsv"
+  manifest: "data/external/aging_reference/manifest.json"

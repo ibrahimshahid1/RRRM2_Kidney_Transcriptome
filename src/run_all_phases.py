@@ -102,7 +102,7 @@ def init_run(run_id: str, max_genes: int, topk: int, num_seeds: int,
     NETWORKS_DIR = RESULTS_DIR / "networks"
     
     # Create all sub-directories up front
-    for subdir in ["deconvolution", "phase1_residuals", "dct_markers", "networks"]:
+    for subdir in ["deconvolution", "phase1_residuals", "dct_markers", "networks", "contrast_vectors"]:
         (RESULTS_DIR / subdir).mkdir(parents=True, exist_ok=True)
     
     # Save run metadata
@@ -747,6 +747,80 @@ def phase_external_validation_wgcna(
     ], dry_run=dry_run)
 
 
+def phase_contrast_vector_framework(
+    dry_run: bool = False,
+    phases: str = "stability,decomposition,cross-osdr,external-axis,mechanism-axis,decision",
+    resolutions: str = "module,pathway,gene,lioness_node",
+    n_bootstrap: int | None = None,
+    n_permutation: int | None = None,
+    mechanism_axis_bootstrap: int | None = None,
+    bypass_stability: bool = False,
+    external_aging_axis: str = "",
+    phase2_dir: str = "",
+    wgcna_dir: str = "",
+    rewiring_dir: str = "",
+    external_root: str = "data/external/osdr",
+    cross_osdr_studies: str = "OSD-513,OSD-253",
+    mechanism_gene_sets: str = "config/mechanism_gene_sets.yaml",
+    axis_source: str = "rrrm2_iss_osd513",
+    primary_transport_set: str = "dct_ncc_wnk",
+    sensitivity_transport_set: str = "ion_transport",
+) -> bool:
+    """Opt-in Cross-OSDR Network-Contrast Framework runner."""
+    log("CONTRAST VECTOR FRAMEWORK: Guardrail-gated decomposition")
+    results_dir = Path(os.environ.get("RRRM_RESULTS_DIR", REPO_ROOT / "data/results/contrast_vectors"))
+    run_id = os.environ.get("RRRM_RUN_ID", results_dir.name)
+    outdir = results_dir / "contrast_vectors"
+
+    rtech_path = find_artifact("phase1_residuals/Rtech.tsv.gz") or (REPO_ROOT / "data/processed/phase1_residuals/Rtech.tsv.gz")
+    meta_path = find_artifact("phase1_residuals/meta_phase1.tsv.gz") or (REPO_ROOT / "data/processed/phase1_residuals/meta_phase1.tsv.gz")
+
+    cmd = [
+        sys.executable,
+        str(REPO_ROOT / "scripts" / "run_contrast_vector_framework.py"),
+        f"--run-id={run_id}",
+        f"--outdir={outdir}",
+        f"--rtech={rtech_path}",
+        f"--meta={meta_path}",
+        f"--phases={phases}",
+        f"--resolutions={resolutions}",
+        f"--external-root={REPO_ROOT / external_root}",
+        f"--cross-osdr-studies={cross_osdr_studies}",
+        f"--mechanism-gene-sets={REPO_ROOT / mechanism_gene_sets}",
+        f"--axis-source={axis_source}",
+        f"--primary-transport-set={primary_transport_set}",
+        f"--sensitivity-transport-set={sensitivity_transport_set}",
+    ]
+    if phase2_dir:
+        cmd.append(f"--phase2-dir={phase2_dir}")
+    if wgcna_dir:
+        cmd.append(f"--wgcna-dir={wgcna_dir}")
+    if rewiring_dir:
+        cmd.append(f"--rewiring-dir={rewiring_dir}")
+    if external_aging_axis:
+        cmd.append(f"--external-aging-axis={external_aging_axis}")
+    if n_bootstrap is not None:
+        cmd.append(f"--n-bootstrap={n_bootstrap}")
+    if n_permutation is not None:
+        cmd.append(f"--n-permutation={n_permutation}")
+    if mechanism_axis_bootstrap is not None:
+        cmd.append(f"--mechanism-axis-bootstrap={mechanism_axis_bootstrap}")
+    if bypass_stability:
+        cmd.append("--bypass-stability")
+    if dry_run:
+        cmd.append("--dry-run")
+
+    log(" ".join(cmd), "RUN")
+    if dry_run:
+        result = subprocess.run(cmd, cwd=REPO_ROOT)
+        return result.returncode == 0
+    result = subprocess.run(cmd, cwd=REPO_ROOT)
+    if result.returncode != 0:
+        log("Contrast-vector framework failed", "ERROR")
+        return False
+    return True
+
+
 def phase_8(dry_run: bool = False, max_genes: int = 2500, topk: int = 80,
             lioness_transform: str = "raw_ranknorm") -> bool:
     """Phase 8: Leakage-Safe Cross-Validation"""
@@ -931,6 +1005,42 @@ Examples:
                         help="Sample-label permutations per external pathway feature.")
     parser.add_argument("--external-pathway-method", choices=["gsea", "mean_t"], default="gsea",
                         help="External pathway statistic: preranked GSEA or legacy mean pathway t.")
+    parser.add_argument("--contrast-vector-framework", action="store_true",
+                        help="Run the new Guardrail-gated contrast-vector framework after selected phases.")
+    parser.add_argument("--contrast-vector-only", action="store_true",
+                        help="Run only the contrast-vector framework and skip legacy OSD-771 phases.")
+    parser.add_argument("--updated-pipeline", action="store_true",
+                        help="One-flag run of the updated contrast-vector pipeline using existing artifacts.")
+    parser.add_argument("--contrast-vector-phases", default="stability,decomposition,cross-osdr,external-axis,mechanism-axis,decision",
+                        help="Comma-separated contrast-vector phases: stability,decomposition,cross-osdr,external-axis,mechanism-axis,decision.")
+    parser.add_argument("--contrast-vector-resolutions", default="module,pathway,gene,lioness_node",
+                        help="Comma-separated resolutions for the contrast-vector framework.")
+    parser.add_argument("--contrast-vector-bootstrap", type=int, default=None,
+                        help="Override config bootstrap count for contrast-vector framework.")
+    parser.add_argument("--contrast-vector-permutations", type=int, default=None,
+                        help="Override config permutation count for contrast-vector framework.")
+    parser.add_argument("--mechanism-axis-bootstrap", type=int, default=None,
+                        help="Override bootstrap/permutation count for the mechanism-axis secondary phase.")
+    parser.add_argument("--bypass-stability", action="store_true",
+                        help="Sensitivity-only: allow within-RRRM-2 projection after a failed stability gate.")
+    parser.add_argument("--external-aging-axis", default="",
+                        help="Optional Tabula Muris Senis aging-axis TSV override.")
+    parser.add_argument("--contrast-vector-phase2-dir", default="",
+                        help="Optional Phase 2 skeleton directory override for edge/gene contrast vectors.")
+    parser.add_argument("--contrast-vector-wgcna-dir", default="",
+                        help="Optional WGCNA directory override for module contrast vectors.")
+    parser.add_argument("--contrast-vector-rewiring-dir", default="",
+                        help="Optional Phase 3 rewiring directory override for mechanism-axis node2vec priority.")
+    parser.add_argument("--cross-osdr-studies", default="OSD-513,OSD-253",
+                        help="Comma-separated external OSD studies for contrast-vector recurrence.")
+    parser.add_argument("--mechanism-gene-sets", default="config/mechanism_gene_sets.yaml",
+                        help="Curated mechanism signatures for the mechanism-axis phase.")
+    parser.add_argument("--axis-source", default="rrrm2_iss_osd513", choices=["rrrm2_iss_osd513"],
+                        help="Source definition for the recurrent remodeling axis.")
+    parser.add_argument("--primary-transport-set", default="dct_ncc_wnk",
+                        help="Primary tubular transport set for recurrent-axis orientation.")
+    parser.add_argument("--sensitivity-transport-set", default="ion_transport",
+                        help="Broad transport set retained as sensitivity/context rather than primary axis.")
     parser.add_argument("--network-method", choices=["lioness", "wgcna"], default="lioness",
                         help="Network analysis method: lioness (default, existing pipeline) or "
                              "wgcna (WGCNA module-based analysis replacing phases 2/3/5/6/7).")
@@ -946,7 +1056,13 @@ Examples:
     # Determine which phases to run first (needed for init_run)
     # Note: Phase 9 (figures) runs last, after all data phases
     phases_available = [0, 1, 1.5, 2, 3, 5, 6, 7, 8, 8.5, 10, 9]
-    if args.external_validation_only:
+    if args.updated_pipeline:
+        to_run = []
+        args.contrast_vector_framework = True
+    elif args.contrast_vector_only:
+        to_run = []
+        args.contrast_vector_framework = True
+    elif args.external_validation_only:
         to_run = []
         args.external_validation = True
     elif args.phases:
@@ -1002,13 +1118,20 @@ Examples:
     
     log(f"RRRM-2 Pipeline Runner", "INFO")
     log(f"Network method: {args.network_method}")
-    log(f"Phases to run: {to_run}")
+    if args.updated_pipeline or args.contrast_vector_only:
+        log("Legacy numbered phases: skipped")
+    else:
+        log(f"Phases to run: {to_run}")
     log(f"Max genes: {args.max_genes}")
     log(f"LIONESS transform: {args.lioness_transform}")
     log(f"Edge regression expression source: {args.expression_source}")
     log(f"Node2vec signed mode: {args.signed_mode}")
     log(f"Skip R steps: {args.skip_r}")
     log(f"Dry run: {args.dry_run}")
+    log(f"Contrast-vector framework: {args.contrast_vector_framework}")
+    if args.contrast_vector_framework:
+        log(f"Contrast-vector phases: {args.contrast_vector_phases}")
+        log(f"Contrast-vector resolutions: {args.contrast_vector_resolutions}")
     print()
     
     # ── WGCNA routing ─────────────────────────────────────────────────
@@ -1047,6 +1170,29 @@ Examples:
         if not phases[phase_num]():
             failed.append(phase_num)
             log(f"Phase {phase_num} failed", "ERROR")
+
+    if args.contrast_vector_framework:
+        if not phase_contrast_vector_framework(
+            dry_run=args.dry_run,
+            phases=args.contrast_vector_phases,
+            resolutions=args.contrast_vector_resolutions,
+            n_bootstrap=args.contrast_vector_bootstrap,
+            n_permutation=args.contrast_vector_permutations,
+            mechanism_axis_bootstrap=args.mechanism_axis_bootstrap,
+            bypass_stability=args.bypass_stability,
+            external_aging_axis=args.external_aging_axis,
+            phase2_dir=args.contrast_vector_phase2_dir,
+            wgcna_dir=args.contrast_vector_wgcna_dir,
+            rewiring_dir=args.contrast_vector_rewiring_dir,
+            external_root=args.external_root,
+            cross_osdr_studies=args.cross_osdr_studies,
+            mechanism_gene_sets=args.mechanism_gene_sets,
+            axis_source=args.axis_source,
+            primary_transport_set=args.primary_transport_set,
+            sensitivity_transport_set=args.sensitivity_transport_set,
+        ):
+            failed.append("contrast_vector_framework")
+            log("Contrast-vector framework failed", "ERROR")
 
     if args.external_validation:
         if args.network_method == "wgcna":

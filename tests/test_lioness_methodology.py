@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from src.networks.edge_regression import validate_covariate_policy
-from src.networks.lioness import compute_lioness_weights
+from src.networks.lioness import compute_lioness_weights, pearson_from_sums
 from src.networks.shared_topology import union_skeleton_with_priors
 from src.validation.cross_validation import transform_fold_edge_weights
 
@@ -40,6 +40,19 @@ def test_z_contribution_is_explicit_sensitivity_mode():
     )
     assert np.isfinite(z).all()
     assert meta["fisher_z_used_on_sample_specific_weights"] is True
+
+
+def test_pearson_from_sums_handles_zero_denominator_without_warning():
+    with np.errstate(all="raise"):
+        r = pearson_from_sums(
+            3,
+            np.array([3.0]),
+            np.array([6.0]),
+            np.array([3.0]),
+            np.array([12.0]),
+            np.array([6.0]),
+        )
+    assert r.tolist() == [0.0]
 
 
 def test_fold_transform_uses_training_reference_for_test_values():
