@@ -749,7 +749,7 @@ def phase_external_validation_wgcna(
 
 def phase_contrast_vector_framework(
     dry_run: bool = False,
-    phases: str = "stability,decomposition,cross-osdr,external-axis,mechanism-axis,decision",
+    phases: str = "stability,decomposition,cross-osdr,external-axis,mechanism-axis,tubulointerstitial-state,lar-reversal,decision",
     resolutions: str = "module,pathway,gene,lioness_node",
     n_bootstrap: int | None = None,
     n_permutation: int | None = None,
@@ -774,6 +774,7 @@ def phase_contrast_vector_framework(
 
     rtech_path = find_artifact("phase1_residuals/Rtech.tsv.gz") or (REPO_ROOT / "data/processed/phase1_residuals/Rtech.tsv.gz")
     meta_path = find_artifact("phase1_residuals/meta_phase1.tsv.gz") or (REPO_ROOT / "data/processed/phase1_residuals/meta_phase1.tsv.gz")
+    deconv_props = find_artifact("deconvolution/music_cluster_proportions.csv")
 
     cmd = [
         sys.executable,
@@ -791,6 +792,8 @@ def phase_contrast_vector_framework(
         f"--primary-transport-set={primary_transport_set}",
         f"--sensitivity-transport-set={sensitivity_transport_set}",
     ]
+    if deconv_props:
+        cmd.append(f"--deconv-dir={deconv_props.parent}")
     if phase2_dir:
         cmd.append(f"--phase2-dir={phase2_dir}")
     if wgcna_dir:
@@ -1011,8 +1014,8 @@ Examples:
                         help="Run only the contrast-vector framework and skip legacy OSD-771 phases.")
     parser.add_argument("--updated-pipeline", action="store_true",
                         help="One-flag run of the updated contrast-vector pipeline using existing artifacts.")
-    parser.add_argument("--contrast-vector-phases", default="stability,decomposition,cross-osdr,external-axis,mechanism-axis,decision",
-                        help="Comma-separated contrast-vector phases: stability,decomposition,cross-osdr,external-axis,mechanism-axis,decision.")
+    parser.add_argument("--contrast-vector-phases", default="stability,decomposition,cross-osdr,external-axis,mechanism-axis,tubulointerstitial-state,lar-reversal,decision",
+                        help="Comma-separated contrast-vector phases: stability,decomposition,cross-osdr,external-axis,mechanism-axis,tubulointerstitial-state,lar-reversal,decision.")
     parser.add_argument("--contrast-vector-resolutions", default="module,pathway,gene,lioness_node",
                         help="Comma-separated resolutions for the contrast-vector framework.")
     parser.add_argument("--contrast-vector-bootstrap", type=int, default=None,

@@ -1031,6 +1031,60 @@ def run_mechanism_axis(
         raise RuntimeError("Mechanism-axis prioritization failed")
 
 
+def run_tubulointerstitial_state(args: argparse.Namespace, outdir: Path) -> None:
+    """Run matrix-high / DCT-low tubulointerstitial state-space analysis."""
+    mechanism_matrix = outdir / "mechanism_axis" / "mechanism_score_matrix.tsv"
+    if not mechanism_matrix.exists():
+        raise FileNotFoundError(
+            f"Mechanism score matrix not found for tubulointerstitial state analysis: {mechanism_matrix}"
+        )
+    cmd = [
+        sys.executable,
+        str(REPO_ROOT / "scripts" / "run_tubulointerstitial_state_analysis.py"),
+        f"--mechanism-score-matrix={mechanism_matrix}",
+        f"--rtech={args.rtech}",
+        f"--id-map={args.id_map}",
+        f"--outdir={outdir / 'mechanism_axis' / 'tubulointerstitial_state'}",
+    ]
+    if args.deconv_dir:
+        cmd.append(f"--deconv-dir={args.deconv_dir}")
+    log("Tubulointerstitial state-space analysis")
+    result = subprocess.run(cmd, cwd=REPO_ROOT)
+    if result.returncode != 0:
+        raise RuntimeError("Tubulointerstitial state-space analysis failed")
+
+
+def run_lar_reversal(args: argparse.Namespace, outdir: Path, n_bootstrap: int, n_permutation: int) -> None:
+    """Run LAR reversal / mechanism-switch secondary analysis."""
+    state_scores = outdir / "mechanism_axis" / "tubulointerstitial_state" / "state_space_scores.tsv"
+    mechanism_matrix = outdir / "mechanism_axis" / "mechanism_score_matrix.tsv"
+    if not state_scores.exists():
+        raise FileNotFoundError(f"State-space scores not found for LAR reversal analysis: {state_scores}")
+    if not mechanism_matrix.exists():
+        raise FileNotFoundError(f"Mechanism score matrix not found for LAR reversal analysis: {mechanism_matrix}")
+    cmd = [
+        sys.executable,
+        str(REPO_ROOT / "scripts" / "run_lar_reversal_analysis.py"),
+        f"--state-space-scores={state_scores}",
+        f"--mechanism-score-matrix={mechanism_matrix}",
+        f"--rtech={args.rtech}",
+        f"--meta={args.meta}",
+        f"--id-map={args.id_map}",
+        f"--gene-priority={outdir / 'mechanism_axis' / 'gene_axis_priority.tsv'}",
+        f"--cross-osdr-summary={outdir / 'cross_osdr_recurrence' / 'cross_osdr_alignment_summary.tsv'}",
+        f"--outdir={outdir / 'mechanism_axis' / 'tubulointerstitial_state' / 'lar_reversal'}",
+        f"--n-bootstrap={args.lar_reversal_bootstrap or n_bootstrap}",
+        f"--n-permutation={args.lar_reversal_permutation or n_permutation}",
+        f"--seed={args.seed or 20260520}",
+    ]
+    if args.wgcna_dir:
+        cmd.append(f"--wgcna-module-eigengenes={Path(args.wgcna_dir) / 'module_eigengenes.csv'}")
+    log("LAR reversal and mechanism-switch analysis")
+    result = subprocess.run(cmd, cwd=REPO_ROOT)
+    if result.returncode != 0:
+        raise RuntimeError("LAR reversal analysis failed")
+
+
 def run_decision(outdir: Path) -> None:
     decision_path = outdir / "agc_stability_decision.json"
     stability = load_stability_decision(decision_path) if decision_path.exists() else {"decisions": []}
@@ -1101,7 +1155,7 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--external-aging-axis", default="")
     ap.add_argument("--outdir", default="")
     ap.add_argument("--run-id", default="")
-    ap.add_argument("--phases", default="stability,decomposition,cross-osdr,external-axis,mechanism-axis,decision")
+    ap.add_argument("--phases", default="stability,decomposition,cross-osdr,external-axis,mechanism-axis,tubulointerstitial-state,lar-reversal,decision")
     ap.add_argument("--resolutions", default="module,pathway,gene,lioness_node")
     ap.add_argument("--external-root", default="data/external/osdr")
     ap.add_argument("--cross-osdr-studies", default="OSD-513,OSD-253")
@@ -1109,6 +1163,9 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--n-bootstrap", type=int, default=None)
     ap.add_argument("--n-permutation", type=int, default=None)
     ap.add_argument("--mechanism-axis-bootstrap", type=int, default=None)
+    ap.add_argument("--lar-reversal-bootstrap", type=int, default=None)
+    ap.add_argument("--lar-reversal-permutation", type=int, default=None)
+    ap.add_argument("--deconv-dir", default="")
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--bypass-stability", action="store_true")
     ap.add_argument("--axis-source", default="rrrm2_iss_osd513", choices=["rrrm2_iss_osd513"])
@@ -1200,6 +1257,15 @@ def main() -> int:
         run_external_axis(args, config, results_dir, rng, n_bootstrap)
     if "mechanism-axis" in args.phases or "mechanism_axis" in args.phases:
         run_mechanism_axis(args, results_dir, n_bootstrap)
+    if (
+        "tubulointerstitial-state" in args.phases
+        or "tubulointerstitial_state" in args.phases
+        or "state-space" in args.phases
+        or "state_space" in args.phases
+    ):
+        run_tubulointerstitial_state(args, results_dir)
+    if "lar-reversal" in args.phases or "lar_reversal" in args.phases:
+        run_lar_reversal(args, results_dir, n_bootstrap, n_permutation)
     if "decision" in args.phases:
         run_decision(results_dir)
 
