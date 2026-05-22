@@ -520,6 +520,7 @@ def main() -> int:
         },
         "outputs": {
             "lar_reversal_vector_summary": str(outdir / "lar_reversal_vector_summary.tsv"),
+            "lar_reversal_node2vec_magnitude_context": str(outdir / "lar_reversal_node2vec_magnitude_context.tsv"),
             "lar_reversal_component_effects": str(outdir / "lar_reversal_component_effects.tsv"),
             "lar_reversal_gene_scatter": str(outdir / "lar_reversal_gene_scatter.tsv"),
             "lar_reversal_pathway_interactions": str(outdir / "lar_reversal_pathway_interactions.tsv"),
