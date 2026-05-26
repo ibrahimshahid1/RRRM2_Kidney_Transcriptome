@@ -694,6 +694,91 @@ def phase_9(dry_run: bool = False, network_method: str = "lioness") -> bool:
     return True
 
 
+def phase_v11(
+    dry_run: bool = False,
+    skip_r: bool = False,
+    site_scope: str = "single",
+    skip_spatial: bool = False,
+    skip_visium: bool = False,
+    skip_xenium: bool = False,
+    skip_figures: bool = False,
+) -> bool:
+    """Phase 11: V11 DCT1/phosphoproteome/mediation analysis stack."""
+    log("PHASE 11: V11 DCT1/phosphoproteome/mediation analyses")
+
+    results_dir = Path(os.environ.get("RRRM_RESULTS_DIR"))
+    if not dry_run:
+        for subdir in [
+            "baseline",
+            "external_qc",
+            "dct_prior",
+            "h2_enrichment",
+            "h2_pxd",
+            "h2_klhl3",
+            "h2_composition_adjusted",
+            "h3_mediation",
+            "spatial_reference",
+            "manifests",
+            "figures/v11",
+        ]:
+            (results_dir / subdir).mkdir(parents=True, exist_ok=True)
+
+    dct_prior_file = results_dir / "dct_prior/gse228367_dct1_vs_dct2_de.tsv"
+    if skip_r:
+        if not dct_prior_file.exists():
+            log("Skipping R but DCT prior is missing; cannot run v11 core analysis", "ERROR")
+            return False
+        log("Skipping GSE228367 DCT-prior R build; existing prior found", "WARN")
+    else:
+        if not run_rscript(
+            "src/v11/build_gse228367_dct_prior.R",
+            args=[
+                str(results_dir / "dct_prior"),
+                str(results_dir / "external_qc"),
+            ],
+            dry_run=dry_run,
+        ):
+            return False
+
+    if not run_python(
+        "src.v11.core_analysis",
+        [f"--run-root={results_dir}"],
+        dry_run=dry_run,
+    ):
+        return False
+
+    if not run_python(
+        "src.v11.h2_composition_aware_phospho",
+        [f"--run-root={results_dir}", f"--site-scope={site_scope}"],
+        dry_run=dry_run,
+    ):
+        return False
+
+    if skip_spatial:
+        log("Skipping v11 external spatial reference projection", "WARN")
+    else:
+        spatial_args = [f"--run-root={results_dir}"]
+        if skip_visium:
+            spatial_args.append("--skip-visium")
+        if skip_xenium:
+            spatial_args.append("--skip-xenium")
+        if not run_python("src.v11.spatial_reference_projection", spatial_args, dry_run=dry_run):
+            return False
+
+    if skip_figures:
+        log("Skipping v11 publication figures", "WARN")
+    else:
+        if not run_python(
+            "src.v11.publication_figures",
+            [f"--run-root={results_dir}"],
+            dry_run=dry_run,
+        ):
+            return False
+
+    log(f"V11 outputs → {results_dir}", "OK")
+    return True
+
+
 def phase_external_validation(
     dry_run: bool = False,
     external_root: str = "data/external/osdr",
@@ -1051,6 +1136,20 @@ Examples:
                         help="Max genes for WGCNA (top by variance, default: 5000)")
     parser.add_argument("--wgcna-pres-perms", type=int, default=200,
                         help="Permutations for WGCNA module preservation (default: 200)")
+    parser.add_argument("--v11", action="store_true",
+                        help="Run the v11 DCT1/phosphoproteome/mediation stack after selected phases.")
+    parser.add_argument("--v11-only", action="store_true",
+                        help="Run only the v11 DCT1/phosphoproteome/mediation stack.")
+    parser.add_argument("--v11-site-scope", choices=["single", "all"], default="single",
+                        help="Phosphosite scope for v11 composition-aware H2 models.")
+    parser.add_argument("--v11-skip-spatial", action="store_true",
+                        help="Skip v11 external Visium/Xenium spatial reference projection.")
+    parser.add_argument("--v11-skip-visium", action="store_true",
+                        help="Skip Visium matrix projection in v11 spatial reference analysis.")
+    parser.add_argument("--v11-skip-xenium", action="store_true",
+                        help="Skip Xenium targeted-panel inventory in v11 spatial reference analysis.")
+    parser.add_argument("--v11-skip-figures", action="store_true",
+                        help="Skip v11 figure generation.")
     
     args = parser.parse_args()
     
@@ -1058,8 +1157,10 @@ Examples:
     
     # Determine which phases to run first (needed for init_run)
     # Note: Phase 9 (figures) runs last, after all data phases
-    phases_available = [0, 1, 1.5, 2, 3, 5, 6, 7, 8, 8.5, 10, 9]
-    if args.updated_pipeline:
+    phases_available = [0, 1, 1.5, 2, 3, 5, 6, 7, 8, 8.5, 10, 11, 9]
+    if args.v11_only:
+        to_run = [11]
+    elif args.updated_pipeline:
         to_run = []
         args.contrast_vector_framework = True
     elif args.contrast_vector_only:
@@ -1071,7 +1172,9 @@ Examples:
     elif args.phases:
         to_run = sorted(set(args.phases) & set(phases_available))
     else:
-        to_run = [p for p in sorted(phases_available) if p >= args.start]
+        to_run = [p for p in sorted(phases_available) if p >= args.start and p != 11]
+    if args.v11 and 11 not in to_run:
+        to_run.append(11)
     
     # Generate run ID if not provided
     run_id = args.run_id
@@ -1116,6 +1219,15 @@ Examples:
         8: lambda: phase_8(args.dry_run, args.max_genes, args.topk, args.lioness_transform),
         8.5: lambda: phase_8b(args.dry_run, args.max_genes, args.topk, args.lioness_transform),
         10: lambda: phase_10(args.dry_run),
+        11: lambda: phase_v11(
+            args.dry_run,
+            args.skip_r,
+            args.v11_site_scope,
+            args.v11_skip_spatial,
+            args.v11_skip_visium,
+            args.v11_skip_xenium,
+            args.v11_skip_figures,
+        ),
         9: lambda: phase_9(args.dry_run, args.network_method),  # Figure generation runs last
     }
     
@@ -1132,6 +1244,7 @@ Examples:
     log(f"Skip R steps: {args.skip_r}")
     log(f"Dry run: {args.dry_run}")
     log(f"Contrast-vector framework: {args.contrast_vector_framework}")
+    log(f"V11 stack: {11 in to_run or args.v11 or args.v11_only}")
     if args.contrast_vector_framework:
         log(f"Contrast-vector phases: {args.contrast_vector_phases}")
         log(f"Contrast-vector resolutions: {args.contrast_vector_resolutions}")
@@ -1153,7 +1266,7 @@ Examples:
             args.dry_run, args.wgcna_genes, args.wgcna_pres_perms)
         phases["wgcna_followup"] = lambda: phase_wgcna_followup(args.dry_run)
         # Build execution order: preprocessing → WGCNA → follow-up → diagnostics → figures
-        execution_order = [0, 1, 1.5, "wgcna", "wgcna_followup", 10, 9]
+        execution_order = [0, 1, 1.5, "wgcna", "wgcna_followup", 10, 11, 9]
         phases_to_execute = []
         for p in execution_order:
             if p in ("wgcna", "wgcna_followup") and any(
@@ -1165,7 +1278,7 @@ Examples:
         log(f"WGCNA mode: replacing phases {sorted(lioness_phases)} + {sorted(lioness_dependent)} with WGCNA analysis")
     else:
         # Standard LIONESS execution order (Phase 6 BEFORE Phase 5 for regression support)
-        execution_order = [0, 1, 1.5, 2, 3, 6, 5, 7, 8, 8.5, 10, 9]
+        execution_order = [0, 1, 1.5, 2, 3, 6, 5, 7, 8, 8.5, 10, 11, 9]
         phases_to_execute = [p for p in execution_order if p in to_run]
     
     failed = []

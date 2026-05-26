@@ -110,6 +110,7 @@ logs/
 *.tmp
 temp/
 tmp/
+transcriptomic_texts
 
 # Debug logs in root (from deconvolution runs)
 debug_*.txt

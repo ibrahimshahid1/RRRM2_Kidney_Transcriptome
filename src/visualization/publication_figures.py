@@ -11,7 +11,8 @@ Figures produced (all saved under <results_dir>/figures/publication/):
   6. arm_comparison.png           — ISS-T vs LAR recovery (persistence) plot
   7. pipeline_schematic.png       — Text-based pipeline overview
   8. retinol_subnetwork.png       — Retinol gene rewiring across contrasts
-  9. result_tables.tsv            — Table 1 (sig genes) + Table 2 (sig pathways)
+  9. figures/v11/*.png/.pdf       — V11 DCT1/phosphoproteome/mediation figures, when present
+ 10. result_tables.tsv            — Table 1 (sig genes) + Table 2 (sig pathways)
 
 Usage (standalone):
     python -m src.visualization.publication_figures --results_dir data/results/run_XYZ
@@ -944,6 +945,18 @@ def generate_all_figures(results_dir: Path, repo_root: Path) -> None:
     print("\n  [8/8] Retinol subnetwork...")
     try:
         fig_retinol_subnetwork(results_dir, repo_root, out_dir)
+    except Exception as e:
+        print(f"    [ERROR] {e}")
+
+    print("\n  [v11] DCT1/phosphoproteome/mediation figures...")
+    try:
+        v11_sentinel = results_dir / "h2_enrichment" / "h2_dct1_sensitivity_summary.tsv"
+        if v11_sentinel.exists():
+            from src.v11.publication_figures import generate_all as generate_v11_figures
+
+            generate_v11_figures(results_dir, results_dir / "figures" / "v11")
+        else:
+            print("    [skip] v11 outputs not detected for this run")
     except Exception as e:
         print(f"    [ERROR] {e}")
 
