@@ -111,6 +111,7 @@ logs/
 temp/
 tmp/
 transcriptomic_texts
+latex_paper
 
 # Debug logs in root (from deconvolution runs)
 debug_*.txt

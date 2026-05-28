@@ -127,6 +127,50 @@ def panel_label(ax: plt.Axes, label: str) -> None:
     )
 
 
+def axis_has_visible_data(ax: plt.Axes) -> bool:
+    """Return True when an axis has at least one visible artist with data."""
+    for line in ax.lines:
+        if line.get_visible() and len(line.get_xdata()) and len(line.get_ydata()):
+            return True
+    for collection in ax.collections:
+        if collection.get_visible():
+            offsets = getattr(collection, "get_offsets", lambda: [])()
+            if len(offsets):
+                return True
+    for patch in ax.patches:
+        if patch.get_visible() and (patch.get_width() or patch.get_height()):
+            return True
+    return False
+
+
+def legend_overlaps_visible_data(ax: plt.Axes) -> bool:
+    """Conservative figure-QA helper: does the legend box cover plotted data?"""
+    legend = ax.get_legend()
+    if legend is None or not legend.get_visible():
+        return False
+    fig = ax.figure
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    legend_bbox = legend.get_window_extent(renderer=renderer)
+    points = []
+    for line in ax.lines:
+        if not line.get_visible():
+            continue
+        xy = np.column_stack([line.get_xdata(), line.get_ydata()])
+        if len(xy):
+            points.append(ax.transData.transform(xy))
+    for collection in ax.collections:
+        if not collection.get_visible():
+            continue
+        offsets = getattr(collection, "get_offsets", lambda: np.empty((0, 2)))()
+        if len(offsets):
+            points.append(ax.transData.transform(offsets))
+    if not points:
+        return False
+    xy = np.vstack(points)
+    return bool(np.any([legend_bbox.contains(x, y) for x, y in xy]))
+
+
 def read_tsv(path: Path) -> pd.DataFrame:
     return pd.read_csv(path, sep="\t")
 
@@ -297,13 +341,14 @@ def fig_h2_primary_enrichment(run_root: Path, out_dir: Path) -> bool:
         return False
 
     df = read_tsv(path)
-    keep_tests = ["fisher_dct1_top_decile", "fisher_dct1_top_quartile"]
+    keep_tests = ["fisher_dct1_top_decile", "fisher_dct2_bottom_decile", "fisher_dct1_top_quartile"]
     keep_analyses = [
         "primary_p05",
         "exclude_anchor_genes",
         "exclude_ncc_sites",
         "composite_sites_excluded",
         "one_site_per_parent_gene",
+        "single_position_one_site_per_parent_gene",
         "strict_q10",
     ]
     sub = df[df["test"].isin(keep_tests) & df["analysis"].isin(keep_analyses)].copy()
@@ -314,6 +359,7 @@ def fig_h2_primary_enrichment(run_root: Path, out_dir: Path) -> bool:
     sub["test_label"] = sub["test"].map(
         {
             "fisher_dct1_top_decile": "DCT1 top decile",
+            "fisher_dct2_bottom_decile": "DCT2-bottom decile",
             "fisher_dct1_top_quartile": "DCT1 top quartile",
         }
     )
@@ -326,15 +372,18 @@ def fig_h2_primary_enrichment(run_root: Path, out_dir: Path) -> bool:
         "exclude_anchor_genes": "Anchor genes excluded",
         "exclude_ncc_sites": "NCC sites excluded",
         "composite_sites_excluded": "Composite sites excluded",
-        "one_site_per_parent_gene": "One site per parent gene",
+        "one_site_per_parent_gene": "One row per parent gene",
+        "single_position_one_site_per_parent_gene": "Single-position row per gene",
         "strict_q10": "Strict q<0.10",
     }
 
-    fig, ax = plt.subplots(figsize=(8.2, 4.8))
-    offsets = {"DCT1 top decile": -0.12, "DCT1 top quartile": 0.12}
-    colors = {"DCT1 top decile": PALETTE["red"], "DCT1 top quartile": PALETTE["blue"]}
+    fig, ax = plt.subplots(figsize=(9.2, 5.4))
+    offsets = {"DCT1 top decile": -0.18, "DCT2-bottom decile": 0.0, "DCT1 top quartile": 0.18}
+    colors = {"DCT1 top decile": PALETTE["red"], "DCT2-bottom decile": PALETTE["teal"], "DCT1 top quartile": PALETTE["blue"]}
     y_base = np.arange(len(keep_analyses))
     for label, part in sub.groupby("test_label", sort=False):
+        if label not in offsets:
+            continue
         ys = np.array([keep_analyses.index(a) for a in part["analysis"].astype(str)]) + offsets[label]
         xerr = np.vstack([part["statistic"] - part["ci_low"], part["ci_high"] - part["statistic"]])
         ax.errorbar(
@@ -354,8 +403,8 @@ def fig_h2_primary_enrichment(run_root: Path, out_dir: Path) -> bool:
     ax.set_yticklabels([y_labels[a] for a in keep_analyses])
     ax.invert_yaxis()
     ax.set_xlabel("Odds ratio for flight-suppressed phosphosites")
-    ax.set_title("DCT1-high parent-gene enrichment")
-    ax.legend(loc="lower right", frameon=True)
+    ax.set_title("Distal-nephron subtype-prior parent-gene enrichment")
+    ax.legend(loc="upper left", bbox_to_anchor=(0.0, -0.16), ncol=2, frameon=True)
     clean_axis(ax)
     ax.text(
         0.01,
@@ -366,6 +415,14 @@ def fig_h2_primary_enrichment(run_root: Path, out_dir: Path) -> bool:
         color=PALETTE["gray"],
     )
     save(fig, out_dir, "v11_dct1_parent_gene_enrichment")
+    # Alias for the revised claim hierarchy while preserving the historical filename.
+    fig_alias = plt.figure(figsize=(0.1, 0.1))
+    plt.close(fig_alias)
+    for ext in ["png", "pdf"]:
+        src = out_dir / f"v11_dct1_parent_gene_enrichment.{ext}"
+        dst = out_dir / f"v11_distal_nephron_prior_enrichment.{ext}"
+        if src.exists():
+            dst.write_bytes(src.read_bytes())
     return True
 
 
@@ -456,7 +513,7 @@ def fig_h2_composition_robustness(run_root: Path, out_dir: Path) -> bool:
     ax.invert_yaxis()
     ax.set_xlabel("Adjusted suppression enrichment odds ratio")
     ax.set_title("Top-decile enrichment persists after adjustment")
-    ax.legend(loc="lower right", frameon=True)
+    ax.legend(loc="upper left", bbox_to_anchor=(0.0, -0.16), frameon=True)
     clean_axis(ax)
     panel_label(ax, "A")
 
@@ -486,7 +543,7 @@ def fig_h2_composition_robustness(run_root: Path, out_dir: Path) -> bool:
     ax.invert_yaxis()
     ax.set_xlabel("DCT1 reference coefficient\nnegative = stronger flight suppression")
     ax.set_title("Continuous gradient models remain weak")
-    ax.legend(loc="lower left", frameon=True)
+    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=True)
     clean_axis(ax)
     panel_label(ax, "B")
     fig.suptitle("Parent-protein and composition-score sensitivity", fontsize=13, fontweight="bold", y=1.02)
@@ -542,18 +599,23 @@ def fig_h3_mediation_forest(run_root: Path, out_dir: Path) -> bool:
     ax.set_yticks(y)
     ax.set_yticklabels([label_map.get(str(m), str(m)) for m in sub["mediator"].astype(str)])
     ax.invert_yaxis()
-    ax.set_xlabel("Indirect effect on NCC regulatory phospho score")
-    ax.set_title("Exploratory remodeling/transporter mediation")
+    ax.set_xlabel("Covariance-decomposition path summary for NCC regulatory phospho score")
+    ax.set_title("Exploratory remodeling/transporter covariance decomposition")
     clean_axis(ax)
     ax.text(
         0.01,
         -0.2,
-        "Approximate Bayesian OLS; cross-sectional bulk tissue.",
+        "Approximate Bayesian OLS; cross-sectional bulk tissue; not causal mediation.",
         transform=ax.transAxes,
         fontsize=8,
         color=PALETTE["gray"],
     )
     save(fig, out_dir, "v11_exploratory_mediation_forest")
+    for ext in ["png", "pdf"]:
+        src = out_dir / f"v11_exploratory_mediation_forest.{ext}"
+        dst = out_dir / f"v11_exploratory_covariance_decomposition.{ext}"
+        if src.exists():
+            dst.write_bytes(src.read_bytes())
     return True
 
 
@@ -727,12 +789,14 @@ def fig_perturbation_triangulation(run_root: Path, out_dir: Path) -> bool:
     occ = read_tsv(occ_path)
     spatial = read_tsv(spatial_path)
 
-    fig = plt.figure(figsize=(13.4, 10.6))
-    gs = fig.add_gridspec(2, 2, hspace=0.72, wspace=0.42)
+    fig = plt.figure(figsize=(13.8, 10.2))
+    gs = fig.add_gridspec(2, 2, hspace=0.50, wspace=0.48)
     ax1 = fig.add_subplot(gs[0, 0])
     ax2 = fig.add_subplot(gs[0, 1])
     ax3 = fig.add_subplot(gs[1, 0])
-    ax4 = fig.add_subplot(gs[1, 1])
+    gs_d = gs[1, 1].subgridspec(2, 1, hspace=0.42)
+    ax4a = fig.add_subplot(gs_d[0, 0])
+    ax4b = fig.add_subplot(gs_d[1, 0], sharex=ax4a)
 
     sub = lowk[
         lowk["spaceflight_vector"].isin(["osd462_rna", "rrrm2_iss_t_rna", "osd513_rna_stat"])
@@ -808,7 +872,7 @@ def fig_perturbation_triangulation(run_root: Path, out_dir: Path) -> bool:
     panel_label(ax2, "B")
 
     occ_sub = occ[
-        occ["analysis"].isin(["occupancy_p05", "occupancy_q10", "occupancy_single_site_p05"])
+        occ["analysis"].isin(["occupancy_p05", "occupancy_q10", "occupancy_one_row_per_parent_gene_p05", "occupancy_single_position_one_row_per_parent_gene_p05"])
         & occ["flag"].isin(["dct1_top_decile", "dct1_top_quartile"])
     ].copy()
     if not occ_sub.empty:
@@ -816,13 +880,14 @@ def fig_perturbation_triangulation(run_root: Path, out_dir: Path) -> bool:
             {
                 "occupancy_p05": "Nominal p<0.05",
                 "occupancy_q10": "Strict q<0.10",
-                "occupancy_single_site_p05": "One site per gene",
+                "occupancy_one_row_per_parent_gene_p05": "One row per gene",
+                "occupancy_single_position_one_row_per_parent_gene_p05": "Single-position row per gene",
             }
         )
         occ_sub["flag_label"] = occ_sub["flag"].map(
             {"dct1_top_decile": "DCT1 top decile", "dct1_top_quartile": "DCT1 top quartile"}
         )
-        order = ["Nominal p<0.05", "Strict q<0.10", "One site per gene"]
+        order = ["Nominal p<0.05", "Strict q<0.10", "One row per gene", "Single-position row per gene"]
         y_base = np.arange(len(order))
         offsets = {"DCT1 top decile": -0.12, "DCT1 top quartile": 0.12}
         colors = {"DCT1 top decile": PALETTE["red"], "DCT1 top quartile": PALETTE["blue"]}
@@ -845,7 +910,7 @@ def fig_perturbation_triangulation(run_root: Path, out_dir: Path) -> bool:
         ax3.invert_yaxis()
         ax3.set_xlabel("Odds ratio")
         ax3.set_title("Parent-protein-normalized phosphosite enrichment")
-        ax3.legend(loc="lower right", frameon=True)
+        ax3.legend(loc="upper left", bbox_to_anchor=(0.0, -0.20), ncol=2, frameon=True)
         clean_axis(ax3)
         panel_label(ax3, "C")
 
@@ -868,7 +933,8 @@ def fig_perturbation_triangulation(run_root: Path, out_dir: Path) -> bool:
         sp["timepoint"] = pd.Categorical(sp["timepoint"], TIME_ORDER, ordered=True)
         sp["group_label"] = sp["group"].map(group_labels)
         for label, part in sp.sort_values("timepoint").groupby("group_label", sort=False):
-            ax4.plot(
+            ax = ax4a if label == "DCT-high spots" else ax4b
+            ax.plot(
                 [TIME_LABELS[str(t)] for t in part["timepoint"]],
                 part["mean_difference_vs_sham"],
                 marker="o",
@@ -876,14 +942,17 @@ def fig_perturbation_triangulation(run_root: Path, out_dir: Path) -> bool:
                 color=colors.get(label, PALETTE["gray"]),
                 label=label,
             )
-        ax4.axhline(0, color="#495057", lw=1, ls="--")
-        ax4.set_ylabel("DCT transport score difference vs sham")
-        ax4.set_title("IRI Visium DCT transport by spatial context")
-        ax4.legend(frameon=True, loc="best")
-        clean_axis(ax4, ygrid=True)
-        panel_label(ax4, "D")
+        for ax, title in [(ax4a, "DCT-marker-high spots"), (ax4b, "All and DCT-adjacent spots")]:
+            ax.axhline(0, color="#495057", lw=1, ls="--")
+            ax.set_ylabel("Difference vs sham")
+            ax.set_title(title)
+            ax.legend(frameon=True, loc="center left", bbox_to_anchor=(1.02, 0.5))
+            clean_axis(ax, ygrid=True)
+        panel_label(ax4a, "D")
+        ax4b.set_xlabel("IRI timepoint")
+        plt.setp(ax4a.get_xticklabels(), visible=False)
 
-    fig.suptitle("Perturbation triangulation of the spaceflight DCT/phosphoproteomic signature", fontsize=13, fontweight="bold", y=0.985)
+    fig.suptitle("Public perturbation-reference checks around the spaceflight DCT/phosphoproteomic signature", fontsize=13, fontweight="bold", y=0.985)
     fig.text(
         0.5,
         0.006,

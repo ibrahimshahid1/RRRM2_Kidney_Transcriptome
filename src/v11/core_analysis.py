@@ -29,6 +29,7 @@ CELLTYPE = Path("data/results/run_20260522_celltype_decomposition")
 REGULATOR = Path("data/results/run_20260522_regulator_activity")
 DCT_PRIOR_DIR = RUN_ROOT / "dct_prior"
 PXD_DIR = Path("data/external/phosphoproteomics/PXD001729")
+KSEA_NET = Path("data/external/kinase_substrate/renal_kinase_substrate_core.tsv")
 
 
 ANCHOR_GENES = {"Slc12a3", "Stk39", "Oxsr1", "Wnk1", "Wnk4"}
@@ -176,6 +177,7 @@ def baseline_lock(root: Path):
         )
     out = pd.DataFrame(rows)
     out.to_csv(root / "baseline" / "v11_baseline_lock_summary.tsv", sep="\t", index=False)
+    write_ksea_substrate_table(root)
 
     inputs = [
         Path("docs/v11_execution_research_plan.md"),
@@ -192,6 +194,61 @@ def baseline_lock(root: Path):
         "inputs": [{"path": str(p), "sha256": sha256(p)} for p in inputs if p.exists()],
     }
     (root / "baseline" / "v11_baseline_input_manifest.json").write_text(json.dumps(manifest, indent=2))
+
+
+def write_ksea_substrate_table(root: Path) -> pd.DataFrame:
+    """Write the curated substrate rows behind the targeted KSEA summary."""
+    if not KSEA_NET.exists():
+        return pd.DataFrame()
+    net = read_tsv(KSEA_NET)
+    phospho = read_tsv(OSD462 / "phospho_all_sites.tsv")
+    phospho["site_position_str"] = phospho["site_position"].astype(str)
+    phospho["phospho_q_value_all_sites"] = bh(phospho["phospho_p_value"])
+    rows = []
+    for _, sub in net.iterrows():
+        site = str(sub["substrate_site"]).strip()
+        matched = phospho[
+            phospho["gene_symbol"].astype(str).eq(str(sub["substrate_gene"]).strip())
+            & phospho["site_position_str"].eq(site)
+        ].copy()
+        if matched.empty:
+            rows.append(
+                {
+                    "kinase": sub["kinase"],
+                    "substrate_gene": sub["substrate_gene"],
+                    "substrate_site": site,
+                    "matched_in_osd462": False,
+                    "phospho_effect": np.nan,
+                    "phospho_p_value": np.nan,
+                    "phospho_q_value_all_sites": np.nan,
+                    "n_fl": 0,
+                    "n_gc": 0,
+                    "n_finite_channels": 0,
+                    "evidence": sub.get("evidence", ""),
+                }
+            )
+            continue
+        for _, row in matched.iterrows():
+            n_fl = pd.to_numeric(row.get("n_fl"), errors="coerce")
+            n_gc = pd.to_numeric(row.get("n_gc"), errors="coerce")
+            rows.append(
+                {
+                    "kinase": sub["kinase"],
+                    "substrate_gene": sub["substrate_gene"],
+                    "substrate_site": site,
+                    "matched_in_osd462": True,
+                    "phospho_effect": row["phospho_effect"],
+                    "phospho_p_value": row["phospho_p_value"],
+                    "phospho_q_value_all_sites": row["phospho_q_value_all_sites"],
+                    "n_fl": n_fl,
+                    "n_gc": n_gc,
+                    "n_finite_channels": n_fl + n_gc if np.isfinite(n_fl) and np.isfinite(n_gc) else np.nan,
+                    "evidence": sub.get("evidence", ""),
+                }
+            )
+    out = pd.DataFrame(rows)
+    out.to_csv(root / "baseline" / "osd462_targeted_ksea_substrates.tsv", sep="\t", index=False)
+    return out
 
 
 def parse_site(site) -> list[tuple[int, str, str]]:
@@ -324,6 +381,9 @@ def build_dct_prior_mapping(root: Path):
     de["dct2_bottom_decile"] = expressed & (de["dct1_enrichment_score"] <= q10)
     de["dct1_core_fdr"] = de["dct_expression_class"].eq("DCT1_core")
     de["dct2_core_fdr"] = de["dct_expression_class"].eq("DCT2_core")
+    de["dct1_score_percentile"] = np.nan
+    de.loc[expressed, "dct1_score_percentile"] = de.loc[expressed, "dct1_enrichment_score"].rank(pct=True)
+    de["dct2_leaning_percentile"] = 1 - de["dct1_score_percentile"]
 
     proteins = read_tsv(OSD462 / "protein_effects_gene_anyplex.tsv")
     phospho = read_tsv(OSD462 / "phospho_all_sites.tsv")
@@ -336,6 +396,8 @@ def build_dct_prior_mapping(root: Path):
     phospho["is_ncc_site"] = phospho["gene_symbol"].eq("Slc12a3")
     phospho["is_suppressed_p05"] = (phospho["phospho_effect"] < 0) & (phospho["phospho_p_value"] < 0.05)
     phospho["is_suppressed_q10"] = (phospho["phospho_effect"] < 0) & (phospho["phospho_q_value_all_sites"] < 0.10)
+    effect_q25 = pd.to_numeric(phospho["phospho_effect"], errors="coerce").quantile(0.25)
+    phospho["is_effect_bottom_quartile"] = pd.to_numeric(phospho["phospho_effect"], errors="coerce") <= effect_q25
 
     prior_cols = [
         "gene_symbol",
@@ -354,6 +416,8 @@ def build_dct_prior_mapping(root: Path):
         "dct2_bottom_decile",
         "dct1_core_fdr",
         "dct2_core_fdr",
+        "dct1_score_percentile",
+        "dct2_leaning_percentile",
     ]
     proteins_prior = proteins.merge(de[prior_cols], on="gene_symbol", how="left", indicator="dct_prior_merge")
     phospho_prior = phospho.merge(de[prior_cols], on="gene_symbol", how="left", indicator="dct_prior_merge")
@@ -393,13 +457,121 @@ def build_dct_prior_mapping(root: Path):
         n_phosphosites=("site_id", "count"),
         mapped=("dct1_enrichment_score", lambda s: bool(s.notna().any())),
         dct1_enrichment_score=("dct1_enrichment_score", "first"),
+        dct1_score_percentile=("dct1_score_percentile", "first"),
+        dct2_leaning_percentile=("dct2_leaning_percentile", "first"),
         dct_expression_class=("dct_expression_class", "first"),
         dct1_top_quartile=("dct1_top_quartile", "first"),
+        dct1_top_decile=("dct1_top_decile", "first"),
+        dct2_bottom_decile=("dct2_bottom_decile", "first"),
     )
     target_cov = target_cov.reset_index()
     coverage.to_csv(root / "dct_prior" / "osd462_dct1_prior_coverage.tsv", sep="\t", index=False)
     target_cov.to_csv(root / "dct_prior" / "osd462_dct1_prior_target_gene_coverage.tsv", sep="\t", index=False)
     return de, proteins_prior, phospho_prior
+
+
+def zscore_values(x: pd.Series) -> pd.Series:
+    vals = pd.to_numeric(x, errors="coerce")
+    sd = vals.std(skipna=True, ddof=0)
+    if not np.isfinite(sd) or sd <= 0:
+        return vals * np.nan
+    return (vals - vals.mean(skipna=True)) / sd
+
+
+def run_dct_prior_sensitivity(root: Path, phospho_prior: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Build leave-one-replicate-out and score-definition DCT prior checks."""
+    by_rep_path = root / "dct_prior" / "gse228367_gene_stats_by_rep.tsv"
+    if not by_rep_path.exists():
+        return pd.DataFrame(), pd.DataFrame()
+    stats_by_rep = read_tsv(by_rep_path)
+    reps = sorted(stats_by_rep["rep"].dropna().astype(str).unique())
+    variants: list[dict[str, object]] = [
+        {"variant": "all_reps", "held_out_rep": "none", "keep_reps": reps},
+    ]
+    variants.extend({"variant": f"leave_one_rep_{r}", "held_out_rep": r, "keep_reps": [x for x in reps if x != r]} for r in reps)
+
+    rows = []
+    for variant in variants:
+        sub = stats_by_rep[stats_by_rep["rep"].astype(str).isin(variant["keep_reps"])].copy()
+        wide = (
+            sub.groupby(["gene_symbol", "subtype"], as_index=False)
+            .agg(mean_expr=("mean_expr", "mean"), pct_detected=("pct_detected", "mean"))
+            .pivot(index="gene_symbol", columns="subtype")
+        )
+        wide.columns = [f"{metric}_{subtype.lower()}" for metric, subtype in wide.columns]
+        wide = wide.reset_index().fillna(0)
+        eps = 0.01
+        wide["mean_difference"] = wide["mean_expr_dct1"] - wide["mean_expr_dct2"]
+        wide["log2_ratio"] = np.log2((wide["mean_expr_dct1"] + eps) / (wide["mean_expr_dct2"] + eps))
+        wide["rank_average"] = (
+            wide["mean_expr_dct1"].rank(pct=True) - wide["mean_expr_dct2"].rank(pct=True)
+        )
+        wide["detection_aware"] = (
+            zscore_values(wide["mean_difference"]).fillna(0)
+            + zscore_values(wide["pct_detected_dct1"] - wide["pct_detected_dct2"]).fillna(0)
+        ) / 2
+        expressed = (
+            (wide["pct_detected_dct1"] >= 0.05)
+            | (wide["pct_detected_dct2"] >= 0.05)
+            | (wide["mean_expr_dct1"] >= 0.05)
+            | (wide["mean_expr_dct2"] >= 0.05)
+        )
+        for score_def in ["mean_difference", "log2_ratio", "rank_average", "detection_aware"]:
+            score = pd.to_numeric(wide[score_def], errors="coerce")
+            q90 = score.loc[expressed].quantile(0.90)
+            q10 = score.loc[expressed].quantile(0.10)
+            pct = pd.Series(np.nan, index=wide.index, dtype=float)
+            pct.loc[expressed] = score.loc[expressed].rank(pct=True)
+            frame = pd.DataFrame(
+                {
+                    "prior_variant": variant["variant"],
+                    "held_out_rep": variant["held_out_rep"],
+                    "score_definition": score_def,
+                    "gene_symbol": wide["gene_symbol"],
+                    "score": score,
+                    "score_percentile": pct,
+                    "dct1_top_decile": expressed & (score >= q90),
+                    "dct2_bottom_decile": expressed & (score <= q10),
+                    "mean_expr_dct1": wide["mean_expr_dct1"],
+                    "mean_expr_dct2": wide["mean_expr_dct2"],
+                    "pct_detected_dct1": wide["pct_detected_dct1"],
+                    "pct_detected_dct2": wide["pct_detected_dct2"],
+                }
+            )
+            rows.append(frame)
+    sens = pd.concat(rows, ignore_index=True)
+    sens.to_csv(root / "dct_prior" / "gse228367_dct_prior_score_sensitivity.tsv", sep="\t", index=False)
+
+    anchor_genes = sorted(ANCHOR_GENES | {"Pvalb", "Trpm6", "Trpv5", "Calb1", "Klhl3"})
+    anchor = sens[sens["gene_symbol"].isin(anchor_genes)].copy()
+    anchor.to_csv(root / "dct_prior" / "gse228367_anchor_gene_prior_positions.tsv", sep="\t", index=False)
+
+    parent_genes = set(phospho_prior["gene_symbol"].dropna().astype(str))
+    primary = sens[
+        sens["prior_variant"].eq("all_reps")
+        & sens["score_definition"].eq("mean_difference")
+    ][["gene_symbol", "dct1_top_decile", "dct2_bottom_decile"]].copy()
+    primary = primary[primary["gene_symbol"].isin(parent_genes)]
+    primary_top = set(primary.loc[primary["dct1_top_decile"], "gene_symbol"])
+    primary_bottom = set(primary.loc[primary["dct2_bottom_decile"], "gene_symbol"])
+    stability_rows = []
+    for (variant, score_def), g in sens[sens["gene_symbol"].isin(parent_genes)].groupby(["prior_variant", "score_definition"]):
+        top = set(g.loc[g["dct1_top_decile"], "gene_symbol"])
+        bottom = set(g.loc[g["dct2_bottom_decile"], "gene_symbol"])
+        stability_rows.append(
+            {
+                "prior_variant": variant,
+                "score_definition": score_def,
+                "n_osd462_parent_genes_scored": int(g["gene_symbol"].nunique()),
+                "n_dct1_top_decile_parent_genes": len(top),
+                "n_dct2_bottom_decile_parent_genes": len(bottom),
+                "jaccard_vs_primary_dct1_top_decile": len(top & primary_top) / len(top | primary_top) if (top | primary_top) else np.nan,
+                "jaccard_vs_primary_dct2_bottom_decile": len(bottom & primary_bottom) / len(bottom | primary_bottom) if (bottom | primary_bottom) else np.nan,
+            }
+        )
+    stability = pd.DataFrame(stability_rows)
+    stability.to_csv(root / "dct_prior" / "gse228367_prior_bin_stability.tsv", sep="\t", index=False)
+    return sens, anchor
 
 
 def fisher_table(df: pd.DataFrame, flag: str, suppressed_col: str):
@@ -438,6 +610,14 @@ def one_representative_site_per_gene(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def one_single_position_representative_site_per_gene(df: pd.DataFrame) -> pd.DataFrame:
+    """Select one representative row per gene after excluding composite rows."""
+    if "is_single_site" not in df.columns:
+        return one_representative_site_per_gene(df)
+    single = df[df["is_single_site"].astype(bool)].copy()
+    return one_representative_site_per_gene(single)
+
+
 def build_parent_gene_table(phospho_prior: pd.DataFrame) -> pd.DataFrame:
     """Collapse phosphosite rows to one parent-gene row."""
     sub = phospho_prior[phospho_prior["dct1_enrichment_score"].notna()].copy()
@@ -448,12 +628,24 @@ def build_parent_gene_table(phospho_prior: pd.DataFrame) -> pd.DataFrame:
                 "gene_symbol": gene,
                 "any_suppressed_p05": bool(g["is_suppressed_p05"].astype(bool).any()),
                 "any_suppressed_q10": bool(g["is_suppressed_q10"].astype(bool).any()),
+                "any_effect_bottom_quartile": bool(g.get("is_effect_bottom_quartile", pd.Series(False, index=g.index)).astype(bool).any()),
                 "min_phospho_p_value": pd.to_numeric(g["phospho_p_value"], errors="coerce").min(),
                 "most_negative_phospho_effect": pd.to_numeric(g["phospho_effect"], errors="coerce").min(),
+                "mean_phospho_effect": pd.to_numeric(g["phospho_effect"], errors="coerce").mean(),
                 "n_quantified_phosphosites": int(len(g)),
                 "n_single_position_sites": int(g["is_single_site"].astype(bool).sum()),
                 "n_composite_sites": int((~g["is_single_site"].astype(bool)).sum()),
+                "mean_n_valid_samples": (
+                    pd.to_numeric(g.get("n_fl", 0), errors="coerce")
+                    + pd.to_numeric(g.get("n_gc", 0), errors="coerce")
+                ).mean(),
+                "mean_missing_samples": 20 - (
+                    pd.to_numeric(g.get("n_fl", 0), errors="coerce")
+                    + pd.to_numeric(g.get("n_gc", 0), errors="coerce")
+                ).mean(),
                 "dct1_enrichment_score": g["dct1_enrichment_score"].iloc[0],
+                "dct1_score_percentile": g.get("dct1_score_percentile", pd.Series(np.nan, index=g.index)).iloc[0],
+                "dct2_leaning_percentile": g.get("dct2_leaning_percentile", pd.Series(np.nan, index=g.index)).iloc[0],
                 "dct1_top_quartile": bool(g["dct1_top_quartile"].fillna(False).iloc[0]),
                 "dct1_top_decile": bool(g["dct1_top_decile"].fillna(False).iloc[0]),
                 "dct2_bottom_quartile": bool(g["dct2_bottom_quartile"].fillna(False).iloc[0]),
@@ -467,7 +659,7 @@ def build_parent_gene_table(phospho_prior: pd.DataFrame) -> pd.DataFrame:
         )
     out = pd.DataFrame(rows)
     if len(out):
-        for col in ["n_quantified_phosphosites", "parent_n_peptides", "parent_abundance_log2"]:
+        for col in ["n_quantified_phosphosites", "parent_n_peptides", "parent_abundance_log2", "mean_missing_samples"]:
             x = pd.to_numeric(out[col], errors="coerce")
             if col.startswith("n_") or col == "parent_n_peptides":
                 x = np.log1p(x)
@@ -506,6 +698,189 @@ def parent_gene_logistic(parent: pd.DataFrame, flag: str, suppressed_col: str) -
         }
     except Exception as exc:
         return {"model_status": f"not_fit: {exc}"}
+
+
+def parent_gene_joint_logistic(parent: pd.DataFrame, suppressed_col: str) -> list[dict]:
+    """Fit DCT1-top and DCT2-bottom decile flags in the same parent-gene model."""
+    try:
+        import statsmodels.api as sm
+    except Exception as exc:  # pragma: no cover - depends on optional dependency
+        return [{"model_status": f"not_fit: {exc}"}]
+
+    terms = ["dct1_top_decile", "dct2_bottom_decile"]
+    covars = terms + [
+        "n_quantified_phosphosites_z",
+        "parent_n_peptides_z",
+        "parent_abundance_log2_z",
+        "mean_missing_samples_z",
+    ]
+    d = parent.dropna(subset=[suppressed_col] + covars).copy()
+    if len(d) < 20 or d[suppressed_col].nunique() < 2:
+        return [{"model_status": "not_fit: insufficient variation"}]
+    X = sm.add_constant(d[covars].astype(float), has_constant="add")
+    y = d[suppressed_col].astype(float)
+    try:
+        fit = sm.GLM(y, X, family=sm.families.Binomial()).fit()
+    except Exception as exc:
+        return [{"model_status": f"not_fit: {exc}"}]
+    rows = []
+    for term in terms:
+        coef = float(fit.params[term])
+        se = float(fit.bse[term])
+        rows.append(
+            {
+                "analysis": suppressed_col,
+                "test": f"parent_gene_joint_logistic_{term}",
+                "unit": "parent_gene",
+                "n_parent_genes": int(len(parent)),
+                "n_suppressed_parent_genes": int(parent[suppressed_col].astype(bool).sum()),
+                "statistic": float(np.exp(coef)),
+                "ci_low": float(np.exp(coef - 1.96 * se)),
+                "ci_high": float(np.exp(coef + 1.96 * se)),
+                "p_value": float(fit.pvalues[term]),
+                "fisher_alternative": np.nan,
+                "model_status": "fit",
+                "log_odds_coef": coef,
+                "se": se,
+                "n_parent_genes_model": int(len(d)),
+                "covariates": (
+                    "dct1_top_decile + dct2_bottom_decile + log1p(n_quantified_phosphosites), "
+                    "log1p(parent_n_peptides), parent_abundance_log2, mean_missing_samples"
+                ),
+            }
+        )
+    return rows
+
+
+def _fisher_odds_from_counts(a: int, b: int, c: int, d: int) -> float:
+    odds, _ = stats.fisher_exact([[a, b], [c, d]], alternative=FISHER_ALTERNATIVE)
+    return float(odds)
+
+
+def parent_gene_cluster_bootstrap_row_or(
+    df: pd.DataFrame,
+    flag: str,
+    suppressed_col: str,
+    n_boot: int = 2000,
+    seed: int = 20260526,
+) -> dict:
+    """Bootstrap row-level odds ratios by resampling parent-gene clusters."""
+    sub = df[df["dct1_enrichment_score"].notna()].dropna(subset=["gene_symbol"]).copy()
+    if sub.empty:
+        return {}
+    sub["_flag"] = sub[flag].fillna(False).astype(bool)
+    sub["_suppressed"] = sub[suppressed_col].fillna(False).astype(bool)
+    counts = (
+        sub.groupby("gene_symbol", sort=False)
+        .apply(
+            lambda g: pd.Series(
+                {
+                    "a": int((g["_suppressed"] & g["_flag"]).sum()),
+                    "b": int((g["_suppressed"] & ~g["_flag"]).sum()),
+                    "c": int((~g["_suppressed"] & g["_flag"]).sum()),
+                    "d": int((~g["_suppressed"] & ~g["_flag"]).sum()),
+                }
+            )
+        )
+        .reset_index(drop=True)
+    )
+    obs = _fisher_odds_from_counts(int(counts["a"].sum()), int(counts["b"].sum()), int(counts["c"].sum()), int(counts["d"].sum()))
+    rng = np.random.default_rng(seed)
+    vals = []
+    arr = counts[["a", "b", "c", "d"]].to_numpy(dtype=int)
+    n = len(arr)
+    for _ in range(n_boot):
+        draw = arr[rng.integers(0, n, n)]
+        total = draw.sum(axis=0)
+        vals.append(_fisher_odds_from_counts(int(total[0]), int(total[1]), int(total[2]), int(total[3])))
+    vals = np.asarray(vals, dtype=float)
+    finite = vals[np.isfinite(vals)]
+    return {
+        "flag": flag,
+        "suppressed_col": suppressed_col,
+        "unit": "parent_gene_cluster_bootstrap_of_phosphosite_rows",
+        "observed_row_level_odds_ratio": obs,
+        "bootstrap_median_odds_ratio": float(np.nanmedian(finite)) if len(finite) else np.nan,
+        "ci_low": float(np.nanquantile(finite, 0.025)) if len(finite) else np.nan,
+        "ci_high": float(np.nanquantile(finite, 0.975)) if len(finite) else np.nan,
+        "n_bootstrap": int(n_boot),
+        "n_parent_gene_clusters": int(n),
+        "seed": seed,
+    }
+
+
+def _strata_from_parent(parent: pd.DataFrame) -> pd.Series:
+    pieces = []
+    specs = [
+        ("n_quantified_phosphosites", True),
+        ("parent_n_peptides", True),
+        ("parent_abundance_log2", False),
+        ("mean_missing_samples", False),
+    ]
+    for col, log_first in specs:
+        x = pd.to_numeric(parent[col], errors="coerce")
+        if log_first:
+            x = np.log1p(x)
+        try:
+            binned = pd.qcut(x.rank(method="first"), q=3, labels=False, duplicates="drop")
+        except ValueError:
+            binned = pd.Series(0, index=parent.index)
+        pieces.append(col + "=" + binned.astype("Int64").astype(str))
+    return pd.Series([";".join(vals) for vals in zip(*pieces)], index=parent.index)
+
+
+def matched_parent_gene_permutation(
+    parent: pd.DataFrame,
+    flag: str,
+    suppressed_col: str,
+    n_perm: int = 5000,
+    seed: int = 20260526,
+) -> dict:
+    """Shuffle subtype-prior labels within parent-gene observability strata."""
+    use_cols = [flag, suppressed_col, "n_quantified_phosphosites", "parent_n_peptides", "parent_abundance_log2", "mean_missing_samples"]
+    d = parent.dropna(subset=use_cols).copy()
+    if d.empty:
+        return {}
+    d["_stratum"] = _strata_from_parent(d)
+    y = d[suppressed_col].astype(bool).to_numpy()
+    labels = d[flag].astype(bool).to_numpy()
+    obs = _fisher_odds_from_counts(
+        int((y & labels).sum()),
+        int((y & ~labels).sum()),
+        int((~y & labels).sum()),
+        int((~y & ~labels).sum()),
+    )
+    rng = np.random.default_rng(seed)
+    strata = d["_stratum"].to_numpy()
+    hits = 0
+    finite = 0
+    for _ in range(n_perm):
+        perm = labels.copy()
+        for stratum in pd.unique(strata):
+            idx = np.flatnonzero(strata == stratum)
+            if len(idx) > 1:
+                perm[idx] = rng.permutation(perm[idx])
+        odds = _fisher_odds_from_counts(
+            int((y & perm).sum()),
+            int((y & ~perm).sum()),
+            int((~y & perm).sum()),
+            int((~y & ~perm).sum()),
+        )
+        if np.isfinite(odds):
+            finite += 1
+            hits += int(odds >= obs)
+    return {
+        "flag": flag,
+        "suppressed_col": suppressed_col,
+        "unit": "parent_gene",
+        "observed_parent_gene_odds_ratio": obs,
+        "n_permutations": int(n_perm),
+        "empirical_p_value": float((hits + 1) / (finite + 1)) if finite else np.nan,
+        "n_parent_genes": int(len(d)),
+        "n_strata": int(d["_stratum"].nunique()),
+        "null": "Subtype-prior labels shuffled within parent-gene strata preserving site count, peptide count, parent abundance, and missingness bins.",
+        "seed": seed,
+    }
 
 
 def site_count_stratified_permutation(
@@ -568,7 +943,7 @@ def site_count_stratified_permutation(
         "observed_row_level_odds_ratio": float(obs_odds),
         "n_permutations": int(n_perm),
         "empirical_p_value": float(p_emp),
-        "null": "DCT1 flag shuffled among parent genes within quantified-site-count bins",
+        "null": "Subtype-prior flag shuffled among parent genes within quantified-site-count bins",
     }
 
 
@@ -601,19 +976,28 @@ def matched_null_mean(df: pd.DataFrame, suppressed_col: str, n_draws=5000, seed=
 def run_h2_enrichment(root: Path, phospho_prior: pd.DataFrame):
     rows = []
     one_site = one_representative_site_per_gene(phospho_prior)
+    single_position_one_site = one_single_position_representative_site_per_gene(phospho_prior)
     families = [
         ("primary_p05", "is_suppressed_p05", phospho_prior),
         ("strict_q10", "is_suppressed_q10", phospho_prior),
+        ("effect_bottom_quartile", "is_effect_bottom_quartile", phospho_prior),
         ("exclude_anchor_genes", "is_suppressed_p05", phospho_prior[~phospho_prior["is_anchor_gene"]]),
         ("exclude_ncc_sites", "is_suppressed_p05", phospho_prior[~phospho_prior["is_ncc_site"]]),
         ("composite_sites_excluded", "is_suppressed_p05", phospho_prior[phospho_prior["is_single_site"]]),
         ("one_site_per_parent_gene", "is_suppressed_p05", one_site),
+        ("single_position_one_site_per_parent_gene", "is_suppressed_p05", single_position_one_site),
     ]
     for label, suppressed_col, df in families:
         sub = df[df["dct1_enrichment_score"].notna()].copy()
         sup = sub[sub[suppressed_col]]
         nonsup = sub[~sub[suppressed_col]]
-        unit = "parent_gene_representative_site" if label == "one_site_per_parent_gene" else "phosphosite_row"
+        unit = (
+            "single_position_parent_gene_representative_site"
+            if label == "single_position_one_site_per_parent_gene"
+            else "parent_gene_representative_site"
+            if label == "one_site_per_parent_gene"
+            else "phosphosite_row"
+        )
         mw = stats.mannwhitneyu(
             sup["dct1_enrichment_score"],
             nonsup["dct1_enrichment_score"],
@@ -758,9 +1142,31 @@ def run_h2_enrichment(root: Path, phospho_prior: pd.DataFrame):
         [
             site_count_stratified_permutation(phospho_prior, "dct1_top_decile", "is_suppressed_p05"),
             site_count_stratified_permutation(phospho_prior, "dct1_top_quartile", "is_suppressed_p05"),
+            site_count_stratified_permutation(phospho_prior, "dct2_bottom_decile", "is_suppressed_p05"),
+            site_count_stratified_permutation(phospho_prior, "dct2_bottom_quartile", "is_suppressed_p05"),
         ]
     )
     site_perm.to_csv(root / "h2_enrichment" / "h2_dct1_site_count_stratified_permutation.tsv", sep="\t", index=False)
+    cluster_boot = pd.DataFrame(
+        [
+            parent_gene_cluster_bootstrap_row_or(phospho_prior, "dct1_top_decile", "is_suppressed_p05"),
+            parent_gene_cluster_bootstrap_row_or(phospho_prior, "dct2_bottom_decile", "is_suppressed_p05"),
+            parent_gene_cluster_bootstrap_row_or(single_position_one_site, "dct1_top_decile", "is_suppressed_p05"),
+            parent_gene_cluster_bootstrap_row_or(single_position_one_site, "dct2_bottom_decile", "is_suppressed_p05"),
+        ]
+    )
+    cluster_boot.to_csv(root / "h2_enrichment" / "h2_dct_extreme_bin_cluster_bootstrap.tsv", sep="\t", index=False)
+    matched_perm = pd.DataFrame(
+        [
+            matched_parent_gene_permutation(parent, "dct1_top_decile", "any_suppressed_p05"),
+            matched_parent_gene_permutation(parent, "dct2_bottom_decile", "any_suppressed_p05"),
+            matched_parent_gene_permutation(parent, "dct1_top_decile", "any_effect_bottom_quartile"),
+            matched_parent_gene_permutation(parent, "dct2_bottom_decile", "any_effect_bottom_quartile"),
+        ]
+    )
+    matched_perm.to_csv(root / "h2_enrichment" / "h2_dct_matched_parent_gene_permutation.tsv", sep="\t", index=False)
+    run_threshold_free_enrichment(root, phospho_prior, parent)
+    run_percentile_threshold_sensitivity(root, phospho_prior, parent)
     return summary, verdict
 
 
@@ -808,9 +1214,128 @@ def run_h2_parent_gene_level(root: Path, phospho_prior: pd.DataFrame) -> pd.Data
                     "covariates": "log1p(n_quantified_phosphosites), log1p(parent_n_peptides), parent_abundance_log2",
                 }
             )
+        rows.extend(parent_gene_joint_logistic(parent, suppressed_col))
     out = pd.DataFrame(rows)
     out["q_value"] = bh(out["p_value"])
     out.to_csv(root / "h2_enrichment" / "h2_dct1_parent_gene_level_summary.tsv", sep="\t", index=False)
+    return parent
+
+
+def run_threshold_free_enrichment(root: Path, phospho_prior: pd.DataFrame, parent: pd.DataFrame) -> pd.DataFrame:
+    """Effect-rank checks that do not define the set by nominal p value."""
+    rows = []
+    row = phospho_prior.dropna(subset=["dct1_enrichment_score", "phospho_effect"]).copy()
+    if len(row):
+        rho, p = stats.spearmanr(row["dct1_enrichment_score"], row["phospho_effect"], nan_policy="omit")
+        rows.append(
+            {
+                "analysis": "all_phosphosite_rows",
+                "test": "spearman_dct1_score_vs_signed_phosphosite_effect",
+                "unit": "phosphosite_row",
+                "statistic": rho,
+                "p_value": p,
+                "directional_read": "negative rho means higher DCT1 prior has more negative flight phosphosite effect",
+                "n_units": int(len(row)),
+                "n_parent_genes": int(row["gene_symbol"].nunique()),
+            }
+        )
+        for flag in ["dct1_top_decile", "dct2_bottom_decile", "dct1_top_quartile", "dct2_bottom_quartile"]:
+            d = row.dropna(subset=[flag]).copy()
+            in_flag = d[d[flag].astype(bool)]["phospho_effect"]
+            out_flag = d[~d[flag].astype(bool)]["phospho_effect"]
+            mw = stats.mannwhitneyu(in_flag, out_flag, alternative="less") if len(in_flag) and len(out_flag) else (np.nan, np.nan)
+            rows.append(
+                {
+                    "analysis": "all_phosphosite_rows",
+                    "test": f"mann_whitney_{flag}_more_negative_effect",
+                    "unit": "phosphosite_row",
+                    "statistic": mw.statistic if hasattr(mw, "statistic") else mw[0],
+                    "p_value": mw.pvalue if hasattr(mw, "pvalue") else mw[1],
+                    "mean_effect_in_flag": float(in_flag.mean()) if len(in_flag) else np.nan,
+                    "mean_effect_outside_flag": float(out_flag.mean()) if len(out_flag) else np.nan,
+                    "directional_read": "one-sided less: subtype-prior bin has more negative signed phosphosite effects",
+                    "n_units": int(len(d)),
+                    "n_parent_genes": int(d["gene_symbol"].nunique()),
+                }
+            )
+
+    p = parent.dropna(subset=["dct1_enrichment_score", "most_negative_phospho_effect"]).copy()
+    if len(p):
+        rho, pval = stats.spearmanr(p["dct1_enrichment_score"], p["most_negative_phospho_effect"], nan_policy="omit")
+        rows.append(
+            {
+                "analysis": "parent_gene_most_negative_site",
+                "test": "spearman_dct1_score_vs_most_negative_parent_site_effect",
+                "unit": "parent_gene",
+                "statistic": rho,
+                "p_value": pval,
+                "directional_read": "negative rho means higher DCT1 prior has a more negative parent-gene phosphosite effect",
+                "n_units": int(len(p)),
+                "n_parent_genes": int(len(p)),
+            }
+        )
+        for flag in ["dct1_top_decile", "dct2_bottom_decile", "dct1_top_quartile", "dct2_bottom_quartile"]:
+            in_flag = p[p[flag].astype(bool)]["most_negative_phospho_effect"]
+            out_flag = p[~p[flag].astype(bool)]["most_negative_phospho_effect"]
+            mw = stats.mannwhitneyu(in_flag, out_flag, alternative="less") if len(in_flag) and len(out_flag) else (np.nan, np.nan)
+            rows.append(
+                {
+                    "analysis": "parent_gene_most_negative_site",
+                    "test": f"mann_whitney_{flag}_more_negative_effect",
+                    "unit": "parent_gene",
+                    "statistic": mw.statistic if hasattr(mw, "statistic") else mw[0],
+                    "p_value": mw.pvalue if hasattr(mw, "pvalue") else mw[1],
+                    "mean_effect_in_flag": float(in_flag.mean()) if len(in_flag) else np.nan,
+                    "mean_effect_outside_flag": float(out_flag.mean()) if len(out_flag) else np.nan,
+                    "directional_read": "one-sided less: subtype-prior bin has more negative parent-gene phosphosite effects",
+                    "n_units": int(len(p)),
+                    "n_parent_genes": int(len(p)),
+                }
+            )
+    out = pd.DataFrame(rows)
+    if len(out):
+        out["q_value"] = bh(out["p_value"])
+    out.to_csv(root / "h2_enrichment" / "h2_dct_threshold_free_summary.tsv", sep="\t", index=False)
+    return out
+
+
+def run_percentile_threshold_sensitivity(root: Path, phospho_prior: pd.DataFrame, parent: pd.DataFrame) -> pd.DataFrame:
+    """Sweep DCT1-top and DCT2-bottom percentile cutoffs at row and parent level."""
+    parent_score = parent.dropna(subset=["dct1_enrichment_score"]).copy()
+    rows = []
+    for pct in [5, 10, 15, 20, 25]:
+        hi = parent_score["dct1_enrichment_score"].quantile(1 - pct / 100)
+        lo = parent_score["dct1_enrichment_score"].quantile(pct / 100)
+        gene_flags = parent_score[["gene_symbol", "dct1_enrichment_score"]].copy()
+        gene_flags[f"dct1_top_{pct}pct"] = gene_flags["dct1_enrichment_score"] >= hi
+        gene_flags[f"dct2_bottom_{pct}pct"] = gene_flags["dct1_enrichment_score"] <= lo
+        row_df = phospho_prior.merge(gene_flags[["gene_symbol", f"dct1_top_{pct}pct", f"dct2_bottom_{pct}pct"]], on="gene_symbol", how="left")
+        parent_df = parent.merge(gene_flags[["gene_symbol", f"dct1_top_{pct}pct", f"dct2_bottom_{pct}pct"]], on="gene_symbol", how="left")
+        for unit, df, suppressed_col in [
+            ("phosphosite_row", row_df, "is_suppressed_p05"),
+            ("parent_gene", parent_df, "any_suppressed_p05"),
+        ]:
+            for direction, flag in [("dct1_top", f"dct1_top_{pct}pct"), ("dct2_bottom", f"dct2_bottom_{pct}pct")]:
+                odds, pval, fold, arr = fisher_table(df, flag, suppressed_col)
+                rows.append(
+                    {
+                        "unit": unit,
+                        "suppressed_col": suppressed_col,
+                        "bin_direction": direction,
+                        "percentile_cutoff": pct,
+                        "flag": flag,
+                        "odds_ratio": odds,
+                        "p_value": pval,
+                        "fold_enrichment": fold,
+                        "table_suppressed_in_flag": int(arr[0, 0]),
+                        "table_suppressed_not_flag": int(arr[0, 1]),
+                        "table_background_in_flag": int(arr[1, 0]),
+                        "table_background_not_flag": int(arr[1, 1]),
+                    }
+                )
+    out = pd.DataFrame(rows)
+    out["q_value"] = bh(out["p_value"])
+    out.to_csv(root / "h2_enrichment" / "h2_dct_percentile_threshold_sensitivity.tsv", sep="\t", index=False)
     return out
 
 
@@ -1116,6 +1641,7 @@ def main():
     baseline_lock(root)
     pxd = load_pxd_tables(root)
     _, proteins_prior, phospho_prior = build_dct_prior_mapping(root)
+    run_dct_prior_sensitivity(root, phospho_prior)
     run_h2_enrichment(root, phospho_prior)
     run_pxd_antialignment(root, pxd, phospho_prior)
     run_klhl3_check(root, pxd, phospho_prior, proteins_prior)

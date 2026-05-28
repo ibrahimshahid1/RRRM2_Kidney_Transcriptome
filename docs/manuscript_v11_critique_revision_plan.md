@@ -1,471 +1,541 @@
 # Manuscript v11 Critique And Revision Plan
 
-Reviewed artifact: `latex_paper/manuscript_v11.pdf`, using the synchronized source
-`latex_paper/manuscript_v11.tex` plus v11 result artifacts under
+Reviewed artifact: `latex_paper/manuscript_v11.pdf`, using the synchronized
+source `latex_paper/manuscript_v11.tex`, the companion compendium
+`latex_paper/results_v11.tex`, and the v11 run artifacts under
 `data/results/run_20260526_v11_dct1_phospho_mediation/`.
+
+This is a fresh critique of the current v11 manuscript. Several flaws from the
+older critique have been fixed: the primary H2 code now uses a directional
+Fisher test, a one-row-per-parent-gene sensitivity exists, the DCT2 comparator
+is reported, KSEA substrate counts are disclosed, NCC residue labels have been
+softened to position-only labels, and there is now at least one v11-specific
+test file. The remaining issues are more about claim hierarchy, biological
+interpretation, statistical independence, and figure/readability polish.
 
 ## Overall Verdict
 
-The manuscript is scientifically much more disciplined than earlier versions
-appear to have been. Its strongest feature is claim hygiene: it repeatedly
-distinguishes DCT1-high parent-gene enrichment from DCT1 cell-of-origin
-localization, and it treats spatial and mediation analyses as hypothesis
-generating. That framing is essential and should be preserved.
+The paper has a coherent observational multi-omic story and much better claim
+discipline than many public-data manuscripts. Its strongest contribution is not
+discovering NCC dephosphorylation, which prior work already established, but
+placing that endpoint into a recurrent cross-cohort RNA context and showing that
+the OSD-462 transporter signal is sharper at the phosphorylation layer than at
+the protein-abundance layer.
 
-The paper is not yet submission-ready. The central DCT1 top-decile result is
-interesting, but the current manuscript still has several reviewer-visible
-weaknesses:
+The central DCT1 result is interesting but still fragile as a headline. The
+manuscript now correctly admits that the DCT2-bottom-decile comparator is also
+enriched and is stronger than DCT1 in the two most row-dependence-robust
+summaries. That admission is scientifically honest, but it creates a title and
+abstract tension: the safest claim is distal-nephron subtype-prior enrichment,
+not a DCT1-centered result. The current title still leads with DCT1.
 
-1. One key sensitivity analysis is mislabeled or overinterpreted.
-2. The KSEA and phosphosite-site labels need stricter biochemical accounting.
-3. The statistical inference still leans heavily on phosphosite rows that are
-   not independent biological units.
-4. Spatial and mediation results are carefully hedged in text, but the abstract
-   and narrative still risk sounding stronger than the data allow.
-5. A figure-generation bug leaves the single-site sensitivity blank in the main
-   DCT1 enrichment plot.
-6. Reproducibility is good at the manifest level but weak at the unit-test level
-   for the new v11-specific methods.
+My bottom-line recommendation is to revise the paper around this hierarchy:
 
-## Major Scientific Strengths
+1. Primary result: matched OSD-462 shows RNA-protein decoupling and NCC/SPAK/WNK
+   regulatory-phosphosite suppression.
+2. Primary enrichment result: suppressed whole-kidney phosphosite parent genes
+   are enriched in distal-nephron subtype-prior bins, including DCT1-high and
+   DCT2-leaning extremes.
+3. DCT1-specific emphasis should be secondary and biologically motivated by the
+   NCC/SPAK/WNK axis, not presented as exclusive or dominant after the DCT2
+   comparator.
+4. Spatial, path, low-K, dDAVP, and KLHL3/CUL3 analyses should remain
+   hypothesis-generating boundary analyses.
 
-### 1. The paper has a clear and plausible biological spine
+## Major Strengths
 
-The strongest story is:
+### 1. The biological spine is plausible
 
-- public mouse kidney spaceflight RNA shows recurrent matrix/endothelial-high
+The paper connects five observations into a coherent model:
+
+- public mouse spaceflight kidney RNA repeatedly shows matrix/endothelial-high
   and DCT/NCC-WNK-low context;
-- matched OSD-462 protein abundance does not mirror the RNA signature;
-- the transporter signal is sharpest at regulatory phosphosite level;
-- suppressed whole-kidney phosphosites are enriched among parent genes that are
-  DCT1-high in an external native DCT1/DCT2 reference;
-- public perturbation references narrow, but do not solve, the upstream WNK
-  suppressor question.
+- OSD-462 RNA recurs the RRRM-2 direction strongly;
+- protein abundance does not mirror the RNA pattern cleanly;
+- NCC/SPAK/WNK regulatory phosphosites are suppressed despite flat total NCC;
+- parent genes of suppressed phosphosite rows are enriched in distal nephron
+  subtype-prior bins from an external DCT reference.
 
-That is a coherent observational multi-omic paper.
+That is a real story, and it is more useful than a generic differential
+expression catalog.
 
-### 2. The most important claim is appropriately hedged
+### 2. Claim boundaries are mostly explicit
 
-The abstract and Results repeatedly state that the DCT1 signal is parent-gene
-enrichment in whole-kidney phosphoproteomics, not DCT1-localized
-phosphoproteomics. This is exactly the right boundary. Keep that language.
+The manuscript repeatedly says that OSD-462 is whole-kidney phosphoproteomics,
+that the DCT1 prior is transcriptomic, and that the result is parent-gene
+prioritization rather than cell-of-origin localization. This language should be
+kept.
 
-### 3. The negative results improve credibility
+### 3. Negative and bounded results improve credibility
 
-The manuscript preserves null or bounded results: protein concordance is null,
-continuous DCT1-gradient models are weak, low-K anti-alignment has wide CIs,
-PXD001729 cannot test transport-target anti-alignment, and KLHL3/CUL3 turnover
-is not resolvable. This makes the positive DCT1 top-decile enrichment more
-credible because the paper is not trying to turn every analysis into support.
+The paper preserves non-supportive findings: continuous DCT1-gradient models
+are weak, parent-gene logistic adjustment attenuates the top-decile result,
+low-K anti-alignment is unstable, PXD001729 cannot test the key transport sites,
+KLHL3/CUL3 turnover is not resolvable, and spatial data are external IRI
+context. This discipline makes the positive results more believable.
 
 ## Major Flaws And Risks
 
-### 1. Critical reporting mismatch: "single-site" is not one-site-per-gene
+### 1. The title overstates the DCT1 interpretation
 
-Manuscript Methods say the sensitivity analyses "retained one representative
-phosphosite per parent gene" (`manuscript_v11.tex`, line 174). The Results cite
-the top-decile OR 1.38, q=2.84e-6 as the single-site sensitivity.
+The title is currently:
 
-But the v11 core implementation defines `single_sites_only` as rows where
-`site_position_str` is a single numeric position, not one representative site
-per parent gene:
+`DCT1-high parent-gene enrichment of flight-suppressed phosphosites in mouse spaceflight kidney`
 
-- `src/v11/core_analysis.py`, line 328: `is_single_site` is a regex for a
-  single numeric site.
-- `src/v11/core_analysis.py`, line 451: the sensitivity uses
-  `phospho_prior[phospho_prior["is_single_site"]]`.
+That is technically true for one subset, but it no longer reflects the paper's
+own safest interpretation. The abstract and Results state that the DCT2-bottom
+decile is also enriched and is stronger than DCT1 in the one-row-per-parent-gene
+and parent-gene Fisher analyses:
 
-That filter removes composite phosphosite rows; it does not solve parent-gene
-row dependence. The mapped "single-site" primary sensitivity still has 16,514
-rows but only 5,109 unique parent genes. Therefore the current text overstates
-how well row dependence has been controlled for the primary DCT1 enrichment.
+- one row per parent gene: DCT2-bottom OR 1.68 versus DCT1-top OR 1.49;
+- parent-gene Fisher: DCT2-bottom OR 1.82 versus DCT1-top OR 1.52.
 
-Important nuance: the occupancy-normalized branch does implement a true
-one-site-per-gene reduction in `src/v11/h2_occupancy_normalized_phospho.py`
-lines 94-100 and uses it at lines 134-135. The primary unadjusted branch does
-not.
+This means a skeptical reviewer will ask why the title names DCT1 rather than
+distal-nephron subtype-prior enrichment or DCT-subtype extremes.
 
 Fix:
 
-- Rename the current primary sensitivity to "single-position sites only" or
-  "composite sites excluded."
-- Add a true one-site-per-parent-gene sensitivity to the primary H2 enrichment,
-  using the same selection rule as the occupancy branch or a pre-specified
-  rule such as lowest phosphosite p value per parent gene.
-- Recompute and report the true one-site-per-gene OR/q in the main DCT1 result.
-- Update Methods, Results, Figure 4, and the compendium.
+- Retitle around "distal-nephron subtype-prior parent-gene enrichment" or
+  "DCT-subtype-prior enrichment".
+- Keep DCT1 in the subtitle or final clause because NCC/SPAK/WNK are
+  DCT1-leaning in the reference.
+- Do not let the first sentence of the abstract sound like DCT1 exclusivity.
 
-### 2. The DCT1 enrichment is row-level; parent-gene and site-count effects are still the main statistical vulnerability
+Suggested title:
 
-The headline DCT1 top-decile enrichment is strong at row level:
+`Distal-nephron subtype-prior enrichment of flight-suppressed phosphosites in mouse spaceflight kidney`
 
-- primary top decile: OR 1.51, q=1.13e-11;
-- anchor excluded: OR 1.49, q=3.68e-11;
-- full adjusted sensitivity: OR 1.30, q=0.00158;
-- occupancy-normalized: OR 1.52, q=3.73e-12.
+Alternative:
 
-But the biological unit is ambiguous. A phosphosite row is not independent of
-other rows on the same parent protein, and DCT1-high genes may have different
-phosphosite observability or multi-site density. The manuscript acknowledges
-this, but the main evidence still relies on a row-level Fisher test.
+`RNA-protein decoupling and distal-nephron phosphosite-prior enrichment in mouse spaceflight kidney`
 
-Fix:
+### 2. The DCT1 result remains statistically vulnerable to observability and parent-gene structure
 
-- Add a parent-gene-level logistic or permutation analysis:
-  - define whether each parent gene has at least one suppressed site;
-  - model DCT1 top-decile status against suppression with covariates for protein
-    abundance, peptide count, number of quantified phosphosites, and missingness;
-  - use Firth/logistic regression or permutation if separation occurs.
-- Add a cluster bootstrap over parent genes for the row-level OR.
-- Add a site-count-stratified permutation preserving the number of sites per
-  parent gene.
-- Make the row-level Fisher result secondary to a parent-gene-aware confirmation.
+The row-level DCT1 top-decile Fisher result is strong, but phosphosite rows are
+not independent biological units. The manuscript has added safeguards:
 
-### 3. Fisher exact test direction is inconsistent across branches
+- composite/multi-position rows excluded;
+- one representative row per parent gene;
+- parent-gene Fisher;
+- site-count-stratified permutation;
+- parent-protein and compartment-score models.
 
-In the primary H2 code, `stats.fisher_exact(arr)` is called without an
-`alternative`, so SciPy uses the two-sided default (`src/v11/core_analysis.py`,
-line 411). In the occupancy and composition branches, Fisher tests use
-`alternative="greater"`. The manuscript generally frames the test as
-directional enrichment.
+Those help. The main unresolved weakness is that the covariate-adjusted
+parent-gene logistic model for any nominally suppressed site is not supportive
+for DCT1 top decile:
 
-This probably does not change the headline top-decile conclusion, but it is a
-reproducibility and interpretation blemish.
+- DCT1 top decile logistic OR 1.14, q = 0.453.
+
+The analogous DCT2-bottom-decile parent-gene logistic result is also only
+borderline:
+
+- DCT2 bottom decile logistic OR 1.27, q = 0.099.
+
+This does not erase the enrichment, but it means the strongest independent-unit
+model does not support the headline as strongly as the row and Fisher summaries
+do.
 
 Fix:
 
-- Decide whether the DCT1 enrichment family is directional or two-sided.
-- Use the same alternative in all H2, occupancy, and composition tests.
-- State the choice explicitly in Methods and table footnotes.
+- Promote the logistic attenuation into the abstract or a boxed limitations
+  sentence if the DCT1 title is kept.
+- Add a parent-gene cluster bootstrap for the row-level odds ratio.
+- Add a matched parent-gene permutation preserving quantified site count,
+  peptide count, and parent abundance, not site count alone.
+- Report whether the DCT1 and DCT2 extreme-bin effects survive in the same
+  multivariable parent-gene model.
 
-### 4. The KSEA result looks more decisive than its substrate count supports
+### 3. "One site per parent gene" is still slightly overphrased
 
-The abstract reports KSEA SPAK/OSR1 z=-6.31 and WNK z=-4.12. The underlying
-table shows only three quantified substrates per kinase against a 21,083-site
-background. This is a coherence check, not an unbiased kinome-wide discovery.
-
-The issue is strongest for WNK: Stk39 S383 is strong, Stk39 S382 is incomplete
-and nominally weaker, and Oxsr1 S339 is essentially flat in the per-site table.
-The WNK score therefore should not be presented as symmetric with the NCC/SPAK
-site cluster.
-
-Fix:
-
-- Add `n_substrates_quantified=3` next to each KSEA z score in Results and
-  compendium.
-- In the abstract, say "targeted KSEA over three curated substrates per kinase"
-  or move the z scores out of the abstract.
-- Discuss WNK as weaker/asymmetric compared with the NCC phosphosite cluster.
-
-### 5. NCC phosphosite labels need biochemical cleanup
-
-Table 2 lists NCC "Thr65" and the composite "Ser65;Thr68." The residue at
-position 65 cannot be both Thr and Ser in the same accession/isoform. The
-underlying OSD-462 site table carries positions, not residue letters.
-
-Also, the curated renal kinase-substrate file lists SPAK/OSR1 NCC positions
-53, 58, 65, and 68, but not 89. The manuscript labels Thr89 as "regulatory,"
-which needs a specific citation or a softer label.
+The code selects one representative phosphosite row per gene using lowest
+phosphosite p value, then more negative effect, then site identifier
+(`src/v11/core_analysis.py`). This is a good row-dependence sensitivity. But it
+is not literally "one single phosphosite site" if the selected row is a
+composite/multi-position row. The manuscript's Methods are mostly accurate
+("one representative row per gene"), but the abstract calls it a "true
+one-site-per-parent-gene sensitivity."
 
 Fix:
 
-- Replace residue-letter labels with position-only labels such as NCC p53,
-  p65, p68, p89 unless the exact accession and residue mapping are verified.
-- Footnote the accession/isoform and site-numbering source.
-- Relabel p89 as "additional N-terminal phosphosite" unless a regulatory
-  citation is added.
+- Rename this everywhere to "one phosphosite row per parent gene".
+- Add a stricter sensitivity: single-position rows only, then one
+  representative row per parent gene.
+- If that stricter sensitivity remains positive, it is the number that should
+  appear in the abstract.
 
-### 6. OSD-513 recurrence numbers are internally inconsistent across artifacts
+### 4. The DCT1/DCT2 reference prior is underpowered and threshold-dependent
 
-The manuscript reports OSD-513 cosine 0.641 with CI 0.351 to 0.814
-(`manuscript_v11.tex`, line 257). The canonical 2,000-bootstrap summary in
-`run_20260518_201823_2500g` reports 0.373 to 0.811. A separate cosine-permutation
-run reports 0.351 to 0.814. Both appear to exist, but the manuscript does not
-identify which run is canonical.
-
-Fix:
-
-- Pick one run as canonical for manuscript v11.
-- Cite the exact artifact in the compendium.
-- If the permutation-null run is canonical, say so because it explains the
-  0.351 CI.
-
-### 7. Figure 1D label is stale or computed from a different vector
-
-The text reports full RRRM-2 ISS-T vs OSD-513 cosine 0.641, but Figure 1D labels
-"Full cosine = 0.55." The figure may use a centered, filtered, or old vector,
-but the caption does not explain this difference.
+GSE228367 is a useful native DCT reference, but the analysis rests on only three
+normal-potassium replicates per subtype. The strict FDR marker inventory is
+extremely sparse: two DCT1-core genes and zero DCT2-core genes in the compendium.
+That supports the choice to use percentile bins, but it also means the
+percentile threshold is doing a lot of work.
 
 Fix:
 
-- Regenerate Figure 1D so the dashed line matches the text, or relabel it as
-  the exact statistic it represents.
-- Add a small figure-note if panel D uses a different feature set from the main
-  0.641 recurrence estimate.
+- Add leave-one-replicate-out DCT1/DCT2 priors.
+- Add score-definition sensitivity: mean difference, log2 ratio, rank-averaged
+  score, and detection-aware score.
+- Add threshold sensitivity across top/bottom 5%, 10%, 15%, 20%, and 25%.
+- Show whether NCC/SPAK/WNK parent genes themselves sit in the claimed bins or
+  are only DCT1-leaning outside the strict bin.
 
-### 8. The main DCT1 enrichment figure drops the single-site row
+### 5. The primary suppressed-site definition uses nominal p < 0.05
 
-The rendered `v11_dct1_parent_gene_enrichment.png` leaves the "Single-site only"
-row blank. The data exist under the label `single_sites_only`, but the plotting
-code expects `single_site_only_p05`:
-
-- data label: `single_sites_only`;
-- plotting label expected at `src/v11/publication_figures.py`, line 178:
-  `single_site_only_p05`.
-
-Fix:
-
-- Change the plotting code to the actual label or standardize the TSV label.
-- After adding a true one-site-per-gene test, plot both "composites excluded"
-  and "one site per gene" or just the latter.
-
-### 9. Occupancy normalization is a useful robustness check, but not true occupancy
-
-The occupancy branch computes:
-
-`occupancy_effect = phosphosite flight effect - parent protein flight effect`.
-
-The p-value threshold still comes from the raw phosphosite model
-(`src/v11/h2_occupancy_normalized_phospho.py`, lines 116-124). That is fine as
-a robustness check, but it is not a direct phospho-stoichiometry model with its
-own uncertainty for the phospho-minus-protein contrast.
+The manuscript correctly says nominal p < 0.05 defines a directional enrichment
+set, not individual-site significance. Still, the main enrichment depends on a
+thresholded p-value set. This can select for high intensity, lower missingness,
+more observable proteins, and multi-site parent proteins.
 
 Fix:
 
-- Rename as "parent-protein-normalized phosphosite effect" throughout; use
-  "occupancy" only with a caveat.
-- Compute uncertainty for the contrast if feasible by animal-level joint
-  modeling or bootstrap.
-- Do not imply biochemical site occupancy was measured directly.
+- Add threshold-free analyses:
+  - rank-based enrichment of DCT1/DCT2 prior versus signed phosphosite effect;
+  - logistic or ordinal model using signed effect rank instead of nominal p;
+  - competitive gene-set test at parent-gene level.
+- Add effect-size-only sensitivity, for example negative effect below the 25th
+  percentile, independent of p value.
+- Report missingness and mean intensity distributions by DCT1/DCT2 bin.
 
-### 10. Spatial analysis is visually persuasive but statistically fragile
+### 6. Composition adjustment is useful, but not deconfounding
 
-The IRI Visium result is useful as a prediction generator. It is not validation.
-The code compares spot-level distributions with Welch t tests
-(`src/v11/spatial_dct_transport_check.py`, lines 115-129), but spots are not
-independent biological replicates and the data are from IRI, not spaceflight.
+The composition-aware ladder is valuable, but it uses bulk RNA marker scores as
+animal-level covariates in n=20 animals. These covariates may be highly
+correlated with flight and may sit on the biological path. The suppressed-site
+set also changes by model:
 
-The manuscript states this limitation, but the abstract gives the spatial
-numbers enough prominence that readers may overread them.
+- M0 raw: 2,430 nominal suppressed sites;
+- M4 full model: 1,390 nominal suppressed sites.
 
-Fix:
-
-- Move spatial p values out of the abstract or explicitly say "spot-level,
-  external IRI reference."
-- Add animal/section-level aggregation if sample metadata allow it.
-- Replace "predict" with "motivates the prediction" unless a true
-  out-of-sample validation design is added.
-
-### 11. Low-K comparison is mechanistically attractive but underpowered and gene-set-selected
-
-The low-K result is directional only in a hand-focused 14-gene target subset,
-with wide bootstrap intervals crossing zero. The genome-wide and DCT-prior
-subsets are near zero. This is correctly not promoted to a primary mechanism,
-but the paper still spends a lot of Results space on it.
+The OR ladder is therefore not tracking one fixed set through adjustment; it is
+redefining the suppressed set on each residual scale.
 
 Fix:
 
-- Keep the low-K analysis in a compact "mechanism triage" paragraph.
-- Add an explicit null sentence: genome-wide and DCT-prior subsets did not show
-  stable anti-alignment.
-- Avoid "potassium/chloride-like" in the title, abstract, or conclusion.
+- State in Results, not just Methods, that set membership changes across M0-M5.
+- Add a fixed-set analysis: take the M0 suppressed set and ask whether adjusted
+  effects remain negative or enriched.
+- Add covariate correlation/VIF diagnostics for flight, DCT identity,
+  endothelial, stromal, and parent-protein abundance.
+- Avoid phrases like "not explained by composition"; use "not eliminated by
+  this bulk-composition sensitivity."
 
-### 12. Mediation/path analysis should be demoted further unless the model details are explicit
+### 7. Parent-protein normalization is not stoichiometry
 
-The path analysis is cross-sectional, n=20, bulk-tissue, and uses an approximate
-Bayesian OLS fallback rather than the intended full SEM/brms model. The text is
-mostly careful, but Results currently says "consistent with negative indirect
-paths" without telling the reader about the fallback.
+The parent-protein-normalized effect is:
 
-Fix:
+`phosphosite flight effect - parent protein flight effect`
 
-- State in Methods and Results that the full Bayesian/SEM fit was not used and
-  the intervals are normal-approximation fallback summaries.
-- Move the mediation forest to supplement unless it is essential to the main
-  narrative.
-- Frame as "covariance decomposition" rather than "mediation" in the main text.
-
-### 13. Multiple-testing families are not explicit enough
-
-The manuscript says BH was applied within defined families, but readers need to
-know those families without searching the compendium. There is no global FWER
-or global FDR across all exploratory analyses.
+This is a useful robustness check, especially because NCC and SPAK parent
+protein effects are slightly positive. But the uncertainty for the
+phosphosite-minus-protein contrast is not propagated, and the protein and
+phosphosite estimates come from different TMT tables with different coverage and
+missingness. It is not direct biochemical occupancy.
 
 Fix:
 
-- Add a short table listing each testing family, number of tests, correction
-  scope, and whether it is primary, sensitivity, or exploratory.
-- State that no global correction was applied across all families.
+- Keep the manuscript's current "not direct stoichiometry" caveat.
+- Rename all remaining "occupancy" language to "parent-protein-normalized".
+- Add a bootstrap or animal-level paired model for the contrast where the same
+  animals have both parent protein and phosphosite values.
 
-### 14. DCT1 reference prior needs more uncertainty and specificity analysis
+### 8. KSEA is a coherence check, not strong kinase-output evidence
 
-The DCT1/DCT2 prior uses only three normal-potassium replicates per subtype.
-Strict FDR marker sets are sparse. Percentile bins are reasonable, but the
-paper should prove the DCT1 top-decile result is not an artifact of one scoring
-definition.
-
-Fix:
-
-- Add sensitivity to:
-  - DCT1-DCT2 difference score;
-  - log2 ratio score;
-  - rank-averaged score;
-  - replicate leave-one-out DCT1 prior;
-  - DCT1 top 5%, 10%, 15%, 20% thresholds.
-- Add an explicit DCT2-high or CNT-associated comparator.
-
-### 15. Reproducibility is strong for manifests but weak for tests
-
-The v11 pipeline records manifests and checksums, which is good. But there are
-no direct tests for the new v11 DCT1 enrichment logic, composition adjustment,
-occupancy normalization, mediation fallback, or figure completeness.
+The manuscript now reports that targeted KSEA uses three curated substrates per
+kinase. Good. But the z scores still look visually and rhetorically stronger
+than the substrate evidence supports. WNK is especially asymmetric because the
+score is driven by a tiny curated set, with individual substrate behavior that
+is not uniformly strong.
 
 Fix:
 
-- Add tests for:
-  - Fisher contingency-table construction on a tiny fixture;
-  - true one-site-per-gene reduction;
-  - consistency of all Fisher alternatives;
-  - figure row completeness, which would have caught the blank single-site row;
-  - occupancy effect calculation and caveat;
-  - mediation fallback determinism.
-- Add a `latex_paper/README.md` note saying `manuscript_v11.tex` and
-  `results_v11.tex` are the current manuscript/compendium pair.
+- Move KSEA z scores out of the abstract or keep only "targeted KSEA over three
+  substrates per kinase was directionally supportive."
+- Add a small substrate table beside the KSEA result with per-site effect, p,
+  q, and number of finite channels.
+- Treat NCC phosphosite suppression as the main phosphoproteomic fact; treat WNK
+  KSEA as pathway coherence.
+
+### 9. RNA recurrence is pathway-level and curated, not genome-wide validation
+
+The RNA recurrence result is one of the manuscript's better pieces, but it is
+based on curated gene-set/pathway scores and cosine similarity over small
+feature vectors. Gene sets overlap biologically, and the OSD-513 recurrence uses
+nine shared features while OSD-462 uses an 11-pathway anchor panel. The current
+caption notes this, but the Methods should make the feature-set difference and
+curation freeze more transparent.
+
+Fix:
+
+- Put gene-set member lists in a supplement table.
+- Add a leave-one-gene-set-family-out analysis, not only leave-one-pathway-out.
+- Bootstrap both the RRRM-2 reference and the external cohort, not only the
+  external cohort, or clearly state that RRRM-2 uncertainty is treated as fixed.
+- Add a concise genome-wide rank correlation or camera/fgsea sensitivity if
+  feasible.
+
+### 10. TMT protein and phosphoprotein models are simple relative-abundance models
+
+The OSD-462 TMT analyses use log2 scaled signal-to-noise values with
+median-centering and simple within-plex or OLS effects. This is reasonable for a
+public reanalysis, but it has limitations:
+
+- median centering can remove true global abundance shifts;
+- missingness may be non-random;
+- no empirical Bayes moderation is used for site-level phosphoproteomics;
+- channel/plex effects and peptide/protein aggregation are simplified;
+- phosphosite localization confidence and accession-specific residue mapping are
+  not central in the current tables.
+
+Fix:
+
+- Add TMT QC panels: channel medians before/after normalization, missingness by
+  group, plex balance, and sample PCA.
+- Add a limma/MSstatsTMT-style sensitivity for protein and phosphosite effects
+  if feasible.
+- Report localization/ambiguity metadata for the NCC/SPAK/WNK sites.
+- Keep "relative TMT abundance" wording throughout.
+
+### 11. Spatial analysis is a prediction generator with pseudoreplication
+
+The IRI Visium analysis is useful, but the spot-level t tests are not
+animal-level replicated evidence. The code explicitly labels this as
+"spot-level descriptive test; no animal-level spatial replication". The
+manuscript states this caveat, but it still quotes p values prominently.
+
+Fix:
+
+- Move spot-level p values to the supplement.
+- In the main text, report effect direction and magnitude without inferential
+  language.
+- If metadata permit, aggregate by section/animal before any testing.
+- Change "found lower DCT transport" in the abstract to "observed a lower
+  spot-level DCT-transport score in an external IRI reference."
+
+### 12. Path analysis should be called covariance decomposition
+
+The path model is cross-sectional, n=20, bulk-tissue, and uses an approximate
+Bayesian OLS fallback rather than a full SEM/brms model. The Methods say this,
+and the verdict JSON says it clearly. The Results still risk sounding like a
+mediation result because of "indirect path" language.
+
+Fix:
+
+- Rename the section "Exploratory covariance decomposition".
+- Keep the forest plot in the supplement unless the main text needs it.
+- In the main text, say only that remodeling scores covary negatively with NCC
+  regulatory phosphorylation after conditioning choices.
+- Remove any causal verbs around endothelial or matrix remodeling.
+
+### 13. Low-K and dDAVP branches are too large for their evidentiary weight
+
+The low-K result is mechanistically attractive but supported only in a focused
+14-gene subset with wide bootstrap intervals crossing zero. Genome-wide and
+DCT-prior subsets are near zero or inconsistent. The dDAVP/mpkDCT comparison has
+60 shared single sites but zero shared transport-target sites.
+
+Fix:
+
+- Compress low-K, dDAVP, and KLHL3/CUL3 into one "mechanism triage did not
+  resolve upstream signal" paragraph in the main text.
+- Keep detailed heatmaps/tables in the compendium.
+- Avoid "potassium/chloride-like" as a named mechanism unless future targeted
+  data support it.
+
+### 14. The figure set needs cleanup before review
+
+Current visual issues:
+
+- `v11_dct1_parent_gene_enrichment.png`: the legend covers the strict-q red
+  estimate/interval.
+- `v11_parent_protein_composition_sensitivity.png`: legends cover M5 estimates
+  in both panels.
+- `v11_perturbation_triangulation.png`: the layout has excessive vertical white
+  space, and panel D is dominated by the DCT-marker-high spike; the subtle
+  DCT-adjacent decline is hard to see.
+- `fig_osd462_multiomics_dashboard.png`: panel B annotation is cramped near the
+  right edge.
+
+Fix:
+
+- Move legends outside plotting areas or into unused margins.
+- Split perturbation Figure 5 into two figures or move the low-K/dDAVP material
+  to supplement.
+- For spatial DCT transport, use separate y axes or small multiples for
+  DCT-marker-high and DCT-adjacent spots.
+- Add a figure QA test that fails if key plotted rows have no visible artist or
+  if a legend overlaps data bounds.
+
+### 15. Reproducibility is better, but v11 test coverage is incomplete
+
+There is now a v11-specific test file, `tests/test_v11_h2_enrichment.py`, which
+checks Fisher directionality, the representative-row reducer, parent-gene table
+collapse, and figure label handling. That is a meaningful improvement.
+
+Remaining gaps:
+
+- no direct tests for composition-adjusted OLS;
+- no test for parent-protein-normalized contrast uncertainty or labels;
+- no test for mediation fallback determinism;
+- no visual snapshot or figure-completeness tests;
+- no test that manuscript headline numbers match TSV/JSON sources.
+
+Fix:
+
+- Add v11 tests for composition adjustment, parent-normalized effects, spatial
+  spot summary labels, and mediation fallback output.
+- Add a headline-number reconciliation test that parses a small YAML/TSV table
+  of expected manuscript numbers.
+- Add `latex_paper/README.md` identifying `manuscript_v11.tex` and
+  `results_v11.tex` as the current pair.
 
 ## Results-Specific Critique
 
 ### RNA recurrence
 
-The recurrence result is plausible and useful, but it should be positioned as
-pathway-level recurrence, not a universal or genome-wide spaceflight kidney
-signature. OSD-462 uses 11 pathways in the anchor summary, while the cross-cohort
-OSD-513 recurrence uses nine. The difference needs one sentence in Methods.
+Useful and plausible, but it should be described as curated pathway-level
+recurrence. It does not establish a universal spaceflight kidney transcriptomic
+signature. Add stronger documentation of gene-set membership and uncertainty in
+the RRRM-2 reference vector.
 
 ### RNA-protein mismatch
 
-This is one of the paper's best results. The null protein-abundance layer
-clarifies why the phosphoproteome matters. However, "matrix proteins moved
-opposite their transcripts" should be interpreted cautiously because TMT protein
-coverage, extracellular matrix extractability, and whole-kidney cellular
-composition can all affect observed protein direction.
+This is one of the paper's most persuasive results. Keep it central. Be careful
+that "matrix proteins moved opposite their transcripts" may reflect TMT
+coverage, ECM extractability, and relative abundance normalization, not only
+biology.
 
 ### NCC/SPAK/WNK phosphosite suppression
 
-The NCC phosphosite cluster is the cleanest molecular anchor, especially because
-total NCC protein is flat. This can stay central. The WNK KSEA interpretation
-should be softened because the WNK substrate count is tiny and one substrate is
-flat.
+The NCC regulatory-phosphosite cluster is the cleanest molecular anchor. Total
+NCC flatness makes it more convincing. KSEA should remain secondary and targeted.
+The p89 site is now appropriately softened as an additional N-terminal
+phosphosite; keep it out of the curated regulatory-site core unless cited.
 
-### DCT1-high parent-gene enrichment
+### DCT1/DCT2 parent-gene enrichment
 
-This is the primary novel result and is worth keeping in the title. But after
-fixing the single-site-per-gene issue, the title should remain precise:
+This is the main novelty, but the current data support "distal-nephron
+subtype-prior subset enrichment" better than "DCT1-centered enrichment." The
+DCT1 top-decile result is real enough to keep, but the DCT2-bottom-decile
+comparator must force a title and abstract reset.
 
-Recommended title:
+### Composition and parent-protein robustness
 
-`DCT1-high parent-gene enrichment of flight-suppressed phosphosites in mouse spaceflight kidney`
-
-Avoid:
-
-`DCT1 phosphoproteomic suppression in spaceflight kidney`
+These analyses are valuable sensitivity checks. They should be framed as "not
+eliminated by these adjustments" rather than "independent of parent protein or
+composition." The top-quartile attenuation and weak continuous-gradient models
+are important boundaries.
 
 ### Public perturbation references
 
-These analyses are useful boundaries, not mechanisms. The parent-protein-normalized
-DCT1 enrichment belongs in the main text. Low-K, dDAVP, KLHL3/CUL3, and IRI
-spatial context can be shorter in the main text and fuller in the compendium.
+These analyses make the paper more honest by showing what public data cannot
+resolve. The main text currently gives them more space than their evidentiary
+weight deserves. Keep parent-protein-normalized enrichment in main; compress
+low-K, dDAVP, KLHL3/CUL3, and spatial IRI into boundaries and predictions.
 
 ## Prioritized Revision Plan
 
-### Phase 1: Fix correctness issues before any prose polishing
+### Phase 1: Reset the central claim
 
-1. Implement a true primary one-site-per-parent-gene H2 sensitivity.
-2. Rename the current `single_sites_only` output to "single-position sites only"
-   or "composite sites excluded."
-3. Standardize Fisher exact test alternatives across H2, composition, and
-   occupancy branches.
-4. Fix the Figure 4 blank row caused by the `single_site_only_p05` vs
-   `single_sites_only` label mismatch.
-5. Reconcile the OSD-513 CI and Figure 1D full-cosine label.
-6. Correct NCC residue/site labels and the p89 regulatory wording.
+1. Change the title from DCT1-high enrichment to distal-nephron subtype-prior
+   enrichment, or add a subtitle that immediately states DCT2-bottom-decile
+   enrichment.
+2. Rewrite the first abstract sentence so DCT1 is not the sole headline.
+3. Make DCT2 comparator results part of the primary Results paragraph, not a
+   boundary afterthought.
+4. Change "true one-site-per-parent-gene" to "one phosphosite row per parent
+   gene" unless a single-position-only representative analysis is added.
 
-### Phase 2: Strengthen the central DCT1 claim
+### Phase 2: Strengthen the core enrichment analysis
 
-1. Add parent-gene-level suppression models.
-2. Add parent-gene cluster bootstrap or site-count-preserving permutations.
-3. Add DCT1 prior score-definition sensitivity.
-4. Add a DCT2/CNT comparator analysis.
-5. Promote the parent-gene-aware result into the abstract only if it remains
-   supportive.
+1. Add single-position-only plus one-row-per-parent-gene sensitivity.
+2. Add parent-gene cluster bootstrap for DCT1 and DCT2 extreme-bin ORs.
+3. Add multivariable parent-gene models that include DCT1-top and DCT2-bottom
+   bins together.
+4. Add matched parent-gene permutation preserving site count, peptide count,
+   parent abundance, and missingness.
+5. Add threshold-free signed-rank enrichment analyses.
 
-### Phase 3: Tighten statistical reporting
+### Phase 3: Harden the DCT reference prior
 
-1. Add a multiple-testing family table.
-2. Add KSEA substrate counts and q-value family size.
-3. Add explicit sample sizes for DCT reference pseudobulk replicates.
-4. State that occupancy-normalized effects are not direct stoichiometry.
-5. State that mediation uses an approximate OLS fallback.
+1. Add leave-one-replicate-out GSE228367 DCT1/DCT2 priors.
+2. Add DCT1/DCT2 score-definition sensitivity.
+3. Add percentile-threshold sensitivity across 5%, 10%, 15%, 20%, and 25%.
+4. Report where NCC/SPAK/WNK anchor parent genes fall under each prior.
 
-### Phase 4: Rebalance the manuscript narrative
+### Phase 4: Rebalance methods and statistics
 
-1. Keep the main text focused on four results:
-   - RNA recurrence;
-   - RNA-protein mismatch;
-   - NCC/SPAK/WNK regulatory phosphosite suppression;
-   - DCT1-high parent-gene enrichment with robust sensitivities.
-2. Move most perturbation, spatial, live-return, aging, TLR4, and network
-   material to the compendium unless it directly protects the main claim.
-3. Shorten the abstract's spatial and low-K details.
-4. Make the Discussion's first paragraph state the claim hierarchy plainly.
+1. Add a compact table of testing families with number of tests and correction
+   scope.
+2. State in Results that M0-M5 adjusted suppressed sets differ in size.
+3. Add TMT QC and missingness summaries.
+4. Keep KSEA as targeted coherence and move exact z/p values out of the
+   abstract if space is tight.
+5. Rename mediation/path results as covariance decomposition.
 
-### Phase 5: Add reviewer-facing reproducibility support
+### Phase 5: Clean figures and tables
 
-1. Add v11-specific tests.
-2. Update `latex_paper/README.md` to identify current manuscript and supplement.
-3. Add a small artifact index table in the supplement that names the exact TSV
-   or JSON source for every headline number.
-4. Add a rendered-figure QA checklist.
+1. Move legends out of data regions in Figures 3-5.
+2. Redesign perturbation Figure 5 or move most of it to supplement.
+3. Add a DCT1-versus-DCT2 comparator forest plot as the key enrichment figure.
+4. Add a small table showing row-level, one-row-per-gene, parent-gene Fisher,
+   logistic, and permutation results side by side.
+5. Add figure QA tests.
 
-## Suggested Claim Hierarchy After Revision
+### Phase 6: Improve reproducibility
+
+1. Add tests for composition adjustment, parent-normalized effects, spatial
+   summaries, and mediation fallback.
+2. Add a headline-number reconciliation test against run-root TSV/JSON files.
+3. Add `latex_paper/README.md` documenting the current manuscript/compendium
+   pair and build command.
+4. Add a supplement artifact index mapping every headline number to its source
+   file and column.
+
+## Suggested Revised Claim Hierarchy
 
 Primary claim:
 
-> In matched OSD-462 whole-kidney phosphoproteomics, flight-suppressed
-> phosphosites are enriched among parent genes that are DCT1-high in an external
-> DCT1/DCT2 snRNA-seq reference, especially in the top decile, and this subset
-> enrichment survives parent-protein and bulk-compartment sensitivity analyses.
+> Matched OSD-462 whole-kidney multi-omics show that the spaceflight
+> DCT/NCC-WNK transporter lesion resolves most clearly at the regulatory
+> phosphosite layer rather than at protein abundance, inside a recurrent
+> matrix/endothelial-high and DCT-transport-low RNA context.
 
-Secondary claims:
+Primary enrichment claim:
 
-> Across public mouse spaceflight kidney cohorts, terminal flight shows a
-> pathway-level matrix/endothelial-high and DCT/NCC-WNK-low RNA context.
+> Flight-suppressed whole-kidney phosphosite parent genes are enriched in
+> distal-nephron subtype-prior extremes from an external DCT1/DCT2 snRNA-seq
+> reference, including a DCT1-high top-decile subset and a DCT2-leaning
+> bottom-decile comparator.
 
-> In OSD-462, that RNA context does not propagate cleanly to protein abundance,
-> while NCC/SPAK/WNK regulatory phosphosites are suppressed despite flat total
-> NCC protein.
+Secondary DCT1 claim:
+
+> The DCT1-high top-decile result is biologically motivated by NCC/SPAK/WNK
+> being DCT1-leaning in the reference, but it is not exclusive and does not
+> localize phosphosite changes to DCT1 cells.
 
 Exploratory claims:
 
-> Bulk compartment scores, low-K references, IRI spatial references, dDAVP
-> phosphoproteomics, and KLHL3/CUL3 checks generate mechanistic and spatial
-> hypotheses but do not identify the upstream WNK suppressor or localize the
-> lesion to DCT1 cells.
+> Bulk compartment scores, low-K DCT references, IRI spatial references,
+> dDAVP/mpkDCT phosphoproteomics, and KLHL3/CUL3 coverage checks generate
+> hypotheses and boundaries; they do not identify the upstream WNK suppressor,
+> prove mediation, or spatially validate the spaceflight lesion.
 
 Forbidden claims:
 
 - DCT1-specific phosphoproteomics.
-- Cell-of-origin assignment from whole-kidney phosphoproteomics.
-- Spatial validation of the spaceflight lesion.
+- DCT1 cell-of-origin assignment from whole-kidney data.
+- DCT1 exclusivity.
+- Spatial validation of spaceflight kidney tissue.
 - Causal mediation by endothelial remodeling.
-- Vasopressin or KLHL3/CUL3 mechanism resolved by public data.
-- Direct phosphosite occupancy/stochiometry measurement.
+- Resolved potassium/chloride, vasopressin, or KLHL3/CUL3 mechanism.
+- Direct phosphosite occupancy or stoichiometry measurement.
 
 ## Bottom Line
 
-The manuscript's core idea is worth preserving: an established spaceflight
-NCC/SPAK/WNK phosphoproteomic lesion sits inside a recurrent remodeling RNA
-context and is enriched in a DCT1-high parent-gene subset. The most urgent
-revision is not more analysis breadth; it is making the central enrichment
-claim parent-gene-aware, fixing the mislabeled single-site sensitivity, and
-cleaning up biochemical/statistical reporting so the paper can survive a
-skeptical methods review.
+The manuscript is worth continuing. The RNA-protein mismatch and NCC regulatory
+phosphosite suppression are strong enough to anchor the story. The DCT1-high
+enrichment is interesting, but after the DCT2 comparator it should no longer be
+the sole headline. The best next revision is a claim reset plus deeper
+parent-gene-aware and DCT-prior sensitivity analysis, not a broader search for
+more public datasets.

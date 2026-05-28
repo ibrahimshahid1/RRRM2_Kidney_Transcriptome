@@ -44,7 +44,7 @@
 \thispagestyle{fancy}
 
 \noindent
-This document collects the curated results, manuscript tables, figure gallery, and artifact index supporting Manuscript v11. It is the technical supplement for the streamlined manuscript: cross-cohort RNA recurrence, matched OSD-462 RNA/protein/phosphoprotein mismatch, DCT1-high parent-gene phosphosite enrichment, parent-protein and compartment-score sensitivity models, exploratory path analysis, external spatial-reference context, and the perturbation-triangulation pass (low-K DCT reference, parent-protein-normalized phosphosite effects, IRI DCT-transport spatial context, dDAVP/mpkDCT, KLHL3/CUL3 turnover). The main manuscript carries the story; this compendium carries the extra tables, secondary analyses, and run artifacts.
+This document collects the curated results, manuscript tables, figure gallery, and artifact index supporting Manuscript v11. It is the technical supplement for the streamlined manuscript: cross-cohort RNA recurrence, matched OSD-462 RNA/protein/phosphoprotein mismatch, DCT1-high parent-gene phosphosite enrichment, parent-protein and compartment-score sensitivity models, exploratory path analysis, external spatial-reference context, and the public perturbation-reference pass (low-K DCT, parent-protein-normalized phosphosite effects, IRI DCT-transport spatial context, dDAVP/mpkDCT, KLHL3/CUL3 turnover). The main manuscript carries the story; this compendium carries the extra tables, secondary analyses, and run artifacts.
 
 \tableofcontents
 \clearpage
@@ -63,7 +63,8 @@ Plan & \path{docs/v11_execution_research_plan.md} \\
 Execution report & \path{docs/v11_execution_results.md} \\
 Plan checksum & \code{d8b7465e09257dd4444fc2abb969a02066f2d360e4fbc04056791a60c9755e3f} \\
 Pipeline entrypoint & \code{python -m src.run_all_phases --v11-only --run-id <run_id>} \\
-Canonical v11 modules & \path{src/v11/core_analysis.py}; \path{src/v11/h2_composition_aware_phospho.py}; \path{src/v11/spatial_reference_projection.py}; \path{src/v11/publication_figures.py}; \path{src/v11/build_gse228367_dct_prior.R} \\
+Canonical v11 modules & \path{src/v11/build_gse228367_dct_prior.R}; \path{src/v11/core_analysis.py}; \path{src/v11/h2_composition_aware_phospho.py}; \path{src/v11/spatial_reference_projection.py}; \path{src/v11/publication_figures.py} \\
+Public perturbation-reference modules & \path{src/v11/perturbation_gse228367_lowk.py}; \path{src/v11/h2_occupancy_normalized_phospho.py}; \path{src/v11/spatial_dct_transport_check.py}; \path{src/v11/perturbation_triage_summary.py} \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -102,7 +103,7 @@ DCT1-high enrichment & Are OSD-462 flight-suppressed phosphosites enriched among
 Sensitivity models & Does the enrichment remain after parent-protein and compartment-score adjustment? & Top-decile subset survives; continuous gradient does not. \\
 Exploratory path analysis & Are remodeling scores statistically related to NCC/SPAK phospho suppression? & Endothelial and matrix/endothelial paths are directionally consistent; temporal order remains experimental. \\
 Spatial supplement & Which injury/repair spatial niches resemble the bulk spaceflight RNA vector? & Contextualized to repair-stage, DCT-adjacent/injured-tubule and fibro-inflammatory/endothelial niches. \\
-Perturbation triangulation & Do public perturbation references (low-K DCT, parent-protein normalization, IRI DCT-transport, dDAVP, KLHL3/CUL3) identify the upstream WNK-suppressing mechanism? & No single upstream signal identified; parent-protein-normalized DCT1 enrichment is a robustness upgrade; IRI Visium DCT-adjacent transport drop is a testable spatial prediction. \\
+Public perturbation references & Do public perturbation references (low-K DCT, parent-protein normalization, IRI DCT-transport, dDAVP, KLHL3/CUL3) identify the upstream WNK-suppressing mechanism? & No single upstream signal identified; parent-protein-normalized DCT1 enrichment is a robustness upgrade; IRI Visium DCT-adjacent transport drop is a testable spatial prediction. \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -221,8 +222,26 @@ Site-count-stratified permutation & row-level p<0.05 suppressed sites & OR 1.51 
 \end{tabularx}
 \end{table}
 
+\begin{table}[H]
+\centering\small
+\caption{\textbf{DCT2-bottom-decile comparator across the same sensitivity ladder.} The DCT2-bottom-decile bin contains the 10\% of detected parent genes with the lowest DCT1 enrichment score (most DCT2-leaning). Both DCT1-top-decile and DCT2-bottom-decile use the same one-sided Fisher exact alternative. In the one-site-per-parent-gene and parent-gene Fisher analyses the DCT2-bottom-decile odds ratio is larger than the DCT1-top-decile.}
+\label{tab:dct2comparesupp}
+\begin{tabularx}{\textwidth}{p{0.34\textwidth}rrrrX}
+\toprule
+Analysis & DCT1-top OR & DCT1-top q & DCT2-bottom OR & DCT2-bottom q & Read \\
+\midrule
+Primary $p<0.05$ & 1.51 & $9.96\times10^{-12}$ & 1.29 & $1.15\times10^{-5}$ & DCT1 stronger at row level \\
+Anchor genes excluded & 1.49 & $2.77\times10^{-11}$ & 1.29 & $1.15\times10^{-5}$ & DCT1 stronger \\
+NCC sites excluded & 1.49 & $2.77\times10^{-11}$ & 1.30 & $1.15\times10^{-5}$ & DCT1 stronger \\
+Composite sites excluded & 1.38 & $1.86\times10^{-6}$ & 1.33 & $1.15\times10^{-5}$ & similar magnitude \\
+One site per parent gene & 1.49 & $6.40\times10^{-4}$ & \textbf{1.68} & $\mathbf{3.96\times10^{-6}}$ & DCT2-bottom larger \\
+Parent-gene Fisher & 1.52 & $1.52\times10^{-4}$ & \textbf{1.82} & $\mathbf{2.64\times10^{-8}}$ & DCT2-bottom larger \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
 \noindent
-Interpretation: suppressed whole-kidney OSD-462 phosphosites are enriched among parent genes that are DCT1-high in the external DCT reference. Direct cell-of-origin assignment would require DCT-enriched or spatially resolved spaceflight phosphoproteomics.
+Interpretation: suppressed whole-kidney OSD-462 phosphosites are enriched among parent genes that are DCT1-high in the external DCT reference, and they are also enriched in the DCT2-bottom-decile comparator bin. In the two row-dependence-robust sensitivities (one site per parent gene, parent-gene Fisher) the DCT2-bottom-decile odds ratio exceeds the DCT1-top-decile. The supported claim is therefore distal-nephron subtype-prior enrichment, strongest in the DCT1 top decile and a priori-motivated by NCC/SPAK/WNK being DCT1-leaning, rather than DCT1 exclusivity. Direct cell-of-origin assignment would require DCT-enriched or spatially resolved spaceflight phosphoproteomics.
 
 % =====================================================================
 \section{Parent-protein and composition-score sensitivity}
@@ -274,40 +293,7 @@ Interpretation: the robust result is top-decile subset enrichment after parent-p
 % =====================================================================
 \section{PXD001729 and KLHL3/CUL3 checks}
 
-\begin{table}[H]
-\centering\small
-\caption{\textbf{PXD001729 dDAVP anti-alignment check.}}
-\label{tab:pxd}
-\begin{tabularx}{\textwidth}{p{0.32\textwidth}rrrX}
-\toprule
-Comparison & Shared sites & Shared genes & Cosine & Read \\
-\midrule
-All shared single sites & 60 & 49 & -0.026 & essentially null / unstable; 95\% bootstrap CI -0.310 to 0.287 \\
-Transport target shared sites & 0 & 0 & NA & not testable \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-\begin{table}[H]
-\centering\small
-\caption{\textbf{KLHL3/CUL3 and WNK/SPAK/NCC coverage.}}
-\label{tab:klhl3}
-\begin{tabularx}{\textwidth}{lrrrX}
-\toprule
-Gene & OSD-462 phosphosites & PXD phosphosites & Protein effect & Read \\
-\midrule
-\gene{Klhl3} & 0 & 0 & +0.013 & no phosphosite evidence \\
-\gene{Cul3} & 1 & 0 & -0.001 & no useful turnover signal \\
-\gene{Wnk1} & 12 & 12 & -0.024 & WNK1 phospho observed, protein mostly flat \\
-\gene{Wnk4} & 8 & 1 & +0.087 & WNK4 phospho observed, protein not depleted \\
-\gene{Stk39}/SPAK & 5 & 3 & +0.081 & phospho suppression despite protein not depleted \\
-\gene{Slc12a3}/NCC & 16 & 0 & +0.089 & phospho suppression with protein flat/up \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-\noindent
-Interpretation: PXD001729 supports DCT-lineage phosphoproteome plausibility but not targeted vasopressin anti-alignment. KLHL3/CUL3 turnover remains a candidate future mechanism because public data lack ubiquitinomics and KLHL3 phosphosite coverage.
+The PXD001729 dDAVP/mpkDCT anti-alignment check and the KLHL3/CUL3/WNK turnover coverage check are presented under the public-perturbation-reference section (\S\ref{sec:perturbation} below), as Branches~4 and~5 of the triangulation pass. See Tables~\ref{tab:pxdshared} and~\ref{tab:klhlcoverage} for the shared-site cosine and the OSD-462/PXD coverage numbers, and the corresponding interpretation paragraphs.
 
 % =====================================================================
 \section{Exploratory path analysis}
@@ -430,18 +416,19 @@ Fibro-inflammatory niche cells & 105,536 & \code{CN} annotation \\
 Interpretation: spatial evidence is a contextual supplement. It supports the wording ``spatially contextualized,'' not ``spatially validated.''
 
 % =====================================================================
-\section{Perturbation triangulation}
+\section{Public perturbation-reference analyses}
+\label{sec:perturbation}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{v11_perturbation_triangulation.pdf}
-\caption{\textbf{Perturbation triangulation.} (A) Low-K DCT response cosines with OSD-462, OSD-513, and RRRM-2 ISS-T RNA by gene-prior class. (B) Focused DCT/WNK transport-target gene direction heatmap. (C) Parent-protein-normalized DCT1 enrichment ORs. (D) IRI Visium DCT-transport score by timepoint and spatial context.}
+\caption{\textbf{Public perturbation-reference analyses.} (A) Low-K DCT response cosines with OSD-462, OSD-513, and RRRM-2 ISS-T RNA by gene-prior class. (B) Focused DCT/WNK transport-target gene direction heatmap. (C) Parent-protein-normalized DCT1 enrichment ORs. (D) IRI Visium DCT-transport score by timepoint and spatial context.}
 \label{fig:perturbation}
 \end{figure}
 
 \begin{table}[H]
 \centering\small
-\caption{\textbf{Perturbation-triangulation branch verdicts.}}
+\caption{\textbf{Public perturbation-reference branch verdicts.}}
 \label{tab:triagebranches}
 \begin{tabularx}{\textwidth}{p{0.22\textwidth}p{0.30\textwidth}Xp{0.18\textwidth}}
 \toprule

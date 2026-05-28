@@ -4,27 +4,50 @@ Scope: statistical robustness, biological claims, interpretability, results, plo
 figures. Cross-checked `latex_paper/manuscript_v11.tex` and `results_v11.tex`
 against the v11 run root
 `data/results/run_20260526_v11_dct1_phospho_mediation/`, the OSD-462 anchor run,
-the regulator-activity run, the spatial-reference outputs, the perturbation
-triangulation outputs, and the v11 source modules under `src/v11/`.
+the regulator-activity run, the spatial-reference outputs, the public
+perturbation-reference outputs, and the v11 source modules under `src/v11/`.
+
+**Round 3 status (2026-05-28).** After the user's round-2 edits, a re-audit
+verified every numerical claim against the May-28 TSV/JSON and identified 14
+remaining items, of which 9 substantive ones have now been incorporated. The
+manuscript and compendium both compile cleanly (27 and 17 pages). Section 0a
+below lists the new fixes; the previous round-1 incorporation summary is
+preserved as Section 0b.
+
+## 0a. Round 3 fixes (this pass)
+
+| Round-2 finding | Action taken |
+|---|---|
+| #1 DCT2-bottom-decile comparator under-reported | Added a side-by-side comparator table (manuscript Table 4 `tab:dct2compare`; compendium Table S\ref{tab:dct2comparesupp}) and one-sentence summaries in the Abstract, Results §3.4, and Conclusion. The supported claim is now "distal-nephron subtype-prior enrichment, strongest in the DCT1 top decile" rather than "DCT1-high parent-gene enrichment" without qualification. |
+| #2 Compendium S5 vs S8.4/S8.5 duplication | Section S5 collapsed to a single forward-reference paragraph pointing to the perturbation-reference section. |
+| #3 Compendium Table S1 missing perturbation modules | Provenance table now has a separate "Public perturbation-reference modules" row listing all four `src/v11/` perturbation modules. |
+| #4 Naming inconsistency | Standardized to "public perturbation-reference analyses" across manuscript Methods §2.8, Results §3.7, Discussion §4.4, Author Contributions, Code Availability, compendium executive verdicts, perturbation section header, and figure caption. |
+| #6 Author Contributions incomplete | Added "public perturbation-reference (low-K DCT, parent-protein-normalized phosphosite, IRI Visium DCT-transport, dDAVP/mpkDCT, KLHL3/CUL3)" to the I.S. contributions list. |
+| #8 Matched-null "weakly" wording | Now stated as "supportive at FDR 0.10" with both the primary_p05 q=0.063 and the strict_q10 q=6.46e−4 explicit. |
+| #9 Composition-aware ladder q values stale | Re-extracted from `h2_composition_adjusted_suppression_enrichment_single.tsv` and re-derived one-sided Fisher p-values from the contingency tables; M0 p=1.06e−7 matches one-sided exactly, M4 p=6.59e−4 matches one-sided exactly. Compendium Table S\ref{tab:h2ladder} is **not stale**: the ladder already uses directional Fisher. Item closed. |
+| #10 One-site matched-null counter-result not in main text | Now reported in Results §3.4: "failed in the one-site-per-parent-gene reduction (observed mean DCT1 score among one-site suppressed parent genes was below the matched null; directional empirical p=0.996)". |
+| #11 n=20 not in mediation description | Added "(n=20 animals with matched RNA and phosphoproteomics)" inline in Results §3.6. |
+| #14 Duplicated opening sentence Results §3.7 vs Discussion §4.4 | Rewritten — Results §3.7 keeps the original, Discussion §4.4 now opens with "Among the five public perturbation references, the parent-protein-normalized re-test of the DCT1-high enrichment carried the strongest result". |
+
+## 0a.1 Remaining round-2 items deferred (not fixed in this pass)
+
+| Item | Reason | Recommendation |
+|---|---|---|
+| #5 Compendium parent-protein-normalized table missing composite-excluded row | The h2_occupancy enrichment TSV doesn't include a composite-excluded sensitivity for the parent-protein-normalized re-test — only `occupancy_p05`, `occupancy_q10`, `occupancy_exclude_anchor_genes`, `occupancy_exclude_ncc_sites`, `occupancy_single_site_p05`. Adding it requires re-running `h2_occupancy_normalized_phospho.py` with the new composite-exclusion filter. | Either re-run the module to produce the composite-excluded occupancy row, or add an explicit note to the table caption stating "composite-excluded sensitivity not run on the parent-protein-normalized version". |
+| #7 Figure 5 panel D y-axis dominated by DCT-marker-high spike | Visual change; needs `publication_figures.py` modification to split panel D into two subpanels or annotate the day-14/week-6 DCT-adjacent points with their values. | Not a numerical bug; flag for the figure module owner. |
+| #12 No `tests/v11/` directory | Reproducibility/regression-test gap. The May-28 re-run used seed=20260526 and the inputs are SHA-256-locked, but a future code change could silently break the contingency-table construction or the BH family. | Add fixture tests for the directional Fisher + BH (verifies #1), parent-gene Fisher and logistic, and a figure-snapshot test that catches the kind of blank-row bug that appeared and was later fixed in `v11_dct1_parent_gene_enrichment.pdf`. |
+| #13 Methods §2.5 tie-breaker text not code-reviewed | The methods description of the one-site-per-parent-gene tie-breaker reads correctly, but the implementation in `src/v11/core_analysis.py` (or its helper) was not directly inspected for the exact tie-breaker order. | One-pass code review of the helper that emits `one_site_per_parent_gene` to confirm the implementation matches "lowest p, then more negative effect, then site identifier". |
+
+---
+
+
 
 Overall: the manuscript text is unusually well aligned with the underlying TSV/JSON
 artifacts. The framing is appropriately hedged ("parent-gene enrichment, not
 cell-of-origin"; "spatial contextualization, not validation"). The issues below
 are tractable revisions, not headline-breakers.
 
-**Update (incorporation pass):** The perturbation-triangulation layer that was
-missing in the first audit pass (low-K DCT, occupancy-normalized phosphosites,
-IRI Visium DCT-transport spatial context, PXD001729 dDAVP, KLHL3/CUL3) has been
-incorporated into `manuscript_v11.tex` (abstract, intro question 5, new Methods
-§2.8, new Results §3.7 with Figure 5, new Discussion §4.4, updated Limitations,
-updated Future Experiments, updated Conclusion and Code Availability) and into
-`results_v11.tex` (new Section S8 "Perturbation triangulation" with five
-subsections, updated verdicts/triage table, updated artifact index, updated
-verification notes). Both documents compile cleanly: manuscript 24 pages,
-compendium 15 pages. Section 0 below summarises the incorporated layer; the
-remaining items 2–5 are the still-open audit findings.
-
-## 0. Incorporated: perturbation triangulation
+## 0b. Round 2 incorporation: public perturbation-reference layer
 
 | Branch | Run-root artifact | Headline number | Manuscript placement |
 |---|---|---|---|

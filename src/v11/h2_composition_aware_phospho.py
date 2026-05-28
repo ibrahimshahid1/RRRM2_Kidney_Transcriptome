@@ -260,6 +260,7 @@ def attach_site_priors(site_meta: pd.DataFrame) -> pd.DataFrame:
             dct1_top_quartile=("dct1_top_quartile", "max"),
             dct1_top_decile=("dct1_top_decile", "max"),
             dct2_bottom_quartile=("dct2_bottom_quartile", "max"),
+            dct2_bottom_decile=("dct2_bottom_decile", "max"),
             parent_protein_flight_effect=("flight_effect", "first"),
             parent_abundance_log2=("abundance_log2", "first"),
             parent_n_peptides=("n_peptides", "first"),
@@ -427,6 +428,81 @@ def adjusted_enrichment(effects: pd.DataFrame, site_meta: pd.DataFrame) -> pd.Da
     if len(out):
         out["q_value"] = bh(out["p_value"])
     return out
+
+
+def fixed_set_adjusted_effects(effects: pd.DataFrame, site_meta: pd.DataFrame) -> pd.DataFrame:
+    """Track the M0 suppressed set through later adjusted effect scales."""
+    df = effects.merge(site_meta, on="site_row_id", how="left")
+    m0 = df[
+        df["model"].eq("M0_raw")
+        & (df["adjusted_flight_effect"] < 0)
+        & (df["adjusted_flight_p"] < 0.05)
+    ][["site_row_id", "dct1_top_decile", "dct1_top_quartile"]].drop_duplicates()
+    rows = []
+    for model, d0 in df[df["site_row_id"].isin(m0["site_row_id"])].groupby("model", sort=False):
+        d = d0.dropna(subset=["adjusted_flight_effect"]).copy()
+        if d.empty:
+            continue
+        for flag in ["all_m0_suppressed", "dct1_top_decile", "dct1_top_quartile"]:
+            part = d if flag == "all_m0_suppressed" else d[d[flag].astype(bool)]
+            if part.empty:
+                continue
+            rows.append(
+                {
+                    "model": model,
+                    "fixed_set": flag,
+                    "n_sites_from_m0_set": int(len(part)),
+                    "fraction_adjusted_effect_negative": float((part["adjusted_flight_effect"] < 0).mean()),
+                    "mean_adjusted_flight_effect": float(part["adjusted_flight_effect"].mean()),
+                    "median_adjusted_flight_effect": float(part["adjusted_flight_effect"].median()),
+                    "n_nominally_suppressed_on_adjusted_scale": int(((part["adjusted_flight_effect"] < 0) & (part["adjusted_flight_p"] < 0.05)).sum()),
+                    "boundary": "Fixed M0 suppressed set tracked across adjustment; adjusted suppressed set membership is not redefined here.",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def covariate_diagnostics(long: pd.DataFrame) -> pd.DataFrame:
+    """Correlation and VIF diagnostics for animal-level adjustment covariates."""
+    sample_cols = [
+        "sample_key",
+        "flight",
+        "plex2",
+        "dct_identity_score_z",
+        "endothelial_score_z",
+        "stromal_score_z",
+        "composition_pc1_z",
+    ]
+    sample = long[sample_cols].drop_duplicates("sample_key").copy()
+    rows = []
+    covars = ["flight", "dct_identity_score_z", "endothelial_score_z", "stromal_score_z", "composition_pc1_z"]
+    for i, a in enumerate(covars):
+        for b in covars[i + 1 :]:
+            d = sample[[a, b]].dropna()
+            r, p = stats.pearsonr(d[a], d[b]) if len(d) > 2 else (np.nan, np.nan)
+            rows.append({"diagnostic": "pearson_correlation", "term": f"{a}__vs__{b}", "value": r, "p_value": p, "n_samples": int(len(d))})
+    try:
+        from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+        design_terms = ["flight", "dct_identity_score_z", "endothelial_score_z", "stromal_score_z"]
+        d = sample[design_terms].dropna().astype(float)
+        if len(d) > len(design_terms) + 1:
+            X = sm.add_constant(d, has_constant="add")
+            for idx, col in enumerate(X.columns):
+                if col == "const":
+                    continue
+                rows.append(
+                    {
+                        "diagnostic": "vif_M4_sample_level",
+                        "term": col,
+                        "value": float(variance_inflation_factor(X.to_numpy(dtype=float), idx)),
+                        "p_value": np.nan,
+                        "n_samples": int(len(d)),
+                    }
+                )
+    except Exception as exc:
+        rows.append({"diagnostic": "vif_M4_sample_level", "term": "not_fit", "value": np.nan, "p_value": np.nan, "n_samples": len(sample), "note": str(exc)})
+    return pd.DataFrame(rows)
 
 
 def site_fixed_long_models(long: pd.DataFrame, site_meta: pd.DataFrame) -> pd.DataFrame:
@@ -625,6 +701,22 @@ def main() -> None:
         index=False,
     )
 
+    print("[h2-composition] tracking fixed M0 suppressed set across adjusted scales")
+    fixed_set = fixed_set_adjusted_effects(effects, site_meta)
+    fixed_set.to_csv(
+        out_dir / f"h2_composition_fixed_set_ladder_{args.site_scope}.tsv",
+        sep="\t",
+        index=False,
+    )
+
+    print("[h2-composition] writing sample-level covariate diagnostics")
+    diagnostics = covariate_diagnostics(long)
+    diagnostics.to_csv(
+        out_dir / f"h2_composition_covariate_diagnostics_{args.site_scope}.tsv",
+        sep="\t",
+        index=False,
+    )
+
     print("[h2-composition] fitting one-shot site-fixed interaction models")
     long_summary = site_fixed_long_models(long, site_meta)
     long_summary.to_csv(
@@ -651,6 +743,8 @@ def main() -> None:
             "site_effects": str(out_dir / f"h2_composition_adjusted_site_effects_{args.site_scope}.tsv.gz"),
             "effect_level": str(out_dir / f"h2_composition_effect_level_dct1_ladder_{args.site_scope}.tsv"),
             "site_fixed": str(out_dir / f"h2_composition_site_fixed_interaction_ladder_{args.site_scope}.tsv"),
+            "fixed_set": str(out_dir / f"h2_composition_fixed_set_ladder_{args.site_scope}.tsv"),
+            "covariate_diagnostics": str(out_dir / f"h2_composition_covariate_diagnostics_{args.site_scope}.tsv"),
             "verdict": str(out_dir / f"h2_composition_aware_verdict_{args.site_scope}.json"),
         },
         "claim_discipline": "composition-aware robustness; not deconvolved or DCT-isolated phosphoproteomics",

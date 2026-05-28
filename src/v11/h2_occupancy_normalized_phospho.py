@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Parent-protein-normalized OSD-462 phosphosite robustness analysis."""
+"""Parent-protein-normalized OSD-462 phosphosite robustness analysis.
+
+The historical output directory is named ``h2_occupancy`` for continuity, but
+the manuscript-facing term is parent-protein-normalized phosphosite effect.
+"""
 
 from __future__ import annotations
 
@@ -62,7 +66,7 @@ def odds_ci(a: float, b: float, c: float, d: float) -> tuple[float, float, float
 
 def fisher_rows(df: pd.DataFrame, suppressed_col: str, analysis: str) -> list[dict]:
     rows = []
-    for flag in ["dct1_top_decile", "dct1_top_quartile"]:
+    for flag in ["dct1_top_decile", "dct1_top_quartile", "dct2_bottom_decile", "dct2_bottom_quartile"]:
         table_df = df[df[flag].notna()].copy()
         sup = table_df[suppressed_col].astype(bool)
         in_flag = table_df[flag].astype(bool)
@@ -91,7 +95,7 @@ def fisher_rows(df: pd.DataFrame, suppressed_col: str, analysis: str) -> list[di
     return rows
 
 
-def single_site_per_gene(df: pd.DataFrame) -> pd.DataFrame:
+def one_representative_row_per_gene(df: pd.DataFrame) -> pd.DataFrame:
     sort_cols = ["gene_symbol", "phospho_p_value", "occupancy_effect", "site_id"]
     return (
         df.sort_values(sort_cols, ascending=[True, True, True, True])
@@ -99,6 +103,94 @@ def single_site_per_gene(df: pd.DataFrame) -> pd.DataFrame:
         .head(1)
         .copy()
     )
+
+
+def single_position_representative_row_per_gene(df: pd.DataFrame) -> pd.DataFrame:
+    return one_representative_row_per_gene(df[df["is_single_site"].astype(bool)].copy())
+
+
+def paired_parent_normalized_models(run_root: Path, out_dir: Path) -> pd.DataFrame:
+    """Fit sample-level phosphosite-minus-parent-protein contrasts where possible."""
+    try:
+        import statsmodels.api as sm  # noqa: F401
+        from src.v11 import h2_composition_aware_phospho as comp
+    except Exception as exc:  # pragma: no cover - optional runtime path
+        note = pd.DataFrame([{"status": f"not_fit: {exc}"}])
+        note.to_csv(out_dir / "h2_parent_normalized_paired_site_effects.tsv", sep="\t", index=False)
+        return note
+
+    comp.RUN_ROOT = run_root
+    comp.DCT_PRIOR = run_root / "dct_prior/osd462_phosphosite_dct1_prior.tsv"
+    phospho_long, site_meta = comp.load_phosphosite_long("single")
+    protein_long = comp.load_protein_long()
+    site_meta = comp.attach_site_priors(site_meta)
+    long = phospho_long.merge(protein_long, on=["gene_symbol", "sample_key"], how="inner")
+    long = long.dropna(subset=["phosphosite_abundance", "parent_protein_abundance", "flight", "plex2"]).copy()
+    long["parent_normalized_abundance"] = long["phosphosite_abundance"] - long["parent_protein_abundance"]
+    rows = []
+    for site_id, g in long.groupby("site_row_id", sort=False):
+        d = g.dropna(subset=["parent_normalized_abundance", "flight", "plex2"])
+        if len(d) < 8 or d["flight"].nunique() < 2:
+            continue
+        y = d["parent_normalized_abundance"].to_numpy(dtype=float)
+        X = np.column_stack([np.ones(len(d)), d["flight"].to_numpy(dtype=float), d["plex2"].to_numpy(dtype=float)])
+        beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+        resid = y - X @ beta
+        df = len(d) - X.shape[1]
+        if df <= 0:
+            continue
+        sigma2 = float((resid @ resid) / df)
+        xtxi = np.linalg.pinv(X.T @ X)
+        se = float(np.sqrt(max(sigma2 * xtxi[1, 1], 0)))
+        tval = beta[1] / se if se > 0 else np.nan
+        pval = float(2 * stats.t.sf(abs(tval), df)) if np.isfinite(tval) else np.nan
+        rows.append(
+            {
+                "site_row_id": site_id,
+                "paired_parent_normalized_effect": float(beta[1]),
+                "paired_parent_normalized_se": se,
+                "paired_parent_normalized_p": pval,
+                "n_obs": int(len(d)),
+            }
+        )
+    effects = pd.DataFrame(rows)
+    if effects.empty:
+        effects.to_csv(out_dir / "h2_parent_normalized_paired_site_effects.tsv", sep="\t", index=False)
+        return effects
+    effects["paired_parent_normalized_q_all_sites"] = bh(effects["paired_parent_normalized_p"])
+    out = effects.merge(site_meta, on="site_row_id", how="left")
+    out.to_csv(out_dir / "h2_parent_normalized_paired_site_effects.tsv.gz", sep="\t", index=False, compression="gzip")
+    enrich_rows = []
+    out["paired_parent_normalized_suppressed_p05"] = (
+        (out["paired_parent_normalized_effect"] < 0) & (out["paired_parent_normalized_p"] < 0.05)
+    )
+    out["paired_parent_normalized_suppressed_q10"] = (
+        (out["paired_parent_normalized_effect"] < 0) & (out["paired_parent_normalized_q_all_sites"] < 0.10)
+    )
+    paired_for_reducer = out.rename(
+        columns={
+            "paired_parent_normalized_p": "phospho_p_value",
+            "paired_parent_normalized_effect": "occupancy_effect",
+        }
+    ).copy()
+    if "site_id" not in paired_for_reducer.columns:
+        paired_for_reducer["site_id"] = paired_for_reducer["site_row_id"]
+    if "is_single_site" not in paired_for_reducer.columns:
+        paired_for_reducer["is_single_site"] = True
+    for analysis, suppressed_col, df in [
+        ("paired_parent_normalized_p05", "paired_parent_normalized_suppressed_p05", out),
+        ("paired_parent_normalized_q10", "paired_parent_normalized_suppressed_q10", out),
+        (
+            "paired_parent_normalized_single_position_one_row_per_parent_gene_p05",
+            "paired_parent_normalized_suppressed_p05",
+            single_position_representative_row_per_gene(paired_for_reducer),
+        ),
+    ]:
+        enrich_rows.extend(fisher_rows(df, suppressed_col, analysis))
+    paired_enrich = pd.DataFrame(enrich_rows)
+    paired_enrich["q_value"] = bh(paired_enrich["p_value"])
+    paired_enrich.to_csv(out_dir / "h2_parent_normalized_paired_enrichment.tsv", sep="\t", index=False)
+    return out
 
 
 def main() -> None:
@@ -131,8 +223,11 @@ def main() -> None:
     rows.extend(fisher_rows(base, "is_occupancy_suppressed_q10", "occupancy_q10"))
     rows.extend(fisher_rows(base[~base["is_anchor_gene"].astype(bool)].copy(), "is_occupancy_suppressed_p05", "occupancy_exclude_anchor_genes"))
     rows.extend(fisher_rows(base[~base["is_ncc_site"].astype(bool)].copy(), "is_occupancy_suppressed_p05", "occupancy_exclude_ncc_sites"))
-    single = single_site_per_gene(base)
-    rows.extend(fisher_rows(single, "is_occupancy_suppressed_p05", "occupancy_single_site_p05"))
+    rows.extend(fisher_rows(base[base["is_single_site"].astype(bool)].copy(), "is_occupancy_suppressed_p05", "occupancy_composite_sites_excluded_p05"))
+    one_row = one_representative_row_per_gene(base)
+    rows.extend(fisher_rows(one_row, "is_occupancy_suppressed_p05", "occupancy_one_row_per_parent_gene_p05"))
+    single = single_position_representative_row_per_gene(base)
+    rows.extend(fisher_rows(single, "is_occupancy_suppressed_p05", "occupancy_single_position_one_row_per_parent_gene_p05"))
     enrich = pd.DataFrame(rows)
     enrich["q_value"] = bh(enrich["p_value"])
     enrich.to_csv(out_dir / "h2_occupancy_dct1_enrichment.tsv", sep="\t", index=False)
@@ -140,6 +235,8 @@ def main() -> None:
     target = base[base["gene_symbol"].isin(TARGET_GENES) | base["is_anchor_gene"].astype(bool) | base["is_ncc_site"].astype(bool)].copy()
     target = target.sort_values(["gene_symbol", "site_position_int", "site_position_str"])
     target.to_csv(out_dir / "h2_occupancy_target_sites.tsv", sep="\t", index=False)
+
+    paired_effects = paired_parent_normalized_models(args.run_root, out_dir)
 
     primary = enrich[
         enrich["analysis"].eq("occupancy_p05") & enrich["flag"].eq("dct1_top_decile")
@@ -155,6 +252,11 @@ def main() -> None:
             "occupancy_effect = phosphosite flight effect - parent protein flight effect. "
             "The p-value threshold still comes from the phosphosite model; this is a parent-protein-normalized "
             "enrichment robustness test, not a direct phospho-stoichiometry measurement."
+        ),
+        "paired_contrast_model": (
+            "h2_parent_normalized_paired_site_effects.tsv.gz"
+            if "paired_parent_normalized_effect" in paired_effects.columns
+            else "not_fit"
         ),
     }
     (out_dir / "h2_occupancy_verdict.json").write_text(json.dumps(verdict, indent=2))
