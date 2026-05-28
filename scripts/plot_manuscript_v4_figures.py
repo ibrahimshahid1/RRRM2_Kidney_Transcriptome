@@ -222,8 +222,8 @@ def plot_rrrm2_remodeling(ax: plt.Axes, *, compact: bool = False) -> None:
     ax.axhline(0, color="#999999", lw=0.8, ls="--")
     ax.set_xticks(xticks)
     ax.set_xticklabels(labels, rotation=0 if compact else 25, ha="center" if compact else "right")
-    ax.set_ylabel("Remodeling score")
-    ax.set_title("RRRM-2 remodeling score by mouse")
+    ax.set_ylabel("RNA remodeling score")
+    ax.set_title("RRRM-2 terminal-flight remodeling score")
     ax.legend(frameon=True, loc="upper left")
     clean_axis(ax)
 
@@ -238,8 +238,8 @@ def plot_osd513_separation(ax: plt.Axes) -> None:
     ax.axhline(0, color="#999999", lw=0.8, ls="--")
     ax.set_xticks(np.arange(len(order)))
     ax.set_xticklabels(order)
-    ax.set_ylabel("Remodeling score")
-    ax.set_title("OSD-513 separates FLT from GC")
+    ax.set_ylabel("RNA remodeling score")
+    ax.set_title("OSD-513 reproduces flight separation")
     clean_axis(ax)
 
 
@@ -271,8 +271,8 @@ def plot_leave_one_pathway_out(ax: plt.Axes) -> None:
     full = float(out.loc[out["pathway"].eq("Full panel"), "cosine"].iloc[0])
     ax.axvline(full, color=C_FLT, linestyle="--", linewidth=1.3, label=f"Full cosine = {full:.2f}")
     ax.axvline(0, color="#666666", linewidth=0.8)
-    ax.set_xlabel("RRRM-2 ISS-T vs OSD-513 cosine")
-    ax.set_title("Leave-one-pathway-out alignment")
+    ax.set_xlabel("Terminal-flight vs OSD-513 cosine")
+    ax.set_title("Alignment is not driven by one pathway")
     ax.legend(frameon=True, loc="lower right")
     clean_axis(ax)
 
@@ -282,12 +282,23 @@ def plot_cross_alignment(ax: plt.Axes) -> None:
     if not cross_path.exists():
         cross_path = RUN25 / "cross_osdr_recurrence/cross_osdr_alignment_summary.tsv"
     cross = pd.read_csv(cross_path, sep="\t")
-    cross["label"] = (
-        cross["study"]
-        + " / "
-        + cross["scenario"].str.replace("_", " ", regex=False)
-        + " / "
-        + cross["arm"]
+    arm_labels = {"ISS-T": "terminal flight", "LAR": "live return"}
+    scenario_labels = {
+        "powered_hgc": "",
+        "original_gc_blue_light": "blue-light GC",
+        "rerun_gc_white_light": "white-light GC",
+    }
+    cross["label"] = cross.apply(
+        lambda row: " / ".join(
+            part
+            for part in [
+                str(row["study"]),
+                scenario_labels.get(str(row["scenario"]), str(row["scenario"]).replace("_", " ")),
+                arm_labels.get(str(row["arm"]), str(row["arm"])),
+            ]
+            if part
+        ),
+        axis=1,
     )
     cross = cross.iloc[::-1].reset_index(drop=True)
     y = np.arange(len(cross))
@@ -304,7 +315,7 @@ def plot_cross_alignment(ax: plt.Axes) -> None:
                 ax.text(
                     1.02,
                     yi,
-                    f"p_perm={row['permutation_p_directional']:.3f}",
+                    f"perm. p={row['permutation_p_directional']:.3f}",
                     va="center",
                     ha="right",
                     fontsize=7.2,
@@ -313,8 +324,8 @@ def plot_cross_alignment(ax: plt.Axes) -> None:
     ax.axvline(0, color="#666666", linewidth=0.8)
     ax.set_yticks(y)
     ax.set_yticklabels(cross["label"], fontsize=8)
-    ax.set_xlabel("Pathway cosine")
-    ax.set_title("ISS-T aligns with OSD-513; LAR anti-aligns")
+    ax.set_xlabel("Pathway-vector cosine")
+    ax.set_title("External RNA-vector alignment")
     ax.set_xlim(-0.9, 1.08)
     clean_axis(ax)
 
@@ -329,7 +340,7 @@ def fig_main_result_multipanel() -> None:
     for label, ax in zip(["A", "B", "C", "D"], axes.ravel()):
         panel_label(ax, label)
     fig.suptitle(
-        "ISS-T captures a recurrent ECM/fibrosis and transport-remodeling direction",
+        "Terminal-flight RNA remodeling recurs across mouse kidney cohorts",
         fontsize=14,
         fontweight="bold",
         y=1.02,

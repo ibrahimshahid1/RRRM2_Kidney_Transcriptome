@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Publication-ready v11 figures.
 
-The v11 figures are intentionally claim-disciplined:
-  * H2 panels show DCT1-prior enrichment, not DCT-isolated phosphoproteomics.
+The v11 figure labels use manuscript-facing terminology:
+  * DCT1 panels show enrichment among DCT1-high parent genes in whole-kidney
+    OSD-462 phosphoproteomics.
   * Composition-aware panels separate robust top-decile enrichment from weak
     continuous DCT1-gradient models.
-  * Spatial panels are external IRI reference contextualization, not RR-10
-    spatial validation.
+  * Spatial panels are external IRI reference contextualization.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ MODEL_LABELS = {
     "M1_parent_protein_abundance": "M1 parent protein",
     "M2_dct_score": "M2 DCT score",
     "M3_endothelial_stromal": "M3 endothelial + stromal",
-    "M4_full_parent_dct_endothelial_stromal": "M4 full conservative",
+    "M4_full_parent_dct_endothelial_stromal": "M4 parent + compartments",
     "M5_parent_composition_pc1": "M5 composition PC",
 }
 PALETTE = {
@@ -58,6 +58,8 @@ PALETTE = {
     "light_gray": "#E9ECEF",
     "dark": "#1F2933",
 }
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def configure_style() -> None:
@@ -163,6 +165,131 @@ def q_label(q: float) -> str:
     return f"q={q:.3f}"
 
 
+def fig_cross_cohort_recurrence(run_root: Path, out_dir: Path) -> bool:
+    """Clean replacement for the legacy cross-cohort figure.
+
+    The older static Figure 1 mixed leave-one-pathway-out diagnostics with the
+    headline OSD-513 cosine, which left a stale label in the rendered panel.
+    This version uses the canonical TSV artifacts and labels each statistic
+    explicitly.
+    """
+    cross_path = (
+        PROJECT_ROOT
+        / "data/results/run_20260518_201823_2500g/contrast_vectors/"
+        / "cross_osdr_recurrence/cross_osdr_alignment_summary.tsv"
+    )
+    osd462_path = PROJECT_ROOT / "data/results/run_20260522_osd462_anchor/osd462_anchor/osd462_rna_recurrence.tsv"
+    osd462_effect_path = PROJECT_ROOT / "data/results/run_20260522_osd462_anchor/osd462_anchor/osd462_rna_pathway_effects.tsv"
+    osd462_loo_path = PROJECT_ROOT / "data/results/run_20260522_osd462_anchor/osd462_anchor/osd462_rna_recurrence_loo.tsv"
+    required = [cross_path, osd462_path, osd462_effect_path, osd462_loo_path]
+    if any(not p.exists() for p in required):
+        missing = [str(p) for p in required if not p.exists()]
+        print(f"  [skip] missing recurrence inputs: {missing}")
+        return False
+
+    cross = read_tsv(cross_path)
+    osd462 = read_tsv(osd462_path).iloc[0]
+    effects = read_tsv(osd462_effect_path)
+    loo = read_tsv(osd462_loo_path)
+
+    rows = []
+    for _, row in cross[cross["study"].eq("OSD-513")].iterrows():
+        rows.append(
+            {
+                "label": f"RRRM-2 {row['arm']} vs OSD-513",
+                "cosine": float(row["point_estimate"]),
+                "ci_low": float(row["ci_low"]),
+                "ci_high": float(row["ci_high"]),
+                "color": PALETTE["red"] if row["arm"] == "ISS-T" else PALETTE["blue"],
+            }
+        )
+    rows.append(
+        {
+            "label": "RRRM-2 ISS-T vs OSD-462 RNA",
+            "cosine": float(osd462["point_cosine"]),
+            "ci_low": float(osd462["ci_low"]),
+            "ci_high": float(osd462["ci_high"]),
+            "color": PALETTE["teal"],
+        }
+    )
+    align = pd.DataFrame(rows)
+
+    fig = plt.figure(figsize=(10.8, 7.1))
+    gs = fig.add_gridspec(2, 2, width_ratios=[1.12, 1], height_ratios=[1, 1], wspace=0.32, hspace=0.42)
+    ax1 = fig.add_subplot(gs[:, 0])
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax3 = fig.add_subplot(gs[1, 1])
+
+    y = np.arange(len(align))
+    for i, row in align.iterrows():
+        ax1.errorbar(
+            row["cosine"],
+            i,
+            xerr=[[row["cosine"] - row["ci_low"]], [row["ci_high"] - row["cosine"]]],
+            fmt="o",
+            color=row["color"],
+            ecolor=row["color"],
+            capsize=3,
+            ms=7,
+        )
+        ax1.text(row["cosine"], i - 0.16, f"{row['cosine']:.2f}", ha="center", va="bottom", fontsize=8)
+    ax1.axvline(0, color="#495057", lw=1, ls="--")
+    ax1.set_yticks(y)
+    ax1.set_yticklabels(align["label"])
+    ax1.invert_yaxis()
+    ax1.set_xlim(-0.85, 1.0)
+    ax1.set_xlabel("Pathway-vector cosine")
+    ax1.set_title("Canonical recurrence estimates")
+    clean_axis(ax1, xgrid=True)
+    panel_label(ax1, "A")
+
+    colors = np.where(effects["sign_agree"].astype(bool), PALETTE["teal"], PALETTE["gray"])
+    ax2.scatter(
+        effects["rrrm2_iss_t_pathway_effect"],
+        effects["osd462_rna_pathway_effect"],
+        s=45,
+        color=colors,
+        edgecolor="white",
+        linewidth=0.6,
+    )
+    for _, row in effects.iterrows():
+        label = str(row["pathway"]).replace("_", " ")
+        if row["pathway"] in {"dct_ncc_wnk_transport", "ecm_organization", "mmp_adam_proteolysis"}:
+            ax2.text(row["rrrm2_iss_t_pathway_effect"], row["osd462_rna_pathway_effect"], label, fontsize=7)
+    ax2.axhline(0, color="#adb5bd", lw=0.8)
+    ax2.axvline(0, color="#adb5bd", lw=0.8)
+    ax2.set_xlabel("RRRM-2 ISS-T RNA effect")
+    ax2.set_ylabel("OSD-462 RNA effect")
+    ax2.set_title("OSD-462 pathway concordance")
+    clean_axis(ax2, xgrid=True, ygrid=True)
+    panel_label(ax2, "B")
+
+    loo = loo.sort_values("cosine")
+    labels = [str(x).replace("_", " ") for x in loo["dropped_pathway"]]
+    ax3.barh(np.arange(len(loo)), loo["cosine"], color=PALETTE["teal"], alpha=0.85)
+    ax3.axvline(float(osd462["point_cosine"]), color=PALETTE["red"], lw=1.2, ls="--", label=f"Full cosine {float(osd462['point_cosine']):.2f}")
+    ax3.set_yticks(np.arange(len(loo)))
+    ax3.set_yticklabels(labels, fontsize=7)
+    ax3.set_xlim(0.75, 0.93)
+    ax3.set_xlabel("Cosine after dropping one pathway")
+    ax3.set_title("OSD-462 leave-one-pathway-out")
+    ax3.legend(frameon=True, loc="lower right", fontsize=8)
+    clean_axis(ax3, xgrid=True)
+    panel_label(ax3, "C")
+
+    fig.suptitle("Cross-cohort RNA recurrence around the spaceflight kidney remodeling state", fontsize=13, fontweight="bold", y=0.985)
+    fig.text(
+        0.5,
+        0.01,
+        "OSD-513 uses nine shared pathway features; OSD-462 uses the 11-pathway multi-omic anchor panel.",
+        ha="center",
+        fontsize=8,
+        color=PALETTE["gray"],
+    )
+    save(fig, out_dir, "fig1_main_result_multipanel")
+    return True
+
+
 def fig_h2_primary_enrichment(run_root: Path, out_dir: Path) -> bool:
     path = run_root / "h2_enrichment/h2_dct1_sensitivity_summary.tsv"
     if not path.exists():
@@ -175,12 +302,13 @@ def fig_h2_primary_enrichment(run_root: Path, out_dir: Path) -> bool:
         "primary_p05",
         "exclude_anchor_genes",
         "exclude_ncc_sites",
-        "single_site_only_p05",
+        "composite_sites_excluded",
+        "one_site_per_parent_gene",
         "strict_q10",
     ]
     sub = df[df["test"].isin(keep_tests) & df["analysis"].isin(keep_analyses)].copy()
     if sub.empty:
-        print("  [skip] no H2 enrichment rows")
+        print("  [skip] no DCT1 enrichment rows")
         return False
     sub["analysis"] = pd.Categorical(sub["analysis"], keep_analyses, ordered=True)
     sub["test_label"] = sub["test"].map(
@@ -197,7 +325,8 @@ def fig_h2_primary_enrichment(run_root: Path, out_dir: Path) -> bool:
         "primary_p05": "Primary p<0.05",
         "exclude_anchor_genes": "Anchor genes excluded",
         "exclude_ncc_sites": "NCC sites excluded",
-        "single_site_only_p05": "Single-site only",
+        "composite_sites_excluded": "Composite sites excluded",
+        "one_site_per_parent_gene": "One site per parent gene",
         "strict_q10": "Strict q<0.10",
     }
 
@@ -225,18 +354,18 @@ def fig_h2_primary_enrichment(run_root: Path, out_dir: Path) -> bool:
     ax.set_yticklabels([y_labels[a] for a in keep_analyses])
     ax.invert_yaxis()
     ax.set_xlabel("Odds ratio for flight-suppressed phosphosites")
-    ax.set_title("H2 primary DCT1-prior enrichment")
+    ax.set_title("DCT1-high parent-gene enrichment")
     ax.legend(loc="lower right", frameon=True)
     clean_axis(ax)
     ax.text(
         0.01,
         -0.18,
-        "Reference-prior enrichment; OSD-462 is whole-kidney phosphoproteomics.",
+        "External DCT1/DCT2 reference; OSD-462 is whole-kidney phosphoproteomics.",
         transform=ax.transAxes,
         fontsize=8,
         color=PALETTE["gray"],
     )
-    save(fig, out_dir, "v11_h2_primary_dct1_enrichment")
+    save(fig, out_dir, "v11_dct1_parent_gene_enrichment")
     return True
 
 
@@ -246,7 +375,7 @@ def fig_h2_composition_robustness(run_root: Path, out_dir: Path) -> bool:
     effect_path = base / "h2_composition_effect_level_dct1_ladder_single.tsv"
     fixed_path = base / "h2_composition_site_fixed_interaction_ladder_single.tsv"
     if not enrich_path.exists() or not effect_path.exists() or not fixed_path.exists():
-        print("  [skip] missing H2 composition-aware outputs")
+        print("  [skip] missing composition-aware outputs")
         return False
 
     enrich = read_tsv(enrich_path)
@@ -326,7 +455,7 @@ def fig_h2_composition_robustness(run_root: Path, out_dir: Path) -> bool:
     ax.set_yticklabels([MODEL_LABELS[m] for m in MODEL_ORDER])
     ax.invert_yaxis()
     ax.set_xlabel("Adjusted suppression enrichment odds ratio")
-    ax.set_title("Subset enrichment survives conservative adjustment")
+    ax.set_title("Top-decile enrichment persists after adjustment")
     ax.legend(loc="lower right", frameon=True)
     clean_axis(ax)
     panel_label(ax, "A")
@@ -355,13 +484,13 @@ def fig_h2_composition_robustness(run_root: Path, out_dir: Path) -> bool:
     ax.set_yticks(y_base)
     ax.set_yticklabels([])
     ax.invert_yaxis()
-    ax.set_xlabel("DCT1-prior coefficient\nnegative = stronger flight suppression")
+    ax.set_xlabel("DCT1 reference coefficient\nnegative = stronger flight suppression")
     ax.set_title("Continuous gradient models remain weak")
     ax.legend(loc="lower left", frameon=True)
     clean_axis(ax)
     panel_label(ax, "B")
-    fig.suptitle("H2 composition-aware robustness", fontsize=13, fontweight="bold", y=1.02)
-    save(fig, out_dir, "v11_h2_composition_robustness")
+    fig.suptitle("Parent-protein and composition-score sensitivity", fontsize=13, fontweight="bold", y=1.02)
+    save(fig, out_dir, "v11_parent_protein_composition_sensitivity")
     return True
 
 
@@ -414,17 +543,17 @@ def fig_h3_mediation_forest(run_root: Path, out_dir: Path) -> bool:
     ax.set_yticklabels([label_map.get(str(m), str(m)) for m in sub["mediator"].astype(str)])
     ax.invert_yaxis()
     ax.set_xlabel("Indirect effect on NCC regulatory phospho score")
-    ax.set_title("H3 mediation-specified remodeling/transporter link")
+    ax.set_title("Exploratory remodeling/transporter mediation")
     clean_axis(ax)
     ax.text(
         0.01,
         -0.2,
-        "Approximate Bayesian OLS; cross-sectional bulk tissue. Intervals are hypothesis-specification, not causal proof.",
+        "Approximate Bayesian OLS; cross-sectional bulk tissue.",
         transform=ax.transAxes,
         fontsize=8,
         color=PALETTE["gray"],
     )
-    save(fig, out_dir, "v11_h3_mediation_forest")
+    save(fig, out_dir, "v11_exploratory_mediation_forest")
     return True
 
 
@@ -584,6 +713,189 @@ def fig_xenium_inventory(run_root: Path, out_dir: Path) -> bool:
     return True
 
 
+def fig_perturbation_triangulation(run_root: Path, out_dir: Path) -> bool:
+    lowk_path = run_root / "perturbation/lowk_dct_alignment_summary.tsv"
+    target_path = run_root / "perturbation/lowk_target_gene_table.tsv"
+    occ_path = run_root / "h2_occupancy/h2_occupancy_dct1_enrichment.tsv"
+    spatial_path = run_root / "spatial_reference/visium_dct_transport_timepoint_summary.tsv"
+    if not all(p.exists() for p in [lowk_path, target_path, occ_path, spatial_path]):
+        print("  [skip] missing perturbation-triangulation outputs")
+        return False
+
+    lowk = read_tsv(lowk_path)
+    target = read_tsv(target_path)
+    occ = read_tsv(occ_path)
+    spatial = read_tsv(spatial_path)
+
+    fig = plt.figure(figsize=(13.4, 10.6))
+    gs = fig.add_gridspec(2, 2, hspace=0.72, wspace=0.42)
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax3 = fig.add_subplot(gs[1, 0])
+    ax4 = fig.add_subplot(gs[1, 1])
+
+    sub = lowk[
+        lowk["spaceflight_vector"].isin(["osd462_rna", "rrrm2_iss_t_rna", "osd513_rna_stat"])
+        & lowk["gene_subset"].isin(["all_overlap", "dct1_top_decile_genes", "dct2_top_decile_genes", "transport_target_genes"])
+    ].copy()
+    vector_labels = {
+        "osd462_rna": "OSD-462 RNA",
+        "rrrm2_iss_t_rna": "RRRM-2 ISS-T RNA",
+        "osd513_rna_stat": "OSD-513 RNA",
+    }
+    subset_order = ["all_overlap", "dct1_top_decile_genes", "dct2_top_decile_genes", "transport_target_genes"]
+    subset_labels = {
+        "all_overlap": "All DCT-prior genes",
+        "dct1_top_decile_genes": "DCT1-prior top decile",
+        "dct2_top_decile_genes": "DCT2-prior top decile",
+        "transport_target_genes": "Transport targets",
+    }
+    if not sub.empty:
+        sub["gene_subset"] = pd.Categorical(sub["gene_subset"], subset_order, ordered=True)
+        pivot = sub.pivot_table(index="gene_subset", columns="spaceflight_vector", values="cosine", observed=False)
+        pivot = pivot.rename(index=subset_labels, columns=vector_labels)
+        sns.heatmap(
+            pivot,
+            ax=ax1,
+            cmap="vlag",
+            center=0,
+            vmin=-0.45,
+            vmax=0.45,
+            annot=True,
+            fmt=".2f",
+            linewidths=0.5,
+            cbar_kws={"label": "Cosine"},
+        )
+        ax1.set_xlabel("")
+        ax1.set_ylabel("")
+        ax1.set_title("Low-K DCT response vs spaceflight RNA")
+        ax1.tick_params(axis="x", labelrotation=35, labelsize=8)
+        ax1.tick_params(axis="y", labelsize=8)
+        for tick in ax1.get_xticklabels():
+            tick.set_ha("right")
+        panel_label(ax1, "A")
+
+    available_cols = ["lowk_effect_kd_minus_nk", "osd462_rna", "rrrm2_iss_t_rna", "osd513_rna_stat"]
+    heat_cols = [c for c in available_cols if c in target.columns]
+    heat = target.set_index("gene_symbol")[heat_cols].copy()
+    heat = heat.apply(lambda col: np.clip((col - col.mean()) / col.std(ddof=0), -2, 2), axis=0)
+    heat = heat.rename(
+        columns={
+            "lowk_effect_kd_minus_nk": "Low-K DCT",
+            "osd462_rna": "OSD-462 RNA",
+            "rrrm2_iss_t_rna": "RRRM-2 ISS-T",
+            "osd513_rna_stat": "OSD-513 RNA",
+        }
+    )
+    sns.heatmap(
+        heat,
+        ax=ax2,
+        cmap="vlag",
+        center=0,
+        vmin=-2,
+        vmax=2,
+        annot=False,
+        linewidths=0.4,
+        cbar_kws={"label": "Column z-score"},
+    )
+    ax2.set_xlabel("")
+    ax2.set_ylabel("")
+    ax2.set_title("Focused DCT/WNK target-gene directions")
+    ax2.tick_params(axis="x", labelrotation=35, labelsize=8)
+    ax2.tick_params(axis="y", labelsize=8)
+    for tick in ax2.get_xticklabels():
+        tick.set_ha("right")
+    panel_label(ax2, "B")
+
+    occ_sub = occ[
+        occ["analysis"].isin(["occupancy_p05", "occupancy_q10", "occupancy_single_site_p05"])
+        & occ["flag"].isin(["dct1_top_decile", "dct1_top_quartile"])
+    ].copy()
+    if not occ_sub.empty:
+        occ_sub["analysis_label"] = occ_sub["analysis"].map(
+            {
+                "occupancy_p05": "Nominal p<0.05",
+                "occupancy_q10": "Strict q<0.10",
+                "occupancy_single_site_p05": "One site per gene",
+            }
+        )
+        occ_sub["flag_label"] = occ_sub["flag"].map(
+            {"dct1_top_decile": "DCT1 top decile", "dct1_top_quartile": "DCT1 top quartile"}
+        )
+        order = ["Nominal p<0.05", "Strict q<0.10", "One site per gene"]
+        y_base = np.arange(len(order))
+        offsets = {"DCT1 top decile": -0.12, "DCT1 top quartile": 0.12}
+        colors = {"DCT1 top decile": PALETTE["red"], "DCT1 top quartile": PALETTE["blue"]}
+        for label, part in occ_sub.groupby("flag_label", sort=False):
+            ys = np.array([order.index(x) for x in part["analysis_label"]]) + offsets[label]
+            ax3.errorbar(
+                part["odds_ratio"],
+                ys,
+                xerr=np.vstack([part["odds_ratio"] - part["ci_low"], part["ci_high"] - part["odds_ratio"]]),
+                fmt="o",
+                ms=5,
+                color=colors[label],
+                ecolor=colors[label],
+                capsize=2,
+                label=label,
+            )
+        ax3.axvline(1, color="#495057", lw=1, ls="--")
+        ax3.set_yticks(y_base)
+        ax3.set_yticklabels(order)
+        ax3.invert_yaxis()
+        ax3.set_xlabel("Odds ratio")
+        ax3.set_title("Parent-protein-normalized phosphosite enrichment")
+        ax3.legend(loc="lower right", frameon=True)
+        clean_axis(ax3)
+        panel_label(ax3, "C")
+
+    sp = spatial[
+        spatial["group"].isin(["all_spots", "dct_marker_top_quartile", "dct_adjacent_spots"])
+        & spatial["comparison"].str.endswith("minus_sham_same_group")
+        & spatial["timepoint"].isin(TIME_ORDER)
+    ].copy()
+    if not sp.empty:
+        group_labels = {
+            "all_spots": "All spots",
+            "dct_marker_top_quartile": "DCT-high spots",
+            "dct_adjacent_spots": "DCT-adjacent spots",
+        }
+        colors = {
+            "All spots": PALETTE["gray"],
+            "DCT-high spots": PALETTE["blue"],
+            "DCT-adjacent spots": PALETTE["teal"],
+        }
+        sp["timepoint"] = pd.Categorical(sp["timepoint"], TIME_ORDER, ordered=True)
+        sp["group_label"] = sp["group"].map(group_labels)
+        for label, part in sp.sort_values("timepoint").groupby("group_label", sort=False):
+            ax4.plot(
+                [TIME_LABELS[str(t)] for t in part["timepoint"]],
+                part["mean_difference_vs_sham"],
+                marker="o",
+                lw=1.8,
+                color=colors.get(label, PALETTE["gray"]),
+                label=label,
+            )
+        ax4.axhline(0, color="#495057", lw=1, ls="--")
+        ax4.set_ylabel("DCT transport score difference vs sham")
+        ax4.set_title("IRI Visium DCT transport by spatial context")
+        ax4.legend(frameon=True, loc="best")
+        clean_axis(ax4, ygrid=True)
+        panel_label(ax4, "D")
+
+    fig.suptitle("Perturbation triangulation of the spaceflight DCT/phosphoproteomic signature", fontsize=13, fontweight="bold", y=0.985)
+    fig.text(
+        0.5,
+        0.006,
+        "Low-K uses DCT-enriched pseudobulk; spatial scores use external IRI Visium and are predictive context, not spaceflight spatial validation.",
+        ha="center",
+        fontsize=8,
+        color=PALETTE["gray"],
+    )
+    save(fig, out_dir, "v11_perturbation_triangulation")
+    return True
+
+
 def generate_all(run_root: Path, out_dir: Path | None = None) -> int:
     configure_style()
     out_dir = out_dir or run_root / "figures" / "v11"
@@ -592,10 +904,12 @@ def generate_all(run_root: Path, out_dir: Path | None = None) -> int:
 
     made = 0
     for fn in [
+        fig_cross_cohort_recurrence,
         fig_h2_primary_enrichment,
         fig_h2_composition_robustness,
         fig_h3_mediation_forest,
         fig_spatial_reference,
+        fig_perturbation_triangulation,
         fig_xenium_inventory,
     ]:
         try:
@@ -611,8 +925,8 @@ def generate_all(run_root: Path, out_dir: Path | None = None) -> int:
                 "",
                 "Generated from v11 DCT1/phosphoproteome/mediation outputs.",
                 "",
-                "Claim boundary: H2 panels show DCT1-prior enrichment in whole-kidney OSD-462 phosphoproteomics, not DCT-isolated phosphoproteomics.",
-                "Claim boundary: spatial panels are external IRI reference contextualization, not direct RR-10 spatial validation.",
+                "DCT1 panels show enrichment among DCT1-high parent genes in whole-kidney OSD-462 phosphoproteomics.",
+                "Spatial panels use external IRI references for context.",
                 "",
                 f"Figures generated: {made}",
                 "",

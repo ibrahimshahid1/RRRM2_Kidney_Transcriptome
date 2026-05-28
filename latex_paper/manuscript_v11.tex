@@ -1,0 +1,556 @@
+\documentclass[11pt]{article}
+
+% ---------------- Packages ----------------
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{pdflscape}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage[activate={true,nocompatibility},final,tracking=true,kerning=true,spacing=true,factor=1100,stretch=10,shrink=10,expansion=false,protrusion=true]{microtype}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+\usepackage{url}
+\usepackage{xspace}
+\usepackage{authblk}
+\usepackage[numbers,sort&compress]{natbib}
+
+\emergencystretch=3em
+\graphicspath{{../data/results/run_20260526_v11_dct1_phospho_mediation/figures/v11/}{figures_v4/}{figures_osd462/}}
+\setlist[itemize]{leftmargin=1.5em,itemsep=0.2em,topsep=0.25em}
+\setlist[enumerate]{leftmargin=1.5em,itemsep=0.2em,topsep=0.25em}
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\itshape}{\thesubsubsection}{0.6em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small DCT1-high phosphosite enrichment}
+\fancyhead[R]{\small \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\gene}[1]{\textit{#1}}
+\newcommand{\RRRM}{RRRM-2\xspace}
+\newcommand{\ISS}{ISS terminal\xspace}
+\newcommand{\LAR}{live animal return\xspace}
+\newcommand{\OSD}{OSDR\xspace}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+\title{\textbf{DCT1-high parent-gene enrichment of flight-suppressed phosphosites in mouse spaceflight kidney}\\[0.35em]
+\large RNA-protein mismatch and public perturbation context for the NCC/SPAK/WNK regulatory-phosphorylation lesion}
+\author{Ibrahim Shahid}
+\affil{Independent research draft for mentor feedback\\Authorship/collaboration structure pending}
+\date{Draft, May 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Flight-suppressed phosphosites in matched RR-10/OSD-462 whole-kidney multi-omics were enriched among parent genes that are DCT1-high in a native DCT1/DCT2 single-nucleus RNA reference. The strongest signal was concentrated in the DCT1 top decile at row level (OR 1.51, q=$9.96\times10^{-12}$) and remained supportive in a true one-site-per-parent-gene sensitivity (OR 1.49, q=$6.40\times10^{-4}$), a parent-gene Fisher analysis (OR 1.52, q=$1.52\times10^{-4}$), per-site parent-protein normalization (OR 1.52, q=$3.73\times10^{-12}$), parent-protein and compartment-score adjustment (OR 1.30, q=0.00158), anchor-gene exclusion, and NCC-site exclusion. This identifies a DCT1-high parent-gene subset within the established spaceflight phosphoproteomic lesion; it does not assign those phosphosites to DCT1 cells.
+
+Cosmic Kidney Disease established spaceflight-associated renal transporter dephosphorylation, including suppression of NCC and related WNK--SPAK/OSR1 regulatory phosphorylation \citep{siew2024cosmic}. We analyzed public mouse kidney RNA, protein, and phosphoprotein datasets (RRRM-2/OSD-771, OSD-513, OSD-253, and matched RR-10/OSD-462) to ask whether public multi-omics could add DCT-subtype-prior resolution around that measured endpoint. Across independent cohorts, flight was associated with increased matrix/endothelial remodeling RNA scores and decreased DCT/NCC-WNK transport RNA scores. OSD-462 RNA reproduced the RRRM-2 direction with pathway-vector cosine 0.87 (95\% CI 0.65--0.90).
+
+The RNA context motivates the phosphoproteomic analysis because it did not propagate cleanly to protein abundance. In matched OSD-462 proteomics, targeted protein concordance was null, matrix proteins moved opposite their transcripts, and total NCC protein was flat. The transporter signal instead appeared at the regulatory-phosphorylation layer, where targeted KSEA over three curated substrates per kinase summarized reduced SPAK/OSR1 and WNK output.
+
+Public perturbation references did not identify a single upstream WNK-suppressing mechanism. Low-potassium DCT response was directionally anti-aligned only in the focused 14-gene transport-target subset, while dDAVP/mpkDCT and KLHL3/CUL3 turnover checks were limited by site coverage. External IRI Visium analysis placed the bulk spaceflight RNA state near late repair, injured-tubule, and DCT-adjacent niches and found lower DCT transport in DCT-adjacent late-repair spots in that external reference. These data support a phosphoproteome-centered model of spaceflight-associated DCT regulatory suppression embedded in recurrent kidney remodeling, and they motivate a spatial prediction for future spaceflight kidney sections: DCT/NCC-WNK suppression should be tested for DCT-intrinsic versus DCT-adjacent repair-neighborhood localization.
+\end{abstract}
+
+\vspace{0.3em}
+\noindent\textbf{Keywords:} spaceflight kidney; mouse kidney; distal convoluted tubule; NCC; SLC12A3; WNK; SPAK/OSR1; phosphoproteomics; DCT1; RNA-protein mismatch; OSD-462; RR-10.
+
+\clearpage
+\tableofcontents
+\clearpage
+
+% =====================================================================
+\section{Introduction}
+
+Kidney risk has long been part of human spaceflight medicine, initially through altered calcium balance and renal stone risk \citep{cockett1962astronautical,pietrzyk2007renal,smith2014men}. Recent work has broadened this view to include renal tubulopathy, interstitial and vascular remodeling, mitochondrial and stress responses, and altered solute handling \citep{afshinnekoo2020fundamental,daSilveira2020comprehensive,chouker2025impact}. Rodent spaceflight studies are especially useful in this context because kidney tissue can be profiled directly across transcriptomic, proteomic, phosphoproteomic, and histologic layers.
+
+The most important prior anchor for the present analysis is the Cosmic Kidney Disease study, which reported an integrated pan-omic, physiological, and morphological analysis of spaceflight-induced renal dysfunction across mice, rats, and astronauts \citep{siew2024cosmic}. Among its central findings, that study established dephosphorylation of NCC and related distal-nephron transport machinery, together with distal convoluted tubule (DCT) remodeling. The mouse kidney phosphoproteomics in that work derives from Rodent Research-10, deposited as OSD-462, which is also the matched multi-omic cohort analyzed here. The present study uses that established phenotype as the reference point for cross-cohort and matched multi-omic analysis.
+
+Bulk kidney RNA-seq is a useful but potentially misleading layer for this question. A recurrent RNA signature of lower DCT transport and higher matrix or endothelial remodeling could reflect cell-autonomous transcriptional suppression, loss or dedifferentiation of nephron segments, or dilution by expanding interstitial compartments. It also need not imply concordant protein abundance. For that reason, a central goal here is to compare the RNA context with matched protein and phosphoprotein measurements in OSD-462, where the same animals carry RNA-seq, proteomics, and phosphoproteomics.
+
+We focus on five questions. First, does a matrix/endothelial-high and DCT-low RNA pattern recur across public mouse kidney spaceflight cohorts? Second, in matched OSD-462 multi-omics, does that RNA pattern propagate to protein abundance, or does the transporter lesion resolve at the phosphorylation layer? Third, are flight-suppressed whole-kidney phosphosites enriched among parent genes that are DCT1-high in an external native kidney reference? Fourth, what do composition-aware and exploratory path analyses imply about remodeling-linked versus parallel-response interpretations? Fifth, do public perturbation references (low-potassium DCT, parent-protein-normalized phosphosite effects, IRI Visium spatial DCT-transport context, vasopressin/cAMP signaling, KLHL3/CUL3 turnover) identify an upstream mechanism for the WNK--SPAK--NCC regulatory suppression, or do they define what public data can and cannot answer?
+
+Together, these analyses support a phosphoproteome-centered model of spaceflight-associated DCT regulatory suppression embedded in recurrent kidney remodeling. The RNA response identifies a matrix/endothelial-high and DCT-low tissue context, but matched OSD-462/RR-10 data place the transporter lesion at the NCC/SPAK/WNK regulatory-phosphorylation layer rather than at protein abundance. The DCT1 signal is a parent-gene enrichment in whole-kidney phosphoproteomics; spatial, DCT-enriched, and physiological experiments are needed to localize it and test function.
+
+% =====================================================================
+\section{Methods}
+
+\subsection{Datasets and study roles}
+
+RRRM-2/OSD-771 was used as the primary mouse kidney RNA-seq cohort because it includes young and old female C57BL/6NTac mice across ISS terminal dissection, live animal return, flight, habitat ground control, vivarium, and basal contexts. Primary flight contrasts compared flight with habitat ground control within mission arm. OSD-513 was used as an independent kidney flight RNA recurrence cohort. OSD-253 was used as a strain and mechanism-context cohort because it includes C57BL/6J and C3H/HeJ mice and more complex ground-control definitions. OSD-462/RR-10 was the matched multi-omic anchor, with kidney RNA-seq, TMT proteomics, and phosphoproteomics from the same animals.
+
+GSE228367 was used as an external native DCT1/DCT2 single-nucleus RNA reference \citep{su2024dct}. PXD001729 was used as a cultured DCT-lineage phosphoproteomic reference from mpkDCT cells stimulated with dDAVP/vasopressin \citep{cheng2015mpkdct}. GSE269622 and GSE269719 were used as external kidney ischemia-reperfusion injury (IRI) spatial reference datasets, with Visium supporting whole-transcriptome pathway projection and Xenium supporting annotation context \citep{spatial2025iri}. Tabula Muris Senis kidney was used only as an external aging reference \citep{tabula2020}.
+
+\subsection{RNA preprocessing and gene-set scoring}
+
+Primary RRRM-2 analyses used the project residualized expression matrix and matched metadata generated by the repository preprocessing pipeline. External cohorts were analyzed within study rather than pooled at raw-expression level, because spaceflight datasets differ in mission, strain, sex, preservation, sequencing, and metadata. Differential-expression and preprocessing resources followed standard RNA-seq/Bioconductor practices \citep{ritchie2015limma,love2014deseq2,robinson2010edger}.
+
+Curated gene sets summarized ECM organization, integrin/cell adhesion, MMP/ADAM proteolysis, endothelial and stromal context, DCT/NCC-WNK transport, broad tubular transport, TLR4/innate signaling, macrophage/inflammatory context, S1P/S1PR3 signaling, oxidative stress/NRF2, and preservation/sample-stress response. Gene-set scores were computed separately within each study. For gene $g$, sample $i$, study $c$, and curated gene set $G_k$, the sample-level score was
+\[
+Z_{g i}^{(c)}=\frac{X_{g i}^{(c)}-\bar{X}_{g\cdot}^{(c)}}{s_{g\cdot}^{(c)}}, \qquad
+S_{i k}^{(c)}=\frac{1}{|G_k\cap U_c|}\sum_{g\in G_k\cap U_c} Z_{g i}^{(c)},
+\]
+where $X_{g i}^{(c)}$ is the processed expression value, $\bar{X}_{g\cdot}^{(c)}$ and $s_{g\cdot}^{(c)}$ are the within-study mean and standard deviation for gene $g$, and $U_c$ is the set of genes observed in study $c$. Thus, scores are within-study mean standardized expression of observed member genes, not pooled cross-study expression values.
+
+Flight effects were computed as Space Flight minus Ground Control within the relevant study arm or comparison group:
+\[
+\Delta_{k r}^{(c)}=\frac{1}{n_{\mathrm{FLT},r}}\sum_{i\in \mathrm{FLT},r}S_{ik}^{(c)}
+-\frac{1}{n_{\mathrm{GC},r}}\sum_{i\in \mathrm{GC},r}S_{ik}^{(c)},
+\]
+where $r$ indexes the arm, age, or comparison stratum. In RRRM-2, primary contrasts compared flight with habitat ground control within ISS terminal and live-return arms. When age-specific effects were needed, young and old strata were estimated separately; age-balanced arm summaries averaged the available age-specific flight-minus-control effects:
+\[
+\Delta_{k,\mathrm{arm}}^{(c)}=\frac{1}{|A|}\sum_{a\in A}\Delta_{k,\mathrm{arm},a}^{(c)}.
+\]
+The primary cross-cohort pathway vectors used within-study differences of means over shared gene-set features rather than a pooled multi-cohort regression. For visualization, an ECM/remodeling score and a DCT/NCC-WNK transport score were plotted together. A simple ECM-minus-DCT score was used as a compact summary of higher matrix remodeling with lower DCT transport.
+
+\subsection{Cross-cohort recurrence analysis}
+
+Within each study, flight effects were computed as Space Flight minus Ground Control at gene-set or pathway level. RRRM-2 ISS terminal and live-return arm effects were computed separately. Cross-cohort recurrence was assessed by cosine similarity between pathway-effect vectors:
+\[
+\cos(\Delta^{A},\Delta^{B})=
+\frac{\sum_{k}\Delta_{k}^{A}\Delta_{k}^{B}}
+{\sqrt{\sum_k(\Delta_{k}^{A})^2}\sqrt{\sum_k(\Delta_{k}^{B})^2}}.
+\]
+The primary recurrence comparison used nine shared pathway features: apoptosis, calcium handling, DCT/NCC-WNK transport, ECM remodeling, fibrosis, inflammation, ion transport, lipid metabolism, and oxidative stress. Bootstrap confidence intervals used 2,000 iterations. In each iteration, animals in the external cohort were resampled with replacement within flight and control strata, the external pathway-effect vector was recomputed, and the fixed RRRM-2 reference vector was reused. Permutation $p$ values used 5,000 iterations in which external-cohort flight/control labels were shuffled over the same samples, the external vector was recomputed, and the RRRM-2 direction was held fixed. Directional and two-sided absolute-tail permutation probabilities were calculated with a plus-one correction, for example $p=(1+\#\{\cos_{\mathrm{null}}\geq \cos_{\mathrm{obs}}\})/(1+B)$ for a positive directional test with $B$ permutations.
+
+OSD-513 was interpreted as the primary recurrence cohort; OSD-253 was interpreted as contextual because of control-scenario complexity. For sample-level plotting, the recurrent RNA score was defined from the concordant RRRM-2 ISS terminal and OSD-513 pathway effects. The RRRM-2 and OSD-513 effect vectors were unit-normalized, averaged, oriented so ECM/fibrosis features were positive, restricted to concordant pathway directions, and renormalized to unit length. The concordant score retained apoptosis, DCT/NCC-WNK transport, ECM remodeling, fibrosis, and oxidative stress; calcium handling, inflammation, ion transport, and lipid metabolism were excluded from this scalar because they were non-concordant or broad sensitivity features. Each cohort's sample-by-pathway score matrix was standardized by pathway within cohort and projected onto those weights. Higher values correspond to stronger matrix/endothelial remodeling and lower DCT/NCC-WNK transport.
+
+RRRM-2 also allowed a planned age-by-flight network question. Control-aging vectors were estimated as old ground control minus young ground control within arm. Bootstrap stability showed that primary module/pathway aging directions were not stable enough to support a main age-rewiring claim. Age-related and live-return analyses are therefore reported as secondary context rather than central results.
+
+\subsection{Matched OSD-462 multi-omic analysis}
+
+The OSD-462 analysis was specified before computing the protein and phosphoprotein flight effects. Flight effects were defined as Space Flight minus Ground Control. RNA recurrence was tested by comparing the OSD-462 RNA pathway-effect vector with the RRRM-2 ISS terminal RNA direction. OSD-462 RNA effects used the OSDR differential-expression table for Space Flight versus Ground Control.
+
+Protein abundance was analyzed from scaled TMT signal-to-noise values. Non-positive values were treated as missing. Values were log$_2$ transformed and median-centered within TMT plex and channel to reduce sample-loading differences. Protein-level flight effects were computed as within-plex differences and then averaged across available plexes:
+\[
+Y_{r j p}=\log_2(\mathrm{SN}_{r j p})-\mathrm{median}_{r}\{\log_2(\mathrm{SN}_{r j p})\}, \qquad
+\delta_{r p}=\bar{Y}_{r,\mathrm{FLT},p}-\bar{Y}_{r,\mathrm{GC},p}, \qquad
+\delta_{r}=\frac{1}{|P_r|}\sum_{p\in P_r}\delta_{r p}.
+\]
+Here $r$ indexes protein rows, $j$ sample channels, and $p$ TMT plex. A row-level plex effect required at least two finite flight and two finite ground-control channels within that plex; otherwise that plex contribution was missing. The primary gene-level protein table required both plexes where possible and collapsed multiple protein rows per gene by peptide-count-weighted averaging. Peptide coverage was therefore used for filtering, row-to-gene weighting, and matched-null construction, not as a regression covariate in the protein-abundance contrast. The protein effects were not estimated with limma; they were estimated as log$_2$ within-plex flight-minus-control differences followed by gene-level aggregation.
+
+Protein-abundance concordance was tested for curated matrix/ECM, DCT/NCC-WNK, TLR4/innate, and S1P gene sets against abundance- and peptide-count-matched random gene-set nulls. Phosphosite effects were estimated per site and evaluated for the WNK--SPAK/OSR1--NCC regulatory chain, with total NCC protein abundance used as a control for whether phosphosite changes reflected altered phosphorylation rather than transporter abundance. RRRM-2 network-prioritized genes were also tested for enrichment among OSD-462 protein- or phosphoprotein-changing genes as an exploratory negative-control layer.
+
+Phosphosite abundance was analyzed from scaled phosphoproteomic TMT signal-to-noise values using the same log$_2$ transformation and within-channel median centering. For each phosphosite $s$, unadjusted flight effects and nominal $p$ values were estimated by ordinary least squares across animal channels:
+\[
+Y_{s j}=\beta_{0s}+\beta_{Fs}\mathbf{1}(\mathrm{Flight}_j)+\beta_{Ps}\mathbf{1}(\mathrm{Plex2}_j)+\epsilon_{s j}.
+\]
+The plex term was included when finite values were present in both plexes and dropped when only one plex contributed. Sites required at least three finite flight and three finite ground-control values. The coefficient $\beta_{Fs}$ is the Space Flight minus Ground Control phosphosite effect. Two-sided $p$ values used the ordinary least-squares residual standard error and residual degrees of freedom, and Benjamini-Hochberg q values were computed across quantified sites for site-level summaries. Flight-suppressed phosphosites for the primary enrichment analysis were defined as $\hat{\beta}_{Fs}<0$ and nominal $p<0.05$.
+
+\subsection{DCT1/DCT2 reference prior and phosphosite enrichment}
+
+GSE228367 DCT1 and DCT2 nuclei from normal-potassium controls were aggregated by subtype and replicate. Gene symbols were harmonized to OSD-462 phosphosite parent genes. For each gene, a DCT1 enrichment score was computed as the difference between mean DCT1 and DCT2 expression:
+\[
+D_g=\bar{E}_{g,\mathrm{DCT1}}-\bar{E}_{g,\mathrm{DCT2}}.
+\]
+A log-ratio with a small offset, $\log_2[(\bar{E}_{g,\mathrm{DCT1}}+0.01)/(\bar{E}_{g,\mathrm{DCT2}}+0.01)]$, was used for marker checks and binary DCT1-core summaries. DCT1 top-quartile and top-decile bins were defined among genes detected in the DCT reference. Marker checks required plausible subtype direction for known DCT markers, including DCT1-leaning \gene{Pvalb}, \gene{Trpm6}, \gene{Stk39}, and \gene{Wnk4}, and DCT2/CNT-associated \gene{Trpv5} and \gene{Calb1}.
+
+OSD-462 phosphosites were mapped to parent genes and annotated with the DCT1 prior. The primary enrichment test asked whether flight-suppressed whole-kidney phosphosites were enriched among DCT1-high parent genes. Suppressed phosphosites were defined by negative Space Flight minus Ground Control effect and nominal $p<0.05$. Nominal $p<0.05$ was used to define a directional phosphosite set for enrichment rather than to declare individual phosphosites significant; site-level FDR summaries are reported separately. Fisher exact tests evaluated DCT1 top-quartile and top-decile bins against the quantified phosphosite background using the directional alternative that the DCT1-high bin was enriched among suppressed sites. Benjamini-Hochberg correction was applied within the DCT1 enrichment test family. The contingency table was
+\[
+\begin{array}{lcc}
+\toprule
+& \text{DCT1-high parent gene} & \text{Not DCT1-high} \\
+\midrule
+\text{Flight-suppressed phosphosite} & a & b \\
+\text{Not suppressed phosphosite} & c & d \\
+\bottomrule
+\end{array}
+\]
+Because phosphosite rows are partially dependent through parent genes and shared proteins, Fisher exact $p$ values were interpreted as enrichment evidence rather than independent-site discovery certainty. Sensitivity analyses excluded anchor genes, excluded NCC sites, excluded composite/multi-position site rows, and retained one representative phosphosite per parent gene. The composite-site exclusion keeps only rows with a single numeric position and does not address parent-gene dependence by itself. The one-site-per-parent-gene sensitivity selects one representative row per gene by lowest phosphosite $p$ value, with the more negative phosphosite effect and then site identifier used as deterministic tie-breakers.
+
+Parent-gene-aware analyses were added for the top-decile result. First, each parent gene was classified by whether it had at least one suppressed quantified phosphosite, and Fisher exact tests compared DCT1 top-decile parent genes with the remaining background. Second, logistic models used the parent gene as the unit and included covariates for $\log(1+n_{\mathrm{quantified\ phosphosites}})$, $\log(1+n_{\mathrm{parent\ peptides}})$, and parent-protein abundance where available. Third, a site-count-stratified permutation preserved the number of quantified sites per parent gene by shuffling DCT1-high labels among genes within phosphosite-count bins and recomputing the row-level odds ratio. These analyses test whether the row-level signal is robust to parent-gene and site-count structure; they do not make phosphosite rows independent biological replicates.
+
+\subsection{Parent-protein and composition-aware sensitivity models}
+
+Composition-aware analyses tested whether the DCT1 top-decile enrichment could be attributed to parent protein abundance or gross bulk-compartment shifts. The first-stage model was fit separately for each phosphosite using animal-level variables:
+\[
+Y_{i s}=\alpha_s+\beta_{Fs}^{(m)}\mathbf{1}(\mathrm{Flight}_i)+\beta_{Ps}^{(m)}\mathbf{1}(\mathrm{Plex2}_i)
++\gamma_s^{(m)T}C_i^{(m)}+\epsilon_{i s},
+\]
+where $Y_{is}$ is log$_2$ median-centered phosphosite abundance for animal/channel $i$ and site $s$, and $C_i^{(m)}$ is the model-specific covariate set. The model ladder was: M0, no additional covariates; M1, sample-level parent-protein abundance; M2, DCT identity score; M3, endothelial and stromal/fibroblast scores; M4, parent-protein abundance plus DCT, endothelial, and stromal/fibroblast scores; and M5, parent-protein abundance plus the first principal component of the DCT/endothelial/stromal score matrix. Compartment scores came from the matched RNA data and were z-scored before modeling. Parent-protein abundance was matched by parent gene and sample where available. Adjusted phosphosite flight effects $\hat{\beta}_{Fs}^{(m)}$ were then retested for enrichment among DCT1 top-quartile and top-decile parent genes using the same Fisher exact framework, defining adjusted suppressed sites as $\hat{\beta}_{Fs}^{(m)}<0$ with nominal model $p<0.05$.
+
+Site-level covariates such as mean phosphosite intensity, missingness, and number of quantified sites on the parent gene do not vary by animal within a per-site regression. They were therefore not included in the first-stage per-site model. They entered the effect-level sensitivity model:
+\[
+\hat{\beta}_{Fs}^{(m)}=\theta_0+\theta_1D_s+\theta_2\delta_{g(s)}^{\mathrm{protein}}
++\theta_3\mathrm{Intensity}_s+\theta_4\mathrm{Missingness}_s
++\theta_5\log(1+n_{\mathrm{sites},g(s)})+\eta_s,
+\]
+where $D_s$ is the DCT1 enrichment score of the parent gene for phosphosite $s$, and $\delta_{g(s)}^{\mathrm{protein}}$ is the parent-gene protein flight effect. Standard errors were clustered by parent gene when estimating continuous DCT1-prior coefficients. A stacked site-fixed-effect sensitivity also tested a flight-by-DCT1-prior interaction after within-site centering:
+\[
+Y_{is}=\alpha_s+\beta_F\mathbf{1}(\mathrm{Flight}_i)+\beta_D\{\mathbf{1}(\mathrm{Flight}_i)\times D_s\}
++\beta_P\mathbf{1}(\mathrm{Plex2}_i)+\gamma^TC_i+\epsilon_{is}.
+\]
+
+These models test parent-abundance and compartment-score alternatives. They do not assign phosphosites to cell types and may overadjust if endothelial or stromal expansion lies on the biological path from flight to transporter suppression.
+
+\subsection{Kinase activity and regulator analyses}
+
+Kinase-substrate enrichment analysis (KSEA) summarized the WNK--SPAK/OSR1--NCC phosphoproteomic axis at kinase-output level \citep{casado2013kinase}. The substrate set was restricted to curated renal WNK/SPAK/OSR1/NCC regulatory sites; KSEA therefore serves as a pathway-level coherence check, not an unbiased kinome-wide discovery screen. A negative KSEA score indicates that annotated substrate phosphosites are suppressed relative to the quantified phosphosite background. The number of quantified substrates contributing to each kinase score was reported with the KSEA result.
+
+RNA-based pathway and transcription-factor activity were explored with decoupler using PROGENy and DoRothEA/CollecTRI priors \citep{badia2022decoupler,schubert2018progeny,garcia2019benchmark}. These analyses were used to nominate candidate context axes and to test whether expected injury/inflammatory programs recur across cohorts. They are not interpreted as causal regulator discovery.
+
+\subsection{Exploratory path and spatial-reference analyses}
+
+Exploratory path models used the OSD-462 animals with matched RNA and phosphoproteomics. Flight status was the exposure-like variable, NCC regulatory phosphorylation was the outcome-like variable, and candidate intermediate scores included DCT identity, DCT transport RNA, endothelial score, stromal/fibroblast score, and a matrix/endothelial composite. The implemented model used simple linear path summaries with bootstrap or normal-approximation OLS uncertainty rather than a full SEM or \code{brms} fit. These models decompose remodeling-phosphorylation covariance; they do not establish temporal order or causality.
+
+Spatial analyses used GSE269622/GSE269719 only as external IRI reference atlases. OSD-462 and RRRM-2 bulk RNA remodeling vectors were projected onto Visium timepoint and niche-level pathway vectors, while Xenium was used for cell-type and neighborhood annotation context. These analyses ask which known kidney injury/repair spatial niches resemble the bulk spaceflight RNA state; they do not localize the spaceflight lesion.
+
+\subsection{Public perturbation-reference analyses}
+
+A five-branch public perturbation-reference analysis tested whether existing mechanistic datasets could identify an upstream signal for the NCC/SPAK/WNK regulatory-phosphorylation lesion. Each branch had a pre-specified role: mechanism triage, robustness analysis, spatial prediction, secondary context, or future-data rationale. No reference was interpreted beyond its data resolution.
+
+\emph{Low-potassium DCT response (GSE228367).} The six GSE228367 filtered 10x matrices (three normal-K and three K-restricted DCT-enriched nuclei objects) were library-size normalized, log-transformed, and reduced to sample-level pseudobulk means. Per-gene low-K effects were $\mathrm{lowK}_g=\bar{E}_{g,\mathrm{KD}}-\bar{E}_{g,\mathrm{NK}}$. The low-K vector was compared with each spaceflight RNA vector (OSD-462 RNA, RRRM-2 ISS terminal RNA, OSD-513 RNA statistic) by cosine similarity and Spearman correlation across all overlapping genes, DCT-shared genes, DCT1 and DCT2 top-decile and top-quartile gene subsets, and a focused set of 14 DCT/WNK transport-target genes (\gene{Slc12a3}, \gene{Stk39}, \gene{Oxsr1}, \gene{Wnk1}, \gene{Wnk4}, \gene{Kcnj10}, \gene{Kcnj16}, \gene{Clcnkb}, \gene{Bsnd}, \gene{Klhl3}, \gene{Cul3}, \gene{Ppp1ca}, \gene{Ppp1r1a}, \gene{Calb1}). Bootstrap confidence intervals resampled genes; the decision rule pre-specified that promotion to a primary mechanistic claim required cosine $<-0.3$ with a CI excluding zero and a directionally consistent target-gene table.
+
+\emph{Parent-protein-normalized phosphosite re-test.} A per-site parent-protein-normalized effect was computed as $\Delta_s^{\mathrm{parent\ norm}}=\hat{\beta}_{Fs}-\hat{\delta}_{g(s)}^{\mathrm{protein}}$. The same Fisher exact framework used in §2.5 was applied to parent-protein-normalized suppressed sites ($\Delta_s^{\mathrm{parent\ norm}}<0$ and nominal phosphosite $p<0.05$ or strict site-level $q<0.10$), with the same anchor-exclusion, NCC-exclusion, and one-site-per-parent-gene sensitivities. The nominal $p$ threshold comes from the raw phosphosite model, so this analysis is a robustness re-test of the DCT1-high parent-gene enrichment rather than a full contrast-level uncertainty model for phosphosite-minus-protein effects. It is not a direct phosphorylation-stoichiometry measurement because the underlying TMT estimates remain whole-kidney.
+
+\emph{IRI Visium DCT-transport spatial context (GSE269622).} A 10-gene DCT-transport score (\gene{Slc12a3}, \gene{Stk39}, \gene{Wnk1}, \gene{Wnk4}, \gene{Oxsr1}, \gene{Kcnj10}, \gene{Kcnj16}, \gene{Clcnkb}, \gene{Bsnd}, \gene{Calb1}) was computed per Visium spot as the mean of standardized expression of detected members. Spots were grouped into all spots, DCT-marker-high (top quartile of DCT marker expression), DCT-adjacent (near DCT-high but not themselves DCT-high), non-DCT-adjacent, and marker-enriched injured-tubule, fibroblast/interstitial, endothelial, immune, and fibro-inflammatory repair niches. Mean differences versus sham within group were tested with two-sample $t$ at spot level. These are spot-level descriptive tests; they have no animal-level spatial replication and are interpreted as spatial-context prediction, not validation.
+
+\emph{Vasopressin/cAMP reference (PXD001729) and KLHL3/CUL3/WNK turnover.} PXD001729 dDAVP-direction phosphosites were intersected with OSD-462 quantified sites; the targeted vasopressin anti-alignment was tested over shared single sites and over the 14 transport-target subset. KLHL3, CUL3, and WNK protein- and phosphosite-level coverage were inventoried from OSD-462 to document whether public data could distinguish KLHL3/CUL3-mediated WNK turnover from ionic/osmotic suppression of WNK-SPAK activity.
+
+A triage summary classified each branch as primary support, robustness support, spatial prediction, secondary negative, or future-data only, so no reference was used at higher resolution than the underlying data support.
+
+\subsection{Statistics, multiple testing, and reproducibility}
+
+Benjamini-Hochberg correction was applied within defined test families \citep{benjamini1995controlling}. Gene-set correlations, LAR component contrasts, OSD-253 strain-context tests, WGCNA module overlaps, and DCT1 phosphosite-enrichment tests were corrected within their respective families. No single global false-discovery correction was applied across all primary, sensitivity, and exploratory families, because those families answer different pre-specified questions and include nested sensitivity analyses. Bootstrap confidence intervals were treated as uncertainty intervals under the chosen fixed analysis definitions. The bootstrap does not propagate uncertainty from gene-set curation, composition-score reference choice, or cohort metadata decisions.
+
+\begin{table}[H]
+\centering\small
+\caption{\textbf{Multiple-testing families used in the main v11 analysis.}}
+\label{tab:testingfamilies}
+\begin{tabularx}{\textwidth}{p{0.24\textwidth}p{0.13\textwidth}Yp{0.18\textwidth}}
+\toprule
+Family & Role & Correction scope & Main interpretation \\
+\midrule
+Cross-cohort RNA recurrence & primary context & Bootstrap CI and external-label permutation per contrast; no pooled BH across OSD-513 and context cohorts & Pathway-level recurrence/context, not genome-wide discovery \\
+OSD-462 phosphosite site-level summaries & anchor & BH across quantified phosphosites & Individual-site support reported separately from enrichment screens \\
+DCT1 phosphosite enrichment & primary DCT1 result & BH within DCT1/DCT2 percentile-bin and sensitivity-test family & Directional enrichment evidence; row-level tests checked with parent-gene-aware sensitivities \\
+Composition-aware phosphosite models & sensitivity & BH within adjusted enrichment/model families & Conservative robustness, not deconvolution \\
+Low-K, PXD001729, KLHL3/CUL3, spatial-reference branches & exploratory/context & Branch-specific BH or descriptive summaries as appropriate & Mechanism triage and prediction generation, not mechanism identification \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{landscape}
+\begin{table}[p]
+\centering\scriptsize
+\caption{\textbf{Primary model and statistic specifications.}}
+\label{tab:modelspec}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{\linewidth}{p{0.13\linewidth}p{0.08\linewidth}p{0.15\linewidth}p{0.20\linewidth}p{0.10\linewidth}Yp{0.12\linewidth}}
+\toprule
+Analysis & Unit & Outcome & Model/statistic & Contrast & Covariates or constraints & Multiple testing \\
+\midrule
+RRRM-2 RNA & sample, pathway & Residualized expression gene-set score & Within-arm difference in mean scores; age-specific effects estimated within age strata when used & FLT $-$ habitat GC within ISS terminal or live-return arm & Scores computed after within-study gene standardization; primary contrast not pooled across arms & BH within declared families for pathway/module tests \\
+OSD-513 RNA & sample, pathway & Processed RNA gene-set score & Difference in mean pathway scores; cosine to fixed RRRM-2 reference & FLT $-$ GC & Within-study scoring; no raw-expression pooling with RRRM-2 & Bootstrap CI and label-permutation $p$ for cosine \\
+OSD-462 protein & protein/gene & Log$_2$ median-centered TMT protein abundance & Within-plex FLT$-$GC difference averaged across plexes; gene collapse by peptide-weighted mean & FLT $-$ GC & Plex handled by within-plex differencing; peptide coverage used for filtering, weighting, and matched nulls & Matched random gene-set nulls; BH for targeted families where used \\
+OSD-462 phosphosite & phosphosite & Log$_2$ median-centered phosphosite abundance & Per-site OLS: $Y_s\sim \mathrm{flight}+\mathrm{plex}$ & FLT $-$ GC coefficient & Plex fixed effect when both plexes present; minimum three finite FLT and GC values & BH across quantified sites for site-level summaries \\
+DCT1 enrichment & phosphosite and parent gene & Suppressed versus not suppressed & Directional Fisher exact tests; parent-gene logistic and site-count-stratified permutation sensitivities & DCT1-high vs background & Top-quartile/top-decile bins; anchor, NCC, composite-site exclusion, one-site-per-parent-gene, and parent-gene checks & BH within DCT1 enrichment family \\
+Adjusted phosphosite model & phosphosite & Adjusted phosphosite flight coefficient & Per-site OLS ladder; second-stage effect-level regression; stacked site-fixed sensitivity & Adjusted FLT coefficient or flight$\times$DCT1 term & Parent protein abundance, DCT, endothelial, stromal scores, or composition PC in first stage; mean intensity, missingness, and site count in second stage & BH within adjusted enrichment/model families \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\end{landscape}
+
+Analyses were implemented in the project Python/R pipeline with versioned configuration files, run manifests, tests, and scripted figure generation. Detailed run identifiers and secondary outputs are archived in the repository and companion results compendium.
+
+% =====================================================================
+\section{Results}
+
+\subsection{A recurrent matrix/endothelial-high and DCT-low RNA response appears across mouse kidney spaceflight cohorts}
+
+The original RRRM-2 age-rewiring question did not pass the stability threshold at primary module/pathway resolution, so it was not promoted as a central result. The stronger signal was a flight-associated RNA response that recurred across independent kidney spaceflight cohorts. RRRM-2 ISS terminal flight effects aligned with OSD-513 at pathway level (cosine 0.641, bootstrap 95\% CI 0.373 to 0.811 in the canonical 2,000-bootstrap run). The live-return arm showed directional anti-alignment but did not pass the external-label permutation null, and is treated as recovery context rather than a primary mechanism.
+
+The recurring RNA pattern combined increased matrix, endothelial/stromal, adhesion, proteolysis, innate/inflammatory, and stress-associated features with decreased DCT/NCC-WNK transport. OSD-462 RNA independently reproduced the RRRM-2 ISS terminal direction with pathway-vector cosine 0.869 (95\% CI 0.65--0.90). This cross-cohort recurrence is the transcriptomic backbone of the study.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig1_main_result_multipanel.pdf}
+\caption{\textbf{Cross-cohort RNA recurrence.} RRRM-2 ISS terminal flight and OSD-513 show a recurring matrix-high / DCT-low RNA response. OSD-513 recurrence uses nine shared pathway features; the matched OSD-462 RNA anchor uses the 11-pathway multi-omic panel. Takeaway: terminal-flight RNA remodeling recurs across cohorts, while live animal return is best treated as recovery context.}
+\label{fig:rnarecurrence}
+\end{figure}
+
+\subsection{OSD-462 shows RNA-protein mismatch}
+
+In OSD-462, the recurrent RNA pattern did not propagate as a simple protein-abundance signature. Targeted protein-abundance concordance was null for every tested gene set. Matrix/ECM proteins moved opposite their transcripts (mean protein effect $-0.107$, two-sided $p=0.012$; RNA--protein concordance $-0.40$), and the DCT/NCC-WNK protein set showed no clear abundance effect (mean $-0.044$). Total NCC protein was unchanged in flight ($+0.089$).
+
+The transporter lesion instead appeared at the regulatory-phosphorylation layer. NCC N-terminal phosphosite features fell by approximately 0.79--0.99 log$_2$ units, and the composite p65;p68 feature fell by $-1.563$ ($p=9.3\times10^{-7}$). SPAK position features p366 and p383 were also suppressed. Non-regulatory NCC sites were comparatively flat. Targeted KSEA summarized the same pathway-level behavior as reduced SPAK/OSR1 ($z=-6.31$, $p=2.8\times10^{-10}$, three quantified curated substrates) and WNK ($z=-4.12$, $p=3.7\times10^{-5}$, three quantified curated substrates) kinase output. Because the WNK KSEA rests on the same small curated substrate set and includes asymmetric site behavior, it is treated as pathway coherence rather than an independent kinome-wide discovery.
+
+\begin{table}[H]
+\centering\small
+\caption{\textbf{Selected OSD-462 WNK--SPAK/OSR1--NCC phospho-axis flight effects.} Space Flight minus Ground Control, log$_2$ scale.}
+\label{tab:phospho}
+\begin{tabular}{llrrl}
+\toprule
+Feature & Site & Flight effect & $p$ value & Role \\
+\midrule
+NCC (\gene{Slc12a3}) protein & --- & $+0.089$ & --- & total abundance control \\
+NCC phospho & p53 & $-0.851$ & $3.8\times10^{-4}$ & N-terminal regulatory-position feature \\
+NCC phospho & p65 & $-0.790$ & $3.5\times10^{-6}$ & N-terminal regulatory-position feature \\
+NCC phospho & p68 & $-0.794$ & $3.3\times10^{-4}$ & N-terminal regulatory-position feature \\
+NCC phospho & p89 & $-0.930$ & $6.6\times10^{-5}$ & additional N-terminal phosphosite \\
+NCC phospho & p65;p68 & $-1.563$ & $9.3\times10^{-7}$ & composite position feature \\
+NCC phospho & p96 & $+0.048$ & $0.48$ & non-regulatory control \\
+NCC phospho & p120 & $+0.027$ & $0.78$ & non-regulatory control \\
+SPAK (\gene{Stk39}) phospho & p366 & $-0.520$ & $1.7\times10^{-5}$ & kinase arm \\
+SPAK (\gene{Stk39}) phospho & p383 & $-0.793$ & $2.8\times10^{-4}$ & kinase arm \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Position-only labels are used because the OSD-462 phosphosite table stores site positions, and residue-letter assignment depends on accession/isoform mapping. The p89 NCC feature is therefore reported as an additional N-terminal phosphosite rather than folded into the curated SPAK/OSR1 regulatory-position set without a separate residue-mapping citation.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig_osd462_multiomics_dashboard.pdf}
+\caption{\textbf{OSD-462 RNA-protein mismatch.} The recurrent RNA response is not matched by concordant protein-abundance changes, while the NCC/SPAK/WNK regulatory phosphosite cluster is suppressed with total NCC protein flat.}
+\label{fig:osd462}
+\end{figure}
+
+\subsection{DCT identity and compartment scores suggest that the bulk DCT-low signal partly reflects remodeling context}
+
+Bulk RNA cannot separate DCT transcriptional suppression from DCT segment loss or dilution by non-tubule compartments. Marker-panel analysis showed that DCT identity and DCT transport markers fell together across cohorts, while endothelial and stromal/fibroblast scores rose. Within OSD-462, endothelial score increased in flight ($+1.00$, $p=0.036$), stromal score increased directionally ($+0.67$, $p=0.054$), and endothelial score anti-correlated with NCC regulatory phosphorylation across animals ($\rho=-0.762$, $p=0.0004$). DCT identity correlated positively with NCC regulatory phosphorylation ($\rho=+0.52$, $p=0.020$).
+
+Animal-matched RNA and phosphoprotein scores were concordant at group level: flight lowered the DCT transport RNA score ($-0.324$) and NCC regulatory phosphorylation score ($-1.298$). The condition-adjusted per-animal correlation was positive but underpowered ($\rho=+0.365$, $p=0.113$). Non-regulatory NCC sites also correlated per animal with the DCT transport RNA score, so per-animal regulatory-site specificity is not claimed. The supported conclusion is group-level concordance with an interstitial/endothelial remodeling component.
+
+\begin{table}[H]
+\centering\small
+\caption{\textbf{Animal-matched comparison of DCT transport RNA and NCC phosphorylation in OSD-462.}}
+\label{tab:matched}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrr}
+\toprule
+Comparison & $n$ & RNA FLT$-$GC & phospho FLT$-$GC & Spearman all & $p$ & condition-adjusted Spearman \\
+\midrule
+Regulatory sites vs RNA & 20 & $-0.324$ & $-1.298$ & $+0.328$ & 0.158 & $+0.365$ \\
+Regulatory + p89 sensitivity & 20 & $-0.324$ & $-1.299$ & $+0.343$ & 0.139 & $+0.325$ \\
+Non-regulatory sites vs RNA & 20 & $-0.324$ & $-0.299$ & $+0.555$ & 0.011 & $+0.474$ \\
+Regulatory vs RNA, \gene{Slc12a3} removed & 20 & $-0.247$ & $-1.298$ & $+0.301$ & 0.198 & $+0.364$ \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\subsection{Primary novel result: flight-suppressed phosphosites are enriched among DCT1-high parent genes}
+
+Because the transporter phenotype resolves at the phosphorylation layer rather than at protein abundance, we next asked whether the suppressed whole-kidney phosphosite set showed distal-nephron subtype prioritization. This analysis maps phosphosites to parent genes and then to an external DCT1/DCT2 transcriptomic prior; it prioritizes DCT1-high parent genes but does not localize phosphosite changes to DCT1 cells.
+
+GSE228367 provided a native DCT1/DCT2 transcriptomic prior. Marker checks supported the expected subtype structure: \gene{Slc12a3} was present in both subtypes but higher in DCT1, \gene{Pvalb} and \gene{Trpm6} were DCT1-high, \gene{Stk39} and \gene{Wnk4} were DCT1-leaning, and \gene{Trpv5}/\gene{Calb1} were DCT2-high. Because strict binary marker sets were sparse, the analysis used continuous DCT1 enrichment scores and DCT1-high percentile bins.
+
+Flight-suppressed OSD-462 whole-kidney phosphosites were enriched among DCT1-high parent genes. This does not prove that the phosphosite changed inside DCT1 cells; it shows that parent genes of suppressed phosphosites are statistically overrepresented among genes that are DCT1-high in an external transcriptomic reference. The strongest row-level result was the DCT1 top decile (OR 1.51, q=$9.96\times10^{-12}$). Because phosphosite rows are partially dependent through parent genes and shared proteins, the Fisher exact q values are enrichment evidence rather than independent-site discovery certainty. The signal survived anchor-gene exclusion (OR 1.49, q=$2.77\times10^{-11}$), NCC-site exclusion (OR 1.49, q=$2.77\times10^{-11}$), exclusion of composite/multi-position rows (OR 1.38, q=$1.86\times10^{-6}$), and a true one-site-per-parent-gene sensitivity (OR 1.49, q=$6.40\times10^{-4}$). At parent-gene level, genes with at least one suppressed site were enriched in the DCT1 top decile by Fisher exact test (OR 1.52, q=$1.52\times10^{-4}$), and the row-level top-decile odds ratio remained unlikely under a site-count-stratified parent-gene permutation (empirical $p=0.0005$). A covariate-adjusted parent-gene logistic model attenuated the nominal suppressed-site result (OR 1.14, q=0.453), which argues against treating the row-level q values as definitive independent-unit statistics. Top-quartile enrichment was weaker (OR 1.14, q=0.0062), and the continuous matched-null mean DCT1-score test was only weakly supportive (q=0.063). Thus, the result is DCT1-high subset enrichment, not a continuous DCT1-gradient effect.
+
+DCT2/CNT-associated comparator bins add another boundary. DCT1-low/DCT2-leaning parent-gene subsets were also enriched in some row-level and parent-gene summaries, especially under the one-site-per-parent-gene reduction. The main result is therefore not DCT1 exclusivity. It is a distal-nephron subtype-prior subset structure in which the DCT1 top-decile parent-gene set gives the clearest positive enrichment for the established NCC/SPAK phosphoproteomic lesion.
+
+\begin{table}[H]
+\centering\small
+\caption{\textbf{DCT1 top-decile enrichment contingency counts.} Counts are phosphosite rows with a mapped DCT1 parent-gene prior. The adjusted row uses the full parent-protein plus DCT/endothelial/stromal model. Row-count p values are supported by sensitivity analyses but are not independent-site discovery claims.}
+\label{tab:dct1counts}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrr}
+\toprule
+Test & Suppressed, DCT1 top decile & Suppressed, other genes & Not suppressed, DCT1 top decile & Not suppressed, other genes & OR & q \\
+\midrule
+Primary unadjusted & 478 & 2556 & 1914 & 15406 & 1.51 & $9.96\times10^{-12}$ \\
+Composite sites excluded & 375 & 2137 & 1582 & 12420 & 1.38 & $1.86\times10^{-6}$ \\
+One site per parent gene & 140 & 1178 & 290 & 3637 & 1.49 & $6.40\times10^{-4}$ \\
+Parent-gene Fisher & 157 & 1322 & 273 & 3493 & 1.52 & $1.52\times10^{-4}$ \\
+Full adjusted sensitivity & 217 & 1173 & 1540 & 10813 & 1.30 & 0.00158 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\subsection{Parent-protein and composition-aware analyses preserve the DCT1 top-decile signal}
+
+The DCT1 top-decile signal remained after parent-protein and compartment-score adjustment. In the full parent-protein plus DCT/endothelial/stromal model, top-decile enrichment remained significant (OR 1.30, q=0.00158). A composition-PC sensitivity was similar (OR 1.38, q=$6.53\times10^{-5}$). The top-quartile result attenuated in the full model (OR 1.05, q=0.282), again indicating that the robust result is concentrated in the most DCT1-high parent-gene subset.
+
+Continuous DCT1-reference models did not support a broad gradient effect. The two-stage full model produced a positive, non-significant DCT1 coefficient, and the one-shot flight-by-DCT1 interaction was directionally negative but weak. These negative results place the signal in subset-enrichment territory rather than a continuous DCT1-gradient model. The enrichment analysis prioritizes parent genes in whole-kidney phosphoproteomics; direct localization would require DCT-enriched or spatially resolved phosphoproteomics.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.49\textwidth}
+  \centering
+  \includegraphics[width=\textwidth]{v11_dct1_parent_gene_enrichment.pdf}
+  \caption{DCT1-high parent-gene enrichment.}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.49\textwidth}
+  \centering
+  \includegraphics[width=\textwidth]{v11_parent_protein_composition_sensitivity.pdf}
+  \caption{Parent-protein and composition-score sensitivity.}
+\end{subfigure}
+\caption{\textbf{DCT1-high parent-gene phosphosite enrichment.} Flight-suppressed whole-kidney phosphosites are enriched among DCT1-high parent genes, especially the top decile, and this top-decile signal remains after parent-protein and bulk-compartment adjustment. The DCT1 signal is a parent-gene prior, not cell localization.}
+\label{fig:dct1}
+\end{figure}
+
+\subsection{Exploratory path models relate remodeling scores to NCC regulatory phosphorylation}
+
+The endothelial score anti-correlated strongly with NCC regulatory phosphorylation in OSD-462, motivating exploratory path models. The implemented covariance-decomposition models used linear path summaries with bootstrap or normal-approximation OLS uncertainty rather than a full SEM or \code{brms} fit. Endothelial and matrix/endothelial composite scores were consistent with negative remodeling-phosphorylation paths between flight and NCC regulatory phosphorylation, while direct flight effects persisted. Stromal/fibroblast and DCT identity paths were directionally consistent but less precise.
+
+The animal-matched data are compatible with a remodeling-linked transporter hypothesis, while also allowing parallel flight effects on tissue remodeling and transporter phosphorylation. Temporal order remains an experimental question because the models are cross-sectional, small-sample, and based on bulk tissue.
+
+\subsection{Public perturbation references support robustness and spatial prediction, but not a single upstream WNK mechanism}
+
+The DCT1-high parent-gene result and the matched multi-omic mismatch leave the upstream signal for WNK--SPAK--NCC phosphosite suppression unresolved. We therefore compared the spaceflight signatures with public mechanistic references to test (i) whether a potassium/chloride-WNK reference matches the spaceflight DCT signature, (ii) whether the DCT1 enrichment survives per-site parent-protein normalization, (iii) whether external IRI niches show DCT-transport suppression in DCT-adjacent neighborhoods, and (iv) whether vasopressin/cAMP signaling or KLHL3/CUL3 turnover can be evaluated from available site coverage.
+
+\emph{Parent-protein-normalized DCT1 enrichment is the strongest robustness upgrade.} Re-running the DCT1-high enrichment on parent-protein-normalized phosphosite effects retained the top-decile signal (OR 1.52, 95\% CI 1.36--1.70, q=$3.73\times10^{-12}$). The result survived anchor-gene exclusion (OR 1.51, q=$9.75\times10^{-12}$), NCC-site exclusion (OR 1.51, q=$9.75\times10^{-12}$), one-site-per-parent-gene reduction (OR 1.50, q=$8.42\times10^{-4}$), and stricter site-level $q<0.10$ (OR 1.61, q=$3.73\times10^{-12}$). The top-quartile result was weaker (OR 1.17, q=0.00113), again localizing the robust signal to the most DCT1-high parent-gene subset. Target-site examples illustrate the construction: NCC p53 raw $-0.851$, parent protein $+0.089$, parent-protein-normalized effect $-0.940$; NCC p89 raw $-0.930$, parent protein $+0.089$, parent-protein-normalized effect $-1.019$; SPAK p383 raw $-0.793$, parent protein $+0.081$, parent-protein-normalized effect $-0.874$. This framing directly answers the parent-protein-abundance concern at the per-site level rather than as a regression covariate, but it is still not a direct biochemical occupancy or stoichiometry measurement.
+
+\emph{Low-K DCT anti-alignment is directional in transport targets but not stable.} A native DCT low-potassium reference (GSE228367 KD vs NK pseudobulk) was compared with each spaceflight RNA vector. In the 14-gene DCT/WNK transport-target subset, all three spaceflight cohorts moved directionally opposite the low-K DCT activation response: OSD-462 RNA cosine $-0.286$ (95\% CI $-0.752$ to $0.458$; Spearman $\rho=-0.420$, $p=0.135$, q=0.218), RRRM-2 ISS terminal RNA cosine $-0.311$ (CI $-0.780$ to $0.325$; $\rho=-0.341$, $p=0.233$, q=0.306), and OSD-513 RNA cosine $-0.146$ (CI $-0.768$ to $0.506$; $\rho=-0.169$, $p=0.563$, q=0.695). Ten of the 14 focused DCT/WNK genes (including \gene{Slc12a3}, \gene{Wnk1}, \gene{Klhl3}, \gene{Cul3}) moved opposite the low-K direction in OSD-462. None of these comparisons cleared the pre-specified primary-result threshold (cosine $<-0.3$ with CI excluding zero), so low-K DCT response is interpreted as mechanism-triage support, not as identification of the upstream WNK-suppressing signal. On genome-wide subsets, cosines were near zero across cohorts, indicating that any low-K-like signal is concentrated in DCT/WNK target genes rather than distributed across the transcriptome.
+
+\emph{External IRI Visium provides a testable DCT-transport spatial prediction.} A 10-gene DCT-transport score across GSE269622 Visium spots showed that DCT-adjacent spots (spots near DCT-marker-high spots but not themselves DCT-high) carried lower DCT transport at day 14 (mean difference $-0.044$, $t=-2.81$, $p=0.005$; 932 vs 1,134 sham spots) and week 6 ($-0.034$, $t=-2.36$, $p=0.018$; 1,574 vs 1,134), while DCT-marker-high spots themselves rose at day 14 ($+0.199$, $p=2.25\times10^{-15}$) and week 6 ($+0.132$, $p=2.70\times10^{-9}$). This contrast — intact DCT-cell transport program in DCT-marker-high spots, attenuated DCT transport in DCT-adjacent neighborhoods — generates a sharper future experiment: spaceflight kidney spatial sections should test whether DCT/NCC-WNK loss is DCT-intrinsic, concentrated in DCT-adjacent repair neighborhoods, or both. These are spot-level descriptive tests in an external IRI reference, not animal-level spatial replication in spaceflight tissue.
+
+\emph{Vasopressin/cAMP and WNK-turnover references are limited by site coverage.} The PXD001729 dDAVP/mpkDCT reference shared 60 single phosphosites with OSD-462 but zero shared transport-target sites; \gene{Slc12a3}, \gene{Stk39}, \gene{Oxsr1}, \gene{Wnk1}, \gene{Wnk4}, \gene{Klhl3}, and \gene{Cul3} did not map as shared changed targets. The cultured DCT-lineage reference therefore cannot evaluate a vasopressin/cAMP anti-alignment hypothesis for the NCC/SPAK/WNK lesion. KLHL3/CUL3 turnover is similarly bounded: \gene{Klhl3} had zero quantified phosphosites and a flat protein effect in OSD-462; \gene{Cul3} had one site and no useful turnover signal; public data do not include kidney ubiquitinomics. WNK/SPAK/NCC protein abundances were flat to slightly positive, which makes a pure degradation-driven story less directly supported by these data and points to ionic/osmotic regulation of WNK-SPAK activity or to mechanisms outside abundance.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{v11_perturbation_triangulation.pdf}
+\caption{\textbf{Public perturbation-reference analysis.} (A) Low-K DCT response cosines with OSD-462, OSD-513, and RRRM-2 ISS terminal RNA across gene-prior classes; the focused 14-gene transport-target row is anti-aligned for OSD-462 ($-0.29$), OSD-513 ($-0.15$), and RRRM-2 ($-0.31$), but bootstrap intervals are wide. (B) Focused DCT/WNK target-gene direction heatmap: most transport targets move opposite the low-K activation direction in flight. (C) Parent-protein-normalized DCT1 top-decile enrichment odds ratios across sensitivity definitions; the top-decile signal remains $\sim1.5$ across primary, anchor-exclusion, NCC-exclusion, and one-site-per-parent-gene analyses. (D) IRI Visium DCT-transport score by spatial context over time: DCT-marker-high spots retain or rise, DCT-adjacent spots fall at late repair timepoints. External references; no spaceflight spatial validation.}
+\label{fig:perturbation}
+\end{figure}
+
+This analysis strengthens the DCT1-high parent-gene result with per-site parent-protein normalization and sharpens the future-experiment design by identifying a concrete spatial expectation in DCT-adjacent neighborhoods. It does not identify a single upstream WNK suppressor from public data.
+
+\subsection{Spatial, network, live-return, TLR4, and aging analyses clarify context}
+
+External spatial references placed the bulk spaceflight RNA vector near IRI repair-stage programs at pathway level, especially injured-tubule, DCT-adjacent, fibro-inflammatory, and endothelial niches. Because these are external IRI data rather than spaceflight kidney sections, this is contextualization rather than spatial validation.
+
+Other secondary analyses clarified the range of plausible interpretations (Table~\ref{tab:contextlayers}). Full outputs, including the public perturbation-reference tables and the IRI DCT-transport-by-niche table, are provided in the companion results compendium so the main text can stay focused on RNA recurrence, RNA-protein mismatch, phosphosite enrichment, path analyses, and the spatial prediction.
+
+\begin{table}[H]
+\centering\small
+\caption{\textbf{Secondary analyses used as context for the main model.}}
+\label{tab:contextlayers}
+\begin{tabularx}{\textwidth}{p{0.20\textwidth}Xp{0.28\textwidth}}
+\toprule
+Analysis & Result & Role in manuscript \\
+\midrule
+Spatial IRI reference & Bulk spaceflight RNA vectors aligned most strongly with repair-stage injured-tubule, DCT-adjacent, fibro-inflammatory, and endothelial Visium niches. & Provides external tissue-context vocabulary; direct localization requires spaceflight kidney sections. \\
+Network analysis & WGCNA modules annotated the RNA response, but LIONESS/node2vec candidate genes did not enrich for OSD-462 protein or phosphoprotein changes. & Keeps network-derived gene rankings exploratory. \\
+Live animal return & Live-return vectors showed attenuation or anti-alignment rather than a stable reversal result. & Recovery context for the terminal-flight RNA state. \\
+OSD-253 strain context & C57BL/6J and C3H/HeJ patterns suggested TLR4/innate association but not strict TLR4 requirement. & Mechanism context rather than decisive pathway dependence. \\
+External aging projection & The spaceflight RNA state did not map cleanly onto a simple accelerated kidney-aging axis. & Separates remodeling from a generic aging interpretation. \\
+PXD001729 mpkDCT phosphoproteome & DCT-lineage phosphoproteomic coverage was useful, but dDAVP anti-alignment was essentially null (cosine $-0.026$, bootstrap CI $-0.310$ to 0.287) and zero of the 14 transport-target sites were shared. & Supports DCT-lineage plausibility without a vasopressin-opposition claim. \\
+KLHL3/CUL3 checks & Public RNA/protein/phosphosite data did not distinguish WNK turnover from ionic or osmotic WNK-SPAK suppression; \gene{Klhl3} had zero quantified OSD-462 phosphosites. & Defines a follow-up experiment for ubiquitinomics and targeted turnover assays. \\
+Low-K DCT response (GSE228367) & Spaceflight DCT/WNK transport-target genes moved directionally opposite the low-K DCT activation direction in all three cohorts (OSD-462 cosine $-0.286$; RRRM-2 ISS-T $-0.311$; OSD-513 $-0.146$), but bootstrap intervals included zero and pre-specified promotion thresholds were not met. & Mechanism-triage support for a potassium/chloride-like DCT deactivation hypothesis; not promoted to a primary upstream mechanism. \\
+Parent-protein-normalized phosphosite enrichment & DCT1 top-decile OR 1.52 (q=$3.73\times10^{-12}$) after per-site parent-protein normalization; survives anchor, NCC, and one-site-per-parent-gene sensitivities. & Robustness upgrade to the DCT1-high parent-gene result; addresses the parent-protein-abundance concern at the site level without claiming direct biochemical occupancy. \\
+IRI Visium DCT-transport spatial context (GSE269622) & DCT-adjacent spots showed lower DCT transport at day 14 ($-0.044$, $p=0.005$) and week 6 ($-0.034$, $p=0.018$); DCT-marker-high spots rose at the same timepoints. & Generates a testable spatial prediction (DCT-adjacent transport drop) for a future spaceflight kidney spatial experiment. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{Discussion}
+
+\subsection{Main interpretation}
+
+These data support a phosphoproteome-centered model of spaceflight-associated DCT regulatory suppression embedded in a recurrent remodeling RNA state. Across mouse kidney spaceflight cohorts, flight reproducibly increased matrix/endothelial remodeling scores and decreased DCT/NCC-WNK transport scores. In matched OSD-462/RR-10 multi-omics, that RNA state did not behave like a simple protein-abundance program: genome-scale RNA-protein agreement was weak, targeted protein concordance was null, matrix proteins moved opposite their transcripts, and DCT/NCC-WNK protein abundance was flat. The transporter signal was sharpest at the regulatory-phosphorylation layer.
+
+That distinction matters biologically. NCC activity is regulated heavily through WNK--SPAK/OSR1-dependent phosphorylation, so flat total NCC protein does not imply flat transporter function. Reduced NCC regulatory phosphorylation is consistent with reduced NCC activation and altered distal sodium-chloride handling, with possible consequences for potassium, calcium, magnesium, and DCT function. The public omics data do not include matched urine chemistry, serum electrolytes, blood pressure, or transporter activity measurements, so the functional consequence remains an experimental prediction rather than a measured endpoint here.
+
+\subsection{Relationship to prior work}
+
+Cosmic Kidney Disease established the spaceflight-associated NCC/distal-nephron dephosphorylation phenotype with stronger physiological and morphological support than the present public-data analysis can provide \citep{siew2024cosmic}. The contribution here is different. This study asks what public cross-cohort RNA and matched OSD-462 protein/phosphoprotein data add around that established endpoint. The answer is that the endpoint sits inside a reproducible matrix/endothelial-high and DCT-low RNA context, but that context does not propagate cleanly to protein abundance. The public data therefore point to phosphorylation, not abundance, as the informative molecular layer for the transporter lesion.
+
+\subsection{Meaning of the DCT1-high parent-gene result}
+
+The DCT1 result refines the distal-nephron interpretation by separating parent-gene prioritization from cell-of-origin assignment. OSD-462 is whole-kidney phosphoproteomics, and GSE228367 is an external transcriptomic reference. Their intersection shows that the parent genes of flight-suppressed phosphosites are overrepresented among genes that are DCT1-high in native kidney. It does not prove that the phosphosite changed inside DCT1 cells.
+
+The strongest and most reproducible result is the DCT1 top-decile parent-gene subset. The top-quartile result is weaker, and continuous DCT1-reference models do not support a broad gradient. Because phosphosite rows are partially dependent through shared parent genes, the very small Fisher exact q values should be read as evidence for enrichment, not as proof from thousands of independent biological units. The one-site-per-parent-gene, parent-gene Fisher, site-count-stratified permutation, and parent-protein/composition-aware analyses reduce the simplest row-amplification and abundance explanations. At the same time, the parent-gene logistic sensitivity attenuates after covariate adjustment, and DCT1-low/DCT2-leaning comparator bins are also enriched in some summaries. The claim is therefore parent-gene enrichment in DCT-subtype-prior programs, strongest in the DCT1 top decile, not DCT1 exclusivity or DCT1 cell localization. A direct test would require DCT-enriched, spatially resolved, or segment-specific spaceflight phosphoproteomics.
+
+\subsection{Public perturbation references and the upstream signal}
+
+The public perturbation-reference analysis moves one question forward. The strongest result was the parent-protein-normalized re-test of the DCT1-high enrichment: the top-decile signal held at OR 1.52 (q=$3.73\times10^{-12}$) when phosphosite effects were normalized by their parent-protein effect at the per-site level. That directly addresses the most natural reviewer concern about the DCT1-high enrichment: that suppressed sites are merely sites on more abundant DCT-resident proteins. The result is at least as strong as the original M0 model in the composition ladder, but it remains parent-gene-prioritized whole-kidney phosphoproteomics rather than cell-of-origin assignment or direct phosphosite occupancy.
+
+The low-potassium DCT reference was the natural mechanism candidate because low potassium normally activates the DCT/NCC-WNK adaptive program, and spaceflight suppresses NCC/SPAK/WNK regulatory phosphorylation. The 14-gene transport-target subset moved directionally opposite the low-K activation response in all three spaceflight cohorts, with 10 of 14 genes flipping for OSD-462 RNA, but none of the cohorts cleared the pre-specified primary threshold and bootstrap intervals were wide. Thus, public low-K DCT references provide partial directional support for a potassium/chloride-like DCT deactivation hypothesis without identifying it as the upstream mechanism. The vasopressin/cAMP reference and KLHL3/CUL3 turnover check were similarly bounded by coverage: no shared changed transport-target sites with PXD001729, no KLHL3 phosphosites in OSD-462, no public kidney ubiquitinomics, and flat WNK/SPAK/NCC protein abundance that does not support a pure degradation-driven story. Public perturbation data therefore narrow the upstream-mechanism question rather than resolve it.
+
+The IRI Visium DCT-transport check turned the spatial section from background context into a concrete prediction. DCT-marker-high spots retained or even raised DCT transport during late repair, while DCT-adjacent spots showed lower DCT transport at day 14 and week 6. If the spaceflight lesion behaves like the IRI repair phase, DCT-adjacent neighborhoods should show the DCT-transport drop in spaceflight kidney sections, while DCT-marker-high regions may retain core DCT identity. That prediction is testable with a single spatial transcriptomic spaceflight experiment.
+
+\subsection{Remodeling versus transporter suppression}
+
+The endothelial and matrix/endothelial path analyses formalize an observation that is biologically interesting on its own: animals with higher endothelial/remodeling scores tended to have lower NCC regulatory phosphorylation. The models are compatible with a remodeling-linked transporter hypothesis, but they are also compatible with parallel flight effects on tissue remodeling and transporter phosphorylation. The useful output is not causal proof; it is a clearer experimental fork. If remodeling precedes transporter deactivation, spatial and time-course data should show DCT phosphorylation loss emerging in or near remodeling-rich neighborhoods. If the processes are parallel, DCT phosphoregulation should change without requiring local matrix/endothelial expansion.
+
+\subsection{Context and boundary analyses}
+
+The secondary analyses clarify context. Spatial IRI references suggest that the bulk spaceflight RNA response resembles repair-stage injured-tubule, DCT-adjacent, fibro-inflammatory, and endothelial niches; direct localization would require spaceflight kidney sections. Network analyses provide annotation but not independent protein/phosphoprotein support. Live-return, OSD-253, and aging analyses argue against over-simple recovery, TLR4-dependence, and accelerated-aging interpretations. PXD001729 supports DCT-lineage phosphoproteomic plausibility, but not a robust vasopressin anti-alignment model. KLHL3/CUL3 turnover remains an important but untested mechanism.
+
+\subsection{Limitations}
+
+Several features of the data shape interpretation. The analysis uses public datasets with heterogeneous missions, strains, sex, sequencing protocols, and metadata. RRRM-2 has small per-group sample size for age-by-flight interactions, and OSD-253 has imperfect control definitions. OSD-462 provides the key matched multi-omic anchor, but its phosphoproteomics is whole-kidney and cannot assign phosphosites to DCT1 cells. The DCT1 prior is derived from snRNA-seq, not phosphoproteomics, so the enrichment analysis prioritizes DCT1-high parent genes rather than localizing phosphosites. Phosphosite rows are not fully independent because multiple sites can map to the same protein. Nominal $p<0.05$ defines a directional enrichment set, not individual phosphosite significance. Parent-gene-aware and site-count-stratified sensitivity analyses reduce row-dependence concerns but do not eliminate all observability, peptide-coverage, or parent-gene annotation structure. Composition-aware models reduce simple parent-protein and bulk-compartment explanations, but they adjust compartment scores rather than estimating cell-type-resolved phosphosite abundance and may overadjust if remodeling lies on the biological path. The path analysis is cross-sectional, small-sample, and based on approximate OLS summaries rather than a full SEM. Spatial references are IRI, not spaceflight, and the DCT-transport-by-spot tests are spot-level descriptive comparisons without animal-level spatial replication. Public perturbation references narrowed but did not resolve the upstream-mechanism question: the low-K DCT reference was directional only in a 14-gene transport-target subset with wide bootstrap intervals, the PXD001729 dDAVP reference shared zero of the 14 transport-target phosphosites with OSD-462, and KLHL3/CUL3 turnover could not be tested because of zero \gene{Klhl3} phosphosite coverage and no public kidney ubiquitinomics. The parent-protein-normalized robustness re-test addresses parent-protein-abundance concerns but uses whole-kidney TMT estimates rather than direct biochemical phospho-stoichiometry. Network candidates did not translate to OSD-462 protein or phosphoprotein enrichment. Animal-matched physiology, urine and serum electrolytes, and blood pressure are not available in these public omics records.
+
+\subsection{Future experiments}
+
+The decisive next experiments are straightforward. DCT-enriched or spatially resolved spaceflight phosphoproteomics should test whether the DCT1-high parent-gene subset localizes to DCT1 or DCT-adjacent compartments. Spatial transcriptomics on flight kidney sections should determine whether DCT-low regions lie near endothelial, fibro-inflammatory, or injured-tubule repair niches, with the specific IRI-derived prediction that DCT-adjacent spots will carry the DCT-transport drop while DCT-marker-high spots may retain core DCT identity. Ubiquitinomics and KLHL3/CUL3/WNK turnover assays should distinguish enhanced WNK degradation from ionic or osmotic suppression of WNK-SPAK activity; the public datasets cannot make this call because of zero \gene{Klhl3} phosphosite coverage and no kidney ubiquitinomics. Animal-matched electrolyte physiology, urine and serum chemistry, blood pressure, and NCC abundance/phosphorylation would connect the molecular pattern to kidney function. A targeted potassium/chloride perturbation in flight or analog studies would test the directional low-K-opposing signal that the public GSE228367 reference suggests but cannot confirm.
+
+The model would be strengthened if DCT-enriched or spatial phosphoproteomics recovered the same suppressed regulatory sites in DCT1/DCT-adjacent regions and weakened if the suppressed sites were broadly distributed away from DCT compartments despite their DCT1-high parent-gene prior. That is the useful feature of the present analysis: it turns a whole-kidney public-data pattern into a testable segment-specific prediction.
+
+\section{Conclusion}
+
+Mouse spaceflight kidney remodeling shows a recurrent RNA pattern of increased matrix/endothelial remodeling and decreased DCT/NCC-WNK transport. In matched OSD-462/RR-10 multi-omics, this RNA pattern does not translate cleanly to protein abundance; the transporter lesion appears at the NCC/SPAK/WNK regulatory-phosphorylation layer. Flight-suppressed whole-kidney phosphosites are enriched among DCT1-high parent genes, especially in the top decile, and this enrichment persists after parent-protein and bulk-compartment adjustment, true one-site-per-parent-gene sensitivity, parent-gene Fisher testing, site-count-stratified permutation, and per-site parent-protein normalization (OR 1.52, q=$3.73\times10^{-12}$). Public perturbation references do not identify a single upstream WNK-suppressing signal: a native low-potassium DCT reference is directional in the 14-gene transport-target subset but not stable, and vasopressin/cAMP and KLHL3/CUL3 turnover are bounded by coverage. External IRI Visium data add a concrete spatial prediction: DCT-adjacent neighborhoods carry a DCT-transport drop in late repair while DCT-marker-high spots retain DCT identity. These data support a phosphoproteome-centered model of spaceflight-associated DCT regulatory suppression embedded in kidney remodeling; the DCT1 signal is parent-gene and bulk-tissue based, and future spaceflight spatial or DCT-enriched phosphoproteomics can test its cellular origin directly.
+
+\section*{Author Contributions}
+I.S. designed and implemented the analysis plan, conducted the cross-cohort RNA, matched multi-omic, KSEA, cell-type score, DCT1-reference, composition-aware sensitivity, exploratory path, and spatial-reference analyses, generated figures, drafted the manuscript, and maintained the source code and run artifacts. Authorship and collaboration structure will be revised with mentor and collaborator input.
+
+\section*{Competing Interests}
+The author declares no competing interests.
+
+\section*{Data and Code Availability}
+NASA Open Science Data Repository accessions include OSD-771/RRRM-2, OSD-513, OSD-253, and OSD-462/RR-10. External references include GSE228367, PXD001729, GSE269622, GSE269719, and Tabula Muris Senis kidney. Pipeline code is under \path{src/}, with extension modules under \path{src/v11/}. Core analysis modules include \path{src/v11/build_gse228367_dct_prior.R}, \path{src/v11/core_analysis.py}, \path{src/v11/h2_composition_aware_phospho.py}, \path{src/v11/spatial_reference_projection.py}, and \path{src/v11/publication_figures.py}; public perturbation-reference modules include \path{src/v11/perturbation_gse228367_lowk.py}, \path{src/v11/h2_occupancy_normalized_phospho.py}, \path{src/v11/spatial_dct_transport_check.py}, and \path{src/v11/perturbation_triage_summary.py}. The end-to-end entrypoint is \code{python -m src.run\_all\_phases --v11-only --run-id RUN\_ID}. Detailed run identifiers, outputs, public perturbation-reference tables, and secondary analyses are collected in the companion results compendium.
+
+% =====================================================================
+\begin{thebibliography}{99}\small
+
+\bibitem{afshinnekoo2020fundamental} Afshinnekoo E, Scott RT, MacKay MJ, et al. Fundamental biological features of spaceflight: advancing the field to enable deep-space exploration. \emph{Cell}. 2020;183:1162--1184. doi:10.1016/j.cell.2020.10.050.
+
+\bibitem{badia2022decoupler} Badia-i-Mompel P, Velez Santiago J, Braunger J, et al. decoupleR: ensemble of computational methods to infer biological activities from omics data. \emph{Bioinformatics Advances}. 2022;2:vbac016. doi:10.1093/bioadv/vbac016.
+
+\bibitem{benjamini1995controlling} Benjamini Y, Hochberg Y. Controlling the false discovery rate: a practical and powerful approach to multiple testing. \emph{Journal of the Royal Statistical Society Series B}. 1995;57:289--300.
+
+\bibitem{casado2013kinase} Casado P, Rodriguez-Prados JC, Cosulich SC, et al. Kinase-substrate enrichment analysis provides insights into the heterogeneity of signaling pathway activation in leukemia cells. \emph{Science Signaling}. 2013;6:rs6. doi:10.1126/scisignal.2003573.
+
+\bibitem{cheng2015mpkdct} Cheng L, Poulsen SB, Wu Q, et al. A systems level analysis of vasopressin-mediated signaling networks in kidney distal convoluted tubule cells. \emph{Scientific Reports}. 2015;5:12829. doi:10.1038/srep12829.
+
+\bibitem{chouker2025impact} Chouker A, Gallo A, et al. Impact of spaceflight on endocrine, metabolic and kidney function: current evidence, open issues, and potential countermeasures. \emph{BMC Biology}. 2025. doi:10.1186/s12915-025-02471-w.
+
+\bibitem{cockett1962astronautical} Cockett ATK, Beehler CC, Roberts JE. Astronautical urolithiasis: a potential hazard during prolonged weightlessness in space travel. \emph{Journal of Urology}. 1962;88:542--544.
+
+\bibitem{daSilveira2020comprehensive} da Silveira WA, Fazelinia H, Rosenthal SB, et al. Comprehensive multi-omics analysis reveals mitochondrial stress as a central biological hub for spaceflight impact. \emph{Cell}. 2020;183:1185--1201. doi:10.1016/j.cell.2020.10.005.
+
+\bibitem{garcia2019benchmark} Garcia-Alonso L, Holland CH, Ibrahim MM, Turei D, Saez-Rodriguez J. Benchmark and integration of resources for the estimation of human transcription factor activities. \emph{Genome Research}. 2019;29:1363--1375. doi:10.1101/gr.240663.118.
+
+\bibitem{love2014deseq2} Love MI, Huber W, Anders S. Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. \emph{Genome Biology}. 2014;15:550. doi:10.1186/s13059-014-0550-8.
+
+\bibitem{pietrzyk2007renal} Pietrzyk RA, Jones JA, Sams CF, Whitson PA. Renal stone formation among astronauts. \emph{Aviation, Space, and Environmental Medicine}. 2007;78:A9--A13.
+
+\bibitem{ritchie2015limma} Ritchie ME, Phipson B, Wu D, et al. limma powers differential expression analyses for RNA-sequencing and microarray studies. \emph{Nucleic Acids Research}. 2015;43:e47. doi:10.1093/nar/gkv007.
+
+\bibitem{robinson2010edger} Robinson MD, McCarthy DJ, Smyth GK. edgeR: a Bioconductor package for differential expression analysis of digital gene expression data. \emph{Bioinformatics}. 2010;26:139--140. doi:10.1093/bioinformatics/btp616.
+
+\bibitem{schubert2018progeny} Schubert M, Klinger B, Klunemann M, et al. Perturbation-response genes reveal signaling footprints in cancer gene expression. \emph{Nature Communications}. 2018;9:20. doi:10.1038/s41467-017-02391-6.
+
+\bibitem{siew2024cosmic} Siew K, Nestler KA, Nelson C, et al. Cosmic kidney disease: an integrated pan-omic, physiological and morphological study into spaceflight-induced renal dysfunction. \emph{Nature Communications}. 2024;15:4923. doi:10.1038/s41467-024-49212-1.
+
+\bibitem{smith2014men} Smith SM, Heer M, Shackelford LC, Sibonga JD, Spatz J, Pietrzyk RA, Hudson EK, Zwart SR. Men and women in space: bone loss and kidney stone risk after long-duration spaceflight. \emph{Journal of Bone and Mineral Research}. 2014;29:1639--1645. doi:10.1002/jbmr.2185.
+
+\bibitem{spatial2025iri} Xuanyuan Q, Wu H, Sundaramoorthi H, et al. Multimodal spatial transcriptomic characterization of mouse kidney injury and repair. \emph{Nature Communications}. 2025;16. doi:10.1038/s41467-025-62599-9.
+
+\bibitem{su2024dct} Su X-T, Reyes JV, Lackey AE, et al. Enriched single-nucleus RNA-sequencing reveals unique attributes of distal convoluted tubule cells. \emph{Journal of the American Society of Nephrology}. 2024;35:426--440. doi:10.1681/ASN.0000000000000297.
+
+\bibitem{tabula2020} The Tabula Muris Consortium. A single-cell transcriptomic atlas characterizes ageing tissues in the mouse. \emph{Nature}. 2020;583:590--595. doi:10.1038/s41586-020-2496-1.
+
+\end{thebibliography}
+
+\end{document}

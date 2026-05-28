@@ -712,9 +712,11 @@ def phase_v11(
             "baseline",
             "external_qc",
             "dct_prior",
+            "perturbation",
             "h2_enrichment",
             "h2_pxd",
             "h2_klhl3",
+            "h2_occupancy",
             "h2_composition_adjusted",
             "h3_mediation",
             "spatial_reference",
@@ -754,6 +756,20 @@ def phase_v11(
     ):
         return False
 
+    if not run_python(
+        "src.v11.perturbation_gse228367_lowk",
+        [f"--run-root={results_dir}"],
+        dry_run=dry_run,
+    ):
+        return False
+
+    if not run_python(
+        "src.v11.h2_occupancy_normalized_phospho",
+        [f"--run-root={results_dir}"],
+        dry_run=dry_run,
+    ):
+        return False
+
     if skip_spatial:
         log("Skipping v11 external spatial reference projection", "WARN")
     else:
@@ -764,6 +780,15 @@ def phase_v11(
             spatial_args.append("--skip-xenium")
         if not run_python("src.v11.spatial_reference_projection", spatial_args, dry_run=dry_run):
             return False
+        if not run_python("src.v11.spatial_dct_transport_check", [f"--run-root={results_dir}"], dry_run=dry_run):
+            return False
+
+    if not run_python(
+        "src.v11.perturbation_triage_summary",
+        [f"--run-root={results_dir}"],
+        dry_run=dry_run,
+    ):
+        return False
 
     if skip_figures:
         log("Skipping v11 publication figures", "WARN")

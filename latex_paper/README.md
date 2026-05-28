@@ -1,15 +1,26 @@
-# LaTeX Paper Project
+# LaTeX Manuscript Artifacts
 
-## Files
-- `main.tex`: main manuscript file
-- `references.bib`: bibliography database
+## Current v11 Pair
+
+- `manuscript_v11.tex` / `manuscript_v11.pdf`: current main manuscript draft.
+- `results_v11.tex` / `results_v11.pdf`: companion results compendium when regenerated.
+
+The v11 manuscript pulls publication figures first from:
+
+`../data/results/run_20260526_v11_dct1_phospho_mediation/figures/v11/`
+
+and then falls back to older local figure folders for legacy panels.
 
 ## Build
-Use your preferred LaTeX editor, or run:
+
+From this directory:
 
 ```bash
-pdflatex main.tex
-bibtex main
-pdflatex main.tex
-pdflatex main.tex
+latexmk -pdf manuscript_v11.tex
+```
+
+The end-to-end analysis entry point is:
+
+```bash
+python -m src.run_all_phases --v11-only --run-id RUN_ID
 ```
