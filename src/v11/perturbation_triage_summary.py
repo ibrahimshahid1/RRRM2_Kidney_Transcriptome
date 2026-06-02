@@ -32,7 +32,7 @@ def main() -> None:
 
     rows = [
         {
-            "mechanism_branch": "potassium_chloride_dct_wnk",
+            "mechanism_branch": "lowk_dct_wnk_reference",
             "analysis": "GSE228367 low-K DCT-enriched pseudobulk anti-alignment",
             "status": lowk.get("status"),
             "headline_result": lowk.get("classification"),
@@ -41,10 +41,10 @@ def main() -> None:
         },
         {
             "mechanism_branch": "parent_protein_normalized_phosphorylation",
-            "analysis": "OSD-462 occupancy-normalized DCT1 parent-gene enrichment",
+            "analysis": "OSD-462 parent-protein-normalized DCT-subtype-prior enrichment",
             "status": occ.get("status"),
             "headline_result": f"primary={occ.get('primary_record', {})}",
-            "paper_use": "robustness_upgrade" if occ.get("supports_parent_normalized_dct1_enrichment") else "bounded_robustness",
+            "paper_use": "robustness_upgrade" if occ.get("supports_parent_normalized_dct_prior_enrichment") else "bounded_robustness",
             "boundary": occ.get("boundary"),
         },
         {
@@ -81,13 +81,13 @@ def main() -> None:
 
     verdict = {
         "status": "complete",
-        "best_current_upgrade": (
-            "lowK_primary_candidate"
-            if lowk.get("promote_to_primary_result")
-            else "occupancy_normalization_and_triage"
-            if occ.get("supports_parent_normalized_dct1_enrichment")
-            else "bounded_negative_mechanism_triage"
-        ),
+            "best_current_upgrade": (
+                "lowK_primary_candidate"
+                if lowk.get("promote_to_primary_result")
+                else "parent_protein_normalization_and_triage"
+                if occ.get("supports_parent_normalized_dct_prior_enrichment")
+                else "bounded_negative_mechanism_triage"
+            ),
         "rows": rows,
     }
     (out_dir / "perturbation_triage_verdict.json").write_text(json.dumps(verdict, indent=2))

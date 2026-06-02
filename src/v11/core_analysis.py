@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Execute the core v11 DCT1/phosphoproteome/mediation analyses.
+"""Execute the core v11 DCT-subtype-prior phosphoproteome analyses.
 
 This script intentionally keeps the external references as priors/scaffolds:
 GSE228367 is a DCT subtype RNA reference, PXD001729 is a cultured DCT-lineage
 phosphoproteomic reference, and OSD-462 remains the only spaceflight
-phosphoproteomic anchor.
+phosphoproteomic anchor. Historical output directories still use H2/DCT1 and
+H3/mediation names for continuity, but manuscript-facing language treats them
+as DCT-subtype-prior enrichment and exploratory covariance decomposition.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 from scipy import stats
+import yaml
 
 
 RUN_ROOT = Path("data/results/run_20260526_v11_dct1_phospho_mediation")
@@ -30,6 +33,9 @@ REGULATOR = Path("data/results/run_20260522_regulator_activity")
 DCT_PRIOR_DIR = RUN_ROOT / "dct_prior"
 PXD_DIR = Path("data/external/phosphoproteomics/PXD001729")
 KSEA_NET = Path("data/external/kinase_substrate/renal_kinase_substrate_core.tsv")
+MECHANISM_SETS = Path("config/mechanism_gene_sets.yaml")
+OSD462_PROTEIN_XLSX = Path("data/external/osdr/OSD-462/GLDS-462_proteomics_2021-12-31_tc884-885_Protein_WorkUp.xlsx")
+OSD462_PHOSPHO_XLSX = Path("data/external/osdr/OSD-462/GLDS-462_phosphproteomics_2021-12-31_tc882-883_Pho_WorkUp_JM.xlsx")
 
 
 ANCHOR_GENES = {"Slc12a3", "Stk39", "Oxsr1", "Wnk1", "Wnk4"}
@@ -48,6 +54,20 @@ TRANSPORT_TARGETS = {
     "Trpm6",
     "Pvalb",
     "Calb1",
+}
+
+PATHWAY_FAMILIES = {
+    "ecm_organization": "matrix_remodeling",
+    "fibrosis_tgfb_emt": "matrix_remodeling",
+    "integrin_cell_adhesion": "matrix_remodeling",
+    "mmp_adam_proteolysis": "matrix_remodeling",
+    "dct_ncc_wnk_transport": "distal_tubule_transport",
+    "tubular_transport_broad": "distal_tubule_transport",
+    "tlr4_innate": "immune_inflammatory",
+    "macrophage_inflammation": "immune_inflammatory",
+    "oxidative_stress_nrf2": "stress_response",
+    "preservation_stress_response": "stress_response",
+    "s1p_s1pr3": "s1p_lipid_signaling",
 }
 
 FISHER_ALTERNATIVE = "greater"
@@ -178,10 +198,16 @@ def baseline_lock(root: Path):
     out = pd.DataFrame(rows)
     out.to_csv(root / "baseline" / "v11_baseline_lock_summary.tsv", sep="\t", index=False)
     write_ksea_substrate_table(root)
+    write_rna_recurrence_supplements(root)
+    write_tmt_qc_summaries(root)
 
     inputs = [
         Path("docs/v11_execution_research_plan.md"),
+        MECHANISM_SETS,
+        OSD462_PROTEIN_XLSX,
+        OSD462_PHOSPHO_XLSX,
         OSD462 / "results_summary.json",
+        OSD462 / "osd462_rna_pathway_effects.tsv",
         PHENO / "phenotype_anchor_summary.tsv",
         PHENO / "phenotype_anchor_per_animal.tsv",
         CELLTYPE / "osd462_compartment_scores_per_sample.tsv",
@@ -249,6 +275,150 @@ def write_ksea_substrate_table(root: Path) -> pd.DataFrame:
     out = pd.DataFrame(rows)
     out.to_csv(root / "baseline" / "osd462_targeted_ksea_substrates.tsv", sep="\t", index=False)
     return out
+
+
+def write_rna_recurrence_supplements(root: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Write transparent gene-set membership and pathway-family sensitivities."""
+    if not MECHANISM_SETS.exists():
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    raw = yaml.safe_load(MECHANISM_SETS.read_text()) or {}
+    member_rows = []
+    for pathway, spec in raw.items():
+        genes = list(spec.get("genes") or [])
+        protected = {str(g).upper() for g in spec.get("protected_genes") or []}
+        family = PATHWAY_FAMILIES.get(pathway, str(spec.get("role", "unassigned")))
+        for i, gene in enumerate(genes, start=1):
+            member_rows.append(
+                {
+                    "pathway": pathway,
+                    "pathway_family": family,
+                    "role": spec.get("role", ""),
+                    "description": spec.get("description", ""),
+                    "gene_symbol": gene,
+                    "gene_rank_in_set": i,
+                    "protected_gene": str(gene).upper() in protected,
+                }
+            )
+    members = pd.DataFrame(member_rows)
+    members.to_csv(root / "baseline" / "rna_recurrence_gene_set_members.tsv", sep="\t", index=False)
+
+    effects_path = OSD462 / "osd462_rna_pathway_effects.tsv"
+    if not effects_path.exists():
+        return members, pd.DataFrame(), pd.DataFrame()
+    effects = read_tsv(effects_path)
+    effects["pathway_family"] = effects["pathway"].map(PATHWAY_FAMILIES).fillna("unassigned")
+    full_cosine = cosine(effects["osd462_rna_pathway_effect"], effects["rrrm2_iss_t_pathway_effect"])
+    family_rows = []
+    for family, part in effects.groupby("pathway_family"):
+        keep = effects["pathway_family"].ne(family)
+        kept = effects[keep]
+        family_rows.append(
+            {
+                "dropped_pathway_family": family,
+                "dropped_pathways": ",".join(part["pathway"].astype(str)),
+                "n_pathways_retained": int(len(kept)),
+                "full_cosine": full_cosine,
+                "cosine_after_drop": cosine(
+                    kept["osd462_rna_pathway_effect"],
+                    kept["rrrm2_iss_t_pathway_effect"],
+                ),
+                "boundary": "Pathway-family leave-out over the curated OSD-462/RRRM-2 anchor panel.",
+            }
+        )
+    families = pd.DataFrame(family_rows)
+    if not families.empty:
+        families["delta_vs_full"] = families["cosine_after_drop"] - families["full_cosine"]
+    families.to_csv(root / "baseline" / "osd462_rna_recurrence_leave_one_family.tsv", sep="\t", index=False)
+
+    paired = effects[["osd462_rna_pathway_effect", "rrrm2_iss_t_pathway_effect"]].dropna()
+    boot_rows = []
+    if len(paired):
+        rng = np.random.default_rng(46211)
+        x = paired["osd462_rna_pathway_effect"].to_numpy(dtype=float)
+        y = paired["rrrm2_iss_t_pathway_effect"].to_numpy(dtype=float)
+        for i in range(2000):
+            idx = rng.integers(0, len(paired), len(paired))
+            boot_rows.append(
+                {
+                    "bootstrap": i + 1,
+                    "n_pathways": int(len(paired)),
+                    "cosine": cosine(x[idx], y[idx]),
+                    "bootstrap_unit": "paired_curated_pathway",
+                }
+            )
+    boot = pd.DataFrame(boot_rows)
+    boot.to_csv(root / "baseline" / "osd462_rna_recurrence_paired_pathway_bootstrap.tsv", sep="\t", index=False)
+    return members, families, boot
+
+
+def _tmt_qc_from_sheet(xlsx: Path, sheet: str, layer: str) -> pd.DataFrame:
+    raw = pd.read_excel(xlsx, sheet_name=sheet, header=None)
+    if raw.shape[0] < 4:
+        return pd.DataFrame()
+    section = raw.iloc[0].ffill().astype(str)
+    labels = raw.iloc[1].astype(str)
+    headers = raw.iloc[2].astype(str)
+    data = raw.iloc[3:].reset_index(drop=True)
+    rows = []
+    for col_idx in range(raw.shape[1]):
+        sample = labels.iloc[col_idx].strip()
+        if not re.match(r"^(BL|FL|GC)-\d+", sample):
+            continue
+        values = pd.to_numeric(data.iloc[:, col_idx], errors="coerce")
+        header = headers.iloc[col_idx]
+        section_label = section.iloc[col_idx].lower()
+        if "scaled" in section_label:
+            metric = "scaled_signal_to_noise_row_sum_100"
+        elif "signal-to-noise" in section_label or "_sn_" in header:
+            metric = "summed_signal_to_noise"
+        else:
+            metric = section_label.replace(" ", "_")
+        plex = "Samp1-5" if str(header).startswith("Samp1-5") else "Samp6-10" if str(header).startswith("Samp6-10") else ""
+        finite = values[np.isfinite(values)]
+        rows.append(
+            {
+                "layer": layer,
+                "source_workbook": str(xlsx),
+                "sheet": sheet,
+                "metric": metric,
+                "plex": plex,
+                "sample_label": sample,
+                "condition": sample.split("-", 1)[0],
+                "n_rows": int(len(values)),
+                "n_finite": int(len(finite)),
+                "missing_fraction": float(1 - len(finite) / len(values)) if len(values) else np.nan,
+                "median": float(finite.median()) if len(finite) else np.nan,
+                "mean": float(finite.mean()) if len(finite) else np.nan,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def write_tmt_qc_summaries(root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Summarize raw OSD-462 TMT channel medians and missingness by layer."""
+    frames = []
+    if OSD462_PROTEIN_XLSX.exists():
+        frames.append(_tmt_qc_from_sheet(OSD462_PROTEIN_XLSX, "protein_quant_2721", "protein"))
+    if OSD462_PHOSPHO_XLSX.exists():
+        frames.append(_tmt_qc_from_sheet(OSD462_PHOSPHO_XLSX, "siteQuant_360", "phosphosite_single"))
+        frames.append(_tmt_qc_from_sheet(OSD462_PHOSPHO_XLSX, "siteQuant_360_compositeSite", "phosphosite_composite"))
+    qc = pd.concat([x for x in frames if not x.empty], ignore_index=True) if frames else pd.DataFrame()
+    qc.to_csv(root / "baseline" / "osd462_tmt_channel_qc.tsv", sep="\t", index=False)
+    if qc.empty:
+        summary = pd.DataFrame()
+    else:
+        summary = (
+            qc.groupby(["layer", "metric", "plex", "condition"], as_index=False)
+            .agg(
+                n_channels=("sample_label", "nunique"),
+                median_channel_median=("median", "median"),
+                median_missing_fraction=("missing_fraction", "median"),
+                max_missing_fraction=("missing_fraction", "max"),
+            )
+            .sort_values(["layer", "metric", "plex", "condition"])
+        )
+    summary.to_csv(root / "baseline" / "osd462_tmt_missingness_by_condition.tsv", sep="\t", index=False)
+    return qc, summary
 
 
 def parse_site(site) -> list[tuple[int, str, str]]:
@@ -623,6 +793,9 @@ def build_parent_gene_table(phospho_prior: pd.DataFrame) -> pd.DataFrame:
     sub = phospho_prior[phospho_prior["dct1_enrichment_score"].notna()].copy()
     rows = []
     for gene, g in sub.groupby("gene_symbol", sort=False):
+        n_fl = pd.to_numeric(g["n_fl"], errors="coerce") if "n_fl" in g.columns else pd.Series(0, index=g.index)
+        n_gc = pd.to_numeric(g["n_gc"], errors="coerce") if "n_gc" in g.columns else pd.Series(0, index=g.index)
+        n_valid = n_fl + n_gc
         rows.append(
             {
                 "gene_symbol": gene,
@@ -635,14 +808,8 @@ def build_parent_gene_table(phospho_prior: pd.DataFrame) -> pd.DataFrame:
                 "n_quantified_phosphosites": int(len(g)),
                 "n_single_position_sites": int(g["is_single_site"].astype(bool).sum()),
                 "n_composite_sites": int((~g["is_single_site"].astype(bool)).sum()),
-                "mean_n_valid_samples": (
-                    pd.to_numeric(g.get("n_fl", 0), errors="coerce")
-                    + pd.to_numeric(g.get("n_gc", 0), errors="coerce")
-                ).mean(),
-                "mean_missing_samples": 20 - (
-                    pd.to_numeric(g.get("n_fl", 0), errors="coerce")
-                    + pd.to_numeric(g.get("n_gc", 0), errors="coerce")
-                ).mean(),
+                "mean_n_valid_samples": n_valid.mean(),
+                "mean_missing_samples": 20 - n_valid.mean(),
                 "dct1_enrichment_score": g["dct1_enrichment_score"].iloc[0],
                 "dct1_score_percentile": g.get("dct1_score_percentile", pd.Series(np.nan, index=g.index)).iloc[0],
                 "dct2_leaning_percentile": g.get("dct2_leaning_percentile", pd.Series(np.nan, index=g.index)).iloc[0],
@@ -890,10 +1057,10 @@ def site_count_stratified_permutation(
     n_perm: int = 2000,
     seed: int = 20260526,
 ) -> dict:
-    """Shuffle DCT1-high flags among parent genes within site-count strata.
+    """Shuffle subtype-prior flags among parent genes within site-count strata.
 
     The row-level suppressed/not-suppressed pattern is held fixed; only the
-    parent-gene DCT1-high label is permuted within bins of quantified site
+    parent-gene subtype-prior label is permuted within bins of quantified site
     count. This preserves parent-gene site density in the null.
     """
     sub = df[df["dct1_enrichment_score"].notna()].copy()
@@ -1100,27 +1267,40 @@ def run_h2_enrichment(root: Path, phospho_prior: pd.DataFrame):
         (summary["analysis"] == "one_site_per_parent_gene")
         & (summary["test"].isin(["fisher_dct1_top_quartile", "fisher_dct1_top_decile"]))
     ]
+    dct2_primary_binary = summary[
+        (summary["analysis"] == "primary_p05")
+        & (summary["test"].isin(["fisher_dct2_bottom_quartile", "fisher_dct2_bottom_decile"]))
+    ]
+    dct2_one_site_binary = summary[
+        (summary["analysis"] == "one_site_per_parent_gene")
+        & (summary["test"].isin(["fisher_dct2_bottom_quartile", "fisher_dct2_bottom_decile"]))
+    ]
     primary_continuous_pass = bool((primary_continuous["q_value"] <= 0.10).any())
     primary_binary_pass = bool((primary_binary["q_value"] <= 0.10).any())
     survives_anchor_continuous = bool((anchor_continuous["q_value"] <= 0.10).any())
     survives_anchor_binary = bool((anchor_binary["q_value"] <= 0.10).any())
     survives_ncc_binary = bool((ncc_binary["q_value"] <= 0.10).any())
     survives_one_site_per_gene = bool((one_site_binary["q_value"] <= 0.10).any())
+    dct2_primary_binary_pass = bool((dct2_primary_binary["q_value"] <= 0.10).any())
+    dct2_one_site_per_gene_pass = bool((dct2_one_site_binary["q_value"] <= 0.10).any())
     passes = primary_continuous_pass or primary_binary_pass
     survives_anchor_exclusion = survives_anchor_continuous or survives_anchor_binary
-    if primary_continuous_pass and survives_anchor_continuous:
-        interpretation = "Broad continuous DCT1-prior enrichment of suppressed phosphosites is supported."
+    if primary_binary_pass and dct2_primary_binary_pass:
+        interpretation = (
+            "Distal-nephron subtype-prior enrichment is supported. The DCT1 top-decile bin is NCC/SPAK/WNK-motivated, "
+            "and the DCT2-bottom comparator also passes; do not claim DCT1 exclusivity."
+        )
     elif primary_binary_pass and survives_anchor_binary and survives_ncc_binary:
         interpretation = (
             "DCT1-high percentile enrichment is supported and survives anchor/NCC exclusion, "
-            "but the continuous DCT1-score shift is weak; claim as DCT1-prioritized subset enrichment only."
+            "but continuous DCT1-score support is weak; claim as DCT1-prioritized subset enrichment only."
         )
+    elif primary_continuous_pass and survives_anchor_continuous:
+        interpretation = "Broad continuous DCT1-prior enrichment of suppressed phosphosites is supported."
     elif passes:
-        interpretation = (
-            "A limited DCT1-prior signal is present, but sensitivity analyses do not support a broad DCT1-specific claim."
-        )
+        interpretation = "A limited DCT1-prior signal is present, but sensitivity analyses do not support a broad DCT1-specific claim."
     else:
-        interpretation = "DCT1 enrichment is not supported under the pre-specified tests."
+        interpretation = "DCT-subtype-prior enrichment is not supported under the pre-specified tests."
     verdict = {
         "primary_h2_supported_at_fdr_0_10": passes,
         "survives_anchor_gene_exclusion_at_fdr_0_10": survives_anchor_exclusion,
@@ -1130,9 +1310,11 @@ def run_h2_enrichment(root: Path, phospho_prior: pd.DataFrame):
         "survives_anchor_binary_percentile": survives_anchor_binary,
         "survives_ncc_binary_percentile": survives_ncc_binary,
         "survives_one_site_per_parent_gene": survives_one_site_per_gene,
+        "dct2_primary_binary_percentile_pass": dct2_primary_binary_pass,
+        "dct2_one_site_per_parent_gene_pass": dct2_one_site_per_gene_pass,
         "interpretation": interpretation,
-        "claim_caution": "OSD-462 remains whole-kidney phosphoproteomics; DCT1 specificity is reference-prior inference only.",
-        "single_position_note": "composite_sites_excluded removes composite/multi-position rows; one_site_per_parent_gene is the parent-gene row-dependence sensitivity.",
+        "claim_caution": "OSD-462 remains whole-kidney phosphoproteomics; DCT-subtype specificity is reference-prior inference only.",
+        "single_position_note": "composite_sites_excluded removes composite/multi-position rows; one_site_per_parent_gene is a one-phosphosite-row-per-parent-gene sensitivity.",
         "fisher_alternative": FISHER_ALTERNATIVE,
     }
     (root / "h2_enrichment" / "h2_dct1_enrichment_verdict.json").write_text(json.dumps(verdict, indent=2))
@@ -1603,7 +1785,7 @@ def run_mediation(root: Path):
     verdict = {
         "model_caveat": "Approximate Bayesian linear-model fallback; cross-sectional n=20 bulk tissue, not causal proof.",
         "mediators": indirect_rows.to_dict(orient="records"),
-        "overall_interpretation": "Use as mediation-specified causal-structure bound. Wide intervals or composition controls prevent mechanistic claims.",
+        "overall_interpretation": "Use as exploratory covariance decomposition. Wide intervals, cross-sectional data, and composition controls prevent mechanistic claims.",
     }
     (root / "h3_mediation" / "h3_mediation_verdict.json").write_text(json.dumps(verdict, indent=2))
 
@@ -1619,7 +1801,7 @@ def write_manifest(root: Path):
         PXD_DIR / "41598_2015_BFsrep12829_MOESM6_ESM.xls",
     ]
     manifest = {
-        "analysis": "v11 core DCT1/phosphoproteome/mediation analysis",
+        "analysis": "v11 core DCT-subtype-prior phosphoproteome and covariance-decomposition analysis",
         "run_root": str(root),
         "claim_discipline": "GSE228367 and PXD001729 are reference priors/scaffolds, not spaceflight evidence.",
         "inputs": [{"path": str(p), "sha256": sha256(p)} for p in input_paths if p.exists()],

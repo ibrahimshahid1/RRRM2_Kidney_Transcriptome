@@ -719,6 +719,10 @@ def phase_v11(
             "h2_occupancy",
             "h2_composition_adjusted",
             "h3_mediation",
+            "cross_osdr_recurrence",
+            "regulator_activity",
+            "human_concordance",
+            "cmap_screen",
             "spatial_reference",
             "manifests",
             "figures/v11",
@@ -744,6 +748,30 @@ def phase_v11(
 
     if not run_python(
         "src.v11.core_analysis",
+        [f"--run-root={results_dir}"],
+        dry_run=dry_run,
+    ):
+        return False
+
+    if not run_python(
+        "src.v11.kinome_atlas_ksea",
+        [
+            f"--run-root={results_dir}",
+            f"--sites-root={REPO_ROOT / 'data/results/run_20260522_osd462_anchor'}",
+        ],
+        dry_run=dry_run,
+    ):
+        return False
+
+    if not run_python(
+        "src.v11.recurrence_meta",
+        [f"--run-root={results_dir}"],
+        dry_run=dry_run,
+    ):
+        return False
+
+    if not run_python(
+        "src.v11.dct_continuous_gradient",
         [f"--run-root={results_dir}"],
         dry_run=dry_run,
     ):
@@ -782,6 +810,27 @@ def phase_v11(
             return False
         if not run_python("src.v11.spatial_dct_transport_check", [f"--run-root={results_dir}"], dry_run=dry_run):
             return False
+
+    if not run_python(
+        "src.v11.aldosterone_axis",
+        [f"--run-root={results_dir}"],
+        dry_run=dry_run,
+    ):
+        return False
+
+    if not run_python(
+        "src.v11.human_concordance",
+        [f"--run-root={results_dir}"],
+        dry_run=dry_run,
+    ):
+        return False
+
+    if not run_python(
+        "src.v11.cmap_screen",
+        [f"--run-root={results_dir}"],
+        dry_run=dry_run,
+    ):
+        return False
 
     if not run_python(
         "src.v11.perturbation_triage_summary",

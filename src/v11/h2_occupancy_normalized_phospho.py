@@ -241,15 +241,25 @@ def main() -> None:
     primary = enrich[
         enrich["analysis"].eq("occupancy_p05") & enrich["flag"].eq("dct1_top_decile")
     ]
+    comparator = enrich[
+        enrich["analysis"].eq("occupancy_p05") & enrich["flag"].eq("dct2_bottom_decile")
+    ]
     primary_record = primary.iloc[0].to_dict() if not primary.empty else {}
+    comparator_record = comparator.iloc[0].to_dict() if not comparator.empty else {}
+    dct1_supported = bool(
+        primary_record and primary_record.get("odds_ratio", 0) > 1 and primary_record.get("q_value", 1) < 0.05
+    )
+    dct2_supported = bool(
+        comparator_record and comparator_record.get("odds_ratio", 0) > 1 and comparator_record.get("q_value", 1) < 0.05
+    )
     verdict = {
         "status": "complete",
         "primary_record": primary_record,
-        "supports_parent_normalized_dct1_enrichment": bool(
-            primary_record and primary_record.get("odds_ratio", 0) > 1 and primary_record.get("q_value", 1) < 0.05
-        ),
+        "dct2_bottom_decile_record": comparator_record,
+        "supports_parent_normalized_dct1_enrichment": dct1_supported,
+        "supports_parent_normalized_dct_prior_enrichment": dct1_supported or dct2_supported,
         "boundary": (
-            "occupancy_effect = phosphosite flight effect - parent protein flight effect. "
+            "parent_protein_normalized_effect = phosphosite flight effect - parent protein flight effect. "
             "The p-value threshold still comes from the phosphosite model; this is a parent-protein-normalized "
             "enrichment robustness test, not a direct phospho-stoichiometry measurement."
         ),

@@ -1,2 +1,1 @@
-"""V11 DCT1/phosphoproteome/mediation analysis package."""
-
+"""V11 DCT-subtype-prior phosphoproteome analysis package."""

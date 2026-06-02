@@ -2,8 +2,8 @@
 """Publication-ready v11 figures.
 
 The v11 figure labels use manuscript-facing terminology:
-  * DCT1 panels show enrichment among DCT1-high parent genes in whole-kidney
-    OSD-462 phosphoproteomics.
+  * DCT-prior panels show enrichment among distal-nephron subtype-prior parent
+    genes in whole-kidney OSD-462 phosphoproteomics.
   * Composition-aware panels separate robust top-decile enrichment from weak
     continuous DCT1-gradient models.
   * Spatial panels are external IRI reference contextualization.
@@ -156,7 +156,7 @@ def legend_overlaps_visible_data(ax: plt.Axes) -> bool:
     for line in ax.lines:
         if not line.get_visible():
             continue
-        xy = np.column_stack([line.get_xdata(), line.get_ydata()])
+        xy = line.get_xydata()
         if len(xy):
             points.append(ax.transData.transform(xy))
     for collection in ax.collections:
@@ -169,6 +169,14 @@ def legend_overlaps_visible_data(ax: plt.Axes) -> bool:
         return False
     xy = np.vstack(points)
     return bool(np.any([legend_bbox.contains(x, y) for x, y in xy]))
+
+
+def qa_axis(ax: plt.Axes, label: str, *, check_legend: bool = True) -> None:
+    """Fail figure generation when an expected panel has no visible data."""
+    if not axis_has_visible_data(ax):
+        raise RuntimeError(f"{label} has no visible plotted data")
+    if check_legend and legend_overlaps_visible_data(ax):
+        raise RuntimeError(f"{label} legend overlaps visible plotted data")
 
 
 def read_tsv(path: Path) -> pd.DataFrame:
@@ -353,7 +361,7 @@ def fig_h2_primary_enrichment(run_root: Path, out_dir: Path) -> bool:
     ]
     sub = df[df["test"].isin(keep_tests) & df["analysis"].isin(keep_analyses)].copy()
     if sub.empty:
-        print("  [skip] no DCT1 enrichment rows")
+        print("  [skip] no DCT-prior enrichment rows")
         return False
     sub["analysis"] = pd.Categorical(sub["analysis"], keep_analyses, ordered=True)
     sub["test_label"] = sub["test"].map(
@@ -414,6 +422,7 @@ def fig_h2_primary_enrichment(run_root: Path, out_dir: Path) -> bool:
         fontsize=8,
         color=PALETTE["gray"],
     )
+    qa_axis(ax, "DCT-prior enrichment panel")
     save(fig, out_dir, "v11_dct1_parent_gene_enrichment")
     # Alias for the revised claim hierarchy while preserving the historical filename.
     fig_alias = plt.figure(figsize=(0.1, 0.1))
@@ -547,6 +556,8 @@ def fig_h2_composition_robustness(run_root: Path, out_dir: Path) -> bool:
     clean_axis(ax)
     panel_label(ax, "B")
     fig.suptitle("Parent-protein and composition-score sensitivity", fontsize=13, fontweight="bold", y=1.02)
+    qa_axis(axes[0], "composition enrichment panel")
+    qa_axis(axes[1], "composition gradient panel")
     save(fig, out_dir, "v11_parent_protein_composition_sensitivity")
     return True
 
@@ -559,7 +570,7 @@ def fig_h3_mediation_forest(run_root: Path, out_dir: Path) -> bool:
     df = read_tsv(path)
     sub = df[df["parameter"].eq("indirect")].copy()
     if sub.empty:
-        print("  [skip] no indirect mediation rows")
+        print("  [skip] no covariance-decomposition rows")
         return False
     label_map = {
         "endothelial": "Endothelial",
@@ -605,11 +616,12 @@ def fig_h3_mediation_forest(run_root: Path, out_dir: Path) -> bool:
     ax.text(
         0.01,
         -0.2,
-        "Approximate Bayesian OLS; cross-sectional bulk tissue; not causal mediation.",
+        "Approximate Bayesian OLS; cross-sectional bulk tissue; not causal evidence.",
         transform=ax.transAxes,
         fontsize=8,
         color=PALETTE["gray"],
     )
+    qa_axis(ax, "covariance-decomposition forest", check_legend=False)
     save(fig, out_dir, "v11_exploratory_mediation_forest")
     for ext in ["png", "pdf"]:
         src = out_dir / f"v11_exploratory_mediation_forest.{ext}"
@@ -961,6 +973,9 @@ def fig_perturbation_triangulation(run_root: Path, out_dir: Path) -> bool:
         fontsize=8,
         color=PALETTE["gray"],
     )
+    qa_axis(ax3, "parent-protein-normalized perturbation panel")
+    qa_axis(ax4a, "DCT-marker-high spatial panel")
+    qa_axis(ax4b, "DCT-adjacent spatial panel")
     save(fig, out_dir, "v11_perturbation_triangulation")
     return True
 
@@ -992,9 +1007,9 @@ def generate_all(run_root: Path, out_dir: Path | None = None) -> int:
             [
                 "# V11 Publication Figures",
                 "",
-                "Generated from v11 DCT1/phosphoproteome/mediation outputs.",
+                "Generated from v11 DCT-subtype-prior phosphoproteome outputs.",
                 "",
-                "DCT1 panels show enrichment among DCT1-high parent genes in whole-kidney OSD-462 phosphoproteomics.",
+                "DCT-prior panels show enrichment among distal-nephron subtype-prior parent genes in whole-kidney OSD-462 phosphoproteomics.",
                 "Spatial panels use external IRI references for context.",
                 "",
                 f"Figures generated: {made}",
