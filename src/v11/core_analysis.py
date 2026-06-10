@@ -125,6 +125,7 @@ def read_tsv(path: Path) -> pd.DataFrame:
 def ensure_dirs(root: Path):
     for name in [
         "baseline",
+        "cross_layer",
         "external_qc",
         "dct_prior",
         "h2_enrichment",
@@ -199,6 +200,7 @@ def baseline_lock(root: Path):
     out.to_csv(root / "baseline" / "v11_baseline_lock_summary.tsv", sep="\t", index=False)
     write_ksea_substrate_table(root)
     write_rna_recurrence_supplements(root)
+    write_cross_layer_pathway_matrix(root)
     write_tmt_qc_summaries(root)
 
     inputs = [
@@ -349,6 +351,100 @@ def write_rna_recurrence_supplements(root: Path) -> tuple[pd.DataFrame, pd.DataF
     boot = pd.DataFrame(boot_rows)
     boot.to_csv(root / "baseline" / "osd462_rna_recurrence_paired_pathway_bootstrap.tsv", sep="\t", index=False)
     return members, families, boot
+
+
+def _direction(value: float, threshold: float) -> str:
+    if not np.isfinite(value) or abs(value) < threshold:
+        return "flat"
+    return "up" if value > 0 else "down"
+
+
+def write_cross_layer_pathway_matrix(root: Path) -> pd.DataFrame:
+    """Summarize where OSD-462 pathway signals live across RNA, protein, and phosphosite layers."""
+    members_path = root / "baseline" / "rna_recurrence_gene_set_members.tsv"
+    rna_path = OSD462 / "osd462_rna_pathway_effects.tsv"
+    protein_path = OSD462 / "protein_effects_gene_anyplex.tsv"
+    phospho_path = OSD462 / "phospho_all_sites.tsv"
+    if not (members_path.exists() and rna_path.exists() and protein_path.exists() and phospho_path.exists()):
+        return pd.DataFrame()
+
+    members = read_tsv(members_path)
+    rna = read_tsv(rna_path)
+    proteins = read_tsv(protein_path)
+    phospho = read_tsv(phospho_path)
+
+    members = members.copy()
+    proteins = proteins.copy()
+    phospho = phospho.copy()
+    members["gene_upper"] = members["gene_symbol"].astype(str).str.upper()
+    proteins["gene_upper"] = proteins["gene_symbol"].astype(str).str.upper()
+    phospho["gene_upper"] = phospho["gene_symbol"].astype(str).str.upper()
+
+    protein_effects = proteins.groupby("gene_upper", as_index=False).agg(
+        protein_effect=("flight_effect", "mean"),
+    )
+    phospho_effects = phospho.groupby("gene_upper", as_index=False).agg(
+        phospho_effect=("phospho_effect", "mean"),
+        n_phospho=("phospho_effect", "count"),
+    )
+
+    rows = []
+    for pathway, part in members.groupby("pathway", sort=False):
+        genes = part["gene_upper"].dropna().astype(str).drop_duplicates()
+        rna_row = rna.loc[rna["pathway"].eq(pathway)]
+        p = protein_effects.loc[protein_effects["gene_upper"].isin(genes)]
+        ph = phospho_effects.loc[phospho_effects["gene_upper"].isin(genes)]
+        rows.append(
+            {
+                "pathway": pathway,
+                "n_set": int(len(genes)),
+                "rna_effect": float(rna_row["osd462_rna_pathway_effect"].iloc[0]) if not rna_row.empty else np.nan,
+                "protein_effect": float(p["protein_effect"].mean()) if len(p) else np.nan,
+                "n_protein": int(len(p)),
+                "phospho_effect": float(ph["phospho_effect"].mean()) if len(ph) else np.nan,
+                "n_phospho": int(len(ph)),
+            }
+        )
+
+    out = pd.DataFrame(rows)
+    for col, zcol in [
+        ("rna_effect", "rna_z"),
+        ("protein_effect", "protein_z"),
+        ("phospho_effect", "phospho_z"),
+    ]:
+        x = pd.to_numeric(out[col], errors="coerce")
+        sd = x.std(ddof=0)
+        out[zcol] = (x - x.mean()) / sd if np.isfinite(sd) and sd > 0 else np.nan
+
+    out["rna_dir"] = out["rna_effect"].apply(lambda x: _direction(x, 0.04))
+    out["protein_dir"] = out["protein_effect"].apply(lambda x: _direction(x, 0.02))
+    out["phospho_dir"] = out["phospho_effect"].apply(lambda x: _direction(x, 0.02))
+
+    def pattern(row: pd.Series) -> str:
+        if row["rna_dir"] in {"up", "down"} and row["protein_dir"] in {"up", "down"}:
+            if row["rna_dir"] != row["protein_dir"]:
+                return "RNA-protein DISCORDANT (opposite)"
+            return "RNA-protein concordant"
+        if row["rna_dir"] in {"up", "down"} and row["protein_dir"] == "flat":
+            return "protein-flat (RNA not propagated)"
+        return "RNA-protein concordant"
+
+    out["pattern"] = out.apply(pattern, axis=1)
+    out = out.sort_values("rna_effect", ascending=False)
+    out.to_csv(root / "cross_layer" / "osd462_cross_layer_pathway_matrix.tsv", sep="\t", index=False)
+
+    summary = (
+        out.groupby("pattern", as_index=False)
+        .agg(
+            n_pathways=("pathway", "size"),
+            pathways=("pathway", lambda x: ",".join(x.astype(str))),
+        )
+        .sort_values("n_pathways", ascending=False)
+    )
+    summary["n_total_pathways"] = int(len(out))
+    summary["fraction_pathways"] = summary["n_pathways"] / summary["n_total_pathways"]
+    summary.to_csv(root / "cross_layer" / "osd462_cross_layer_pattern_summary.tsv", sep="\t", index=False)
+    return out
 
 
 def _tmt_qc_from_sheet(xlsx: Path, sheet: str, layer: str) -> pd.DataFrame:
@@ -1329,12 +1425,18 @@ def run_h2_enrichment(root: Path, phospho_prior: pd.DataFrame):
         ]
     )
     site_perm.to_csv(root / "h2_enrichment" / "h2_dct1_site_count_stratified_permutation.tsv", sep="\t", index=False)
+
+    def cluster_row(analysis: str, df: pd.DataFrame, flag: str) -> dict:
+        row = parent_gene_cluster_bootstrap_row_or(df, flag, "is_suppressed_p05")
+        row["analysis"] = analysis
+        return row
+
     cluster_boot = pd.DataFrame(
         [
-            parent_gene_cluster_bootstrap_row_or(phospho_prior, "dct1_top_decile", "is_suppressed_p05"),
-            parent_gene_cluster_bootstrap_row_or(phospho_prior, "dct2_bottom_decile", "is_suppressed_p05"),
-            parent_gene_cluster_bootstrap_row_or(single_position_one_site, "dct1_top_decile", "is_suppressed_p05"),
-            parent_gene_cluster_bootstrap_row_or(single_position_one_site, "dct2_bottom_decile", "is_suppressed_p05"),
+            cluster_row("all_phosphosite_rows", phospho_prior, "dct1_top_decile"),
+            cluster_row("all_phosphosite_rows", phospho_prior, "dct2_bottom_decile"),
+            cluster_row("single_position_one_site_per_parent_gene", single_position_one_site, "dct1_top_decile"),
+            cluster_row("single_position_one_site_per_parent_gene", single_position_one_site, "dct2_bottom_decile"),
         ]
     )
     cluster_boot.to_csv(root / "h2_enrichment" / "h2_dct_extreme_bin_cluster_bootstrap.tsv", sep="\t", index=False)
@@ -1403,6 +1505,30 @@ def run_h2_parent_gene_level(root: Path, phospho_prior: pd.DataFrame) -> pd.Data
     return parent
 
 
+def _gradient_directional_read(rho: float, p: float, score_label: str) -> str:
+    """Sign-aware interpretation of a DCT1-score vs phosphosite-effect Spearman.
+
+    A continuous suppression gradient predicts NEGATIVE rho (more negative effect
+    at higher DCT1 prior). The label reports the OBSERVED sign so a positive rho is
+    never silently read as supportive of suppression.
+    """
+    if not np.isfinite(rho):
+        return f"insufficient data for Spearman of DCT1 prior vs {score_label}"
+    sig = bool(np.isfinite(p) and p < 0.05)
+    if rho < 0:
+        trend = "higher DCT1 prior tracks a more negative (more suppressed) effect"
+        supports = sig
+    else:
+        trend = ("higher DCT1 prior tracks a less negative (less suppressed) effect, "
+                 "opposite the suppression direction")
+        supports = False
+    return (
+        f"observed rho={rho:+.3f} ({'p<0.05' if sig else 'n.s.'}); {trend}; "
+        f"continuous gradient {'supported' if supports else 'NOT supported'} -- the "
+        f"supported result is extreme-bin enrichment, not a graded DCT1 trend"
+    )
+
+
 def run_threshold_free_enrichment(root: Path, phospho_prior: pd.DataFrame, parent: pd.DataFrame) -> pd.DataFrame:
     """Effect-rank checks that do not define the set by nominal p value."""
     rows = []
@@ -1416,7 +1542,7 @@ def run_threshold_free_enrichment(root: Path, phospho_prior: pd.DataFrame, paren
                 "unit": "phosphosite_row",
                 "statistic": rho,
                 "p_value": p,
-                "directional_read": "negative rho means higher DCT1 prior has more negative flight phosphosite effect",
+                "directional_read": _gradient_directional_read(rho, p, "signed phosphosite effect"),
                 "n_units": int(len(row)),
                 "n_parent_genes": int(row["gene_symbol"].nunique()),
             }
@@ -1451,7 +1577,7 @@ def run_threshold_free_enrichment(root: Path, phospho_prior: pd.DataFrame, paren
                 "unit": "parent_gene",
                 "statistic": rho,
                 "p_value": pval,
-                "directional_read": "negative rho means higher DCT1 prior has a more negative parent-gene phosphosite effect",
+                "directional_read": _gradient_directional_read(rho, pval, "parent-gene most-negative-site effect"),
                 "n_units": int(len(p)),
                 "n_parent_genes": int(len(p)),
             }
@@ -1794,6 +1920,8 @@ def write_manifest(root: Path):
     input_paths = [
         Path("docs/v11_execution_research_plan.md"),
         DCT_PRIOR_DIR / "gse228367_dct1_vs_dct2_de.tsv",
+        root / "baseline" / "rna_recurrence_gene_set_members.tsv",
+        OSD462 / "osd462_rna_pathway_effects.tsv",
         OSD462 / "phospho_all_sites.tsv",
         OSD462 / "protein_effects_gene_anyplex.tsv",
         PHENO / "phenotype_anchor_per_animal.tsv",

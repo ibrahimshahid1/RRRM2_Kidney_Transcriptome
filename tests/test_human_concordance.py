@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from src.v11.human_concordance import (
     build_axis_concordance,
@@ -71,10 +72,16 @@ def test_summarize_table_analytes_is_sign_faithful():
     assert summary.loc["urinary_potassium", "scored"] == False
 
 
-def test_figure_evidence_scores_aqp2_and_agt_but_not_renr():
+def test_figure_evidence_scores_aqp2_but_not_circular_agt_or_renr():
     fig = figure_evidence_table().set_index("analyte")
     assert fig.loc["AQP2", "concordant"] is True
+    assert fig.loc["AQP2", "scored"] == True
+    # AGT's predicted direction is read off the same Fig. S4A panel that supplies its
+    # observation, so it cannot be discordant by construction -> it stays directionally
+    # concordant but is no longer counted in the sign test.
     assert fig.loc["AGT", "concordant"] is True
+    assert fig.loc["AGT", "scored"] == False
+    assert fig.loc["AGT", "excluded_reason"] == "circular_figure_prediction"
     assert fig.loc["RENR", "scored"] == False
 
 
@@ -108,10 +115,18 @@ def test_osd656_prepost_summary_is_recovery_context_not_primary_validation():
     assert "not independent inflight AQP2 validation" in summary.loc["AQP2", "caveat"]
 
 
-def test_verdict_counts_only_scored_rows():
+def test_verdict_uses_independent_axes_not_individual_analytes():
     table_summary = summarize_table_analytes(_long_fixture())
     axis = build_axis_concordance(table_summary, figure_evidence_table())
     verdict = concordance_verdict(axis)
-    assert verdict["n_scored_analytes"] == 5
-    assert verdict["n_concordant"] == 5
-    assert verdict["status"] == "directionally_concordant_all_scored"
+    # Sodium, 24 h volume, magnesium, and figure-level AQP2 are scored; AGT is now
+    # report-only (circular) and potassium is context, so four scored analytes
+    # collapse to three independent physiological axes.
+    assert verdict["n_analytes_scored"] == 4
+    assert verdict["n_analytes_concordant"] == 4
+    assert verdict["n_axes_scored"] == 3
+    assert verdict["n_axes_concordant"] == 3
+    assert verdict["fraction_axes_concordant"] == 1.0
+    # Exact two-sided sign test over 3/3 axes is not significant for one trajectory.
+    assert verdict["sign_test_p_two_sided"] == pytest.approx(0.25)
+    assert verdict["status"] == "directionally_concordant_all_axes_underpowered"

@@ -1,0 +1,157 @@
+# Preregistered human urine / fluid-axis sign-concordance spec (Reach D).
+#
+# SINGLE SOURCE OF TRUTH for the predictions and scoring decisions that were
+# previously hardcoded as Python literals in src/v11/human_concordance.py
+# (TABLE_ANALYTE_SPECS and FIGURE_EVIDENCE_ROWS).
+#
+# Discipline:
+#   * `expected_direction` and the `scored` / `confounded` / `excluded_reason`
+#     flags are ANALYST PREDICTIONS derived from the mouse kidney model. They are
+#     fixed here, under version control, BEFORE the observed directions are
+#     computed. Changing a prediction is therefore an auditable edit to this file,
+#     not a silent edit to analysis code.
+#   * `observed_direction` for table analytes is NOT stored here -- it is computed
+#     at runtime from the Twins Table S8 workbook (pre-flight vs in-flight means).
+#   * `observed_direction` for the figure rows IS stored here because Fig. S4A has
+#     no underlying numeric deposit; the values were digitized from the figure
+#     (see `figure_evidence.provenance`) rather than asserted.
+
+meta:
+  analysis: "Reach D -- human urine/fluid-axis concordance"
+  twins_citation: "Garrett-Bakelman et al. 2019, Science 364:eaau8650 (NASA Twins Study)"
+  table_s8_source: "data/external/human_spaceflight/aau8650_table_s8.xlsx"
+  prereg_principle: >
+    Predictions come from the mouse distal-nephron / RAAS-fluid model and are
+    fixed before scoring. The sign test is taken over independent physiological
+    axes, not individual analytes; a single Twins flight trajectory (n=1 pair)
+    cannot reach significance and the per-analyte directions, not the p-value,
+    are the substantive result.
+
+# Scored against Twins Table S8. observed_direction computed at runtime.
+table_analytes:
+  - label: "Urinary sodium mmol/day"
+    analyte: urinary_sodium
+    axis: aldosterone_fluid
+    expected_direction: up
+    evidence_type: machine_readable_table
+    scored: true
+    interpretation: "RAAS/MR down-shift context predicts natriuresis."
+    prediction_basis: "Mouse mineralocorticoid/RAAS down-shift -> increased urinary Na excretion."
+    source: "Twins Table S8, urinary electrolyte excretion, per timepoint."
+
+  - label: "24 h volume mL"
+    analyte: urine_volume_24h
+    axis: water_balance
+    expected_direction: down
+    evidence_type: machine_readable_table
+    scored: true
+    interpretation: "AQP2-up water-retention context predicts lower 24 h urine volume."
+    prediction_basis: "Mouse AQP2-up water retention -> reduced 24 h urine volume."
+    source: "Twins Table S8, 24 h urine volume, per timepoint."
+
+  - label: "Urinary magnesium mg/day"
+    analyte: urinary_magnesium
+    axis: dct_transport_context
+    expected_direction: up
+    evidence_type: machine_readable_table
+    scored: true
+    interpretation: "DCT transport suppression context predicts reduced Mg reabsorption."
+    prediction_basis: "Mouse DCT/NCC suppression -> reduced Mg2+ reabsorption -> magnesuria."
+    source: "Twins Table S8, urinary magnesium, per timepoint."
+
+  - label: "Urinary calcium mmol/day"
+    analyte: urinary_calcium
+    axis: dct_transport_context
+    expected_direction: down
+    evidence_type: machine_readable_table
+    scored: false
+    confounded: true
+    excluded_reason: confounded_bone_loss_hypercalciuria
+    interpretation: >
+      Reduced-NCC (thiazide-like) physiology predicts hypocalciuria, but spaceflight
+      bone-loss hypercalciuria is a strong opposing confounder; retained report-only.
+    prediction_basis: "Thiazide-like reduced-NCC physiology predicts hypocalciuria."
+    source: "Twins Table S8, urinary calcium, per timepoint."
+
+  - label: "Urinary potassium mmol/day"
+    analyte: urinary_potassium
+    axis: electrolyte_context
+    expected_direction: context
+    evidence_type: machine_readable_table
+    scored: false
+    interpretation: "Potassium excretion is downstream of mixed MR and distal-delivery effects."
+    prediction_basis: "Mixed MR + distal-delivery effects; no clean directional prediction."
+    source: "Twins Table S8, urinary potassium, per timepoint."
+
+  - label: "Urinary phosphorus mg/day"
+    analyte: urinary_phosphorus
+    axis: stone_risk_context
+    expected_direction: context
+    evidence_type: machine_readable_table
+    scored: false
+    interpretation: "Stone-risk / mineral context; not a direct DCT/MR prediction."
+    prediction_basis: "Mineral / stone-risk context; not a DCT/MR prediction."
+    source: "Twins Table S8, urinary phosphorus, per timepoint."
+
+  - label: "Creatinine mmol/day"
+    analyte: urinary_creatinine
+    axis: collection_qc_context
+    expected_direction: context
+    evidence_type: machine_readable_table
+    scored: false
+    interpretation: "Collection normalization context."
+    prediction_basis: "Collection normalization QC; not a physiological prediction."
+    source: "Twins Table S8, urinary creatinine, per timepoint."
+
+# Figure-level evidence (Twins SM PDF, Fig. S4A). observed_direction DIGITIZED.
+figure_evidence:
+  source_panel: "Twins Supplement Fig. S4A Fluid Regulation"
+  assay: "Targeted urine proteomics (LC-MS/MS), SM Methods p.10"
+  source_pdf: "data/external/human_spaceflight/aau8650_garrett-bakelman_sm.pdf"
+  page_1based: 26
+  provenance: "data/external/human_spaceflight/figS4A_provenance/figS4A_digitization.json"
+  digitization_note: >
+    observed_direction values were read from the TW flight-twin boxplot medians
+    (in-flight vs pre-flight) on Fig. S4A, rendered from the on-disk SM PDF (page 26)
+    at ~432 dpi. n=1 twin pair; direction-level only -- no per-replicate numeric
+    deposit exists for this panel. These values replace prior hand-asserted literals
+    and are reproducible from the saved provenance crops in figS4A_provenance/.
+  rows:
+    - analyte: AQP2
+      human_symbol: AQP2
+      axis: water_balance
+      expected_direction: up
+      observed_direction: up
+      scored: true
+      confounded: false
+      excluded_reason: ""
+      observed_basis: "Digitized Fig. S4A: TW pre-flight median ~0.43 -> in-flight ~0.62 (partial return ~0.53 post-flight)."
+      caveat: "Direction digitized from Fig. S4A TW boxplot (n=1 twin pair); no per-replicate numeric deposit exists."
+
+    - analyte: AGT
+      human_symbol: AGT
+      axis: aldosterone_fluid
+      expected_direction: down
+      observed_direction: down
+      scored: false
+      confounded: false
+      excluded_reason: circular_figure_prediction
+      observed_basis: "Digitized Fig. S4A: TW pre-flight median ~30000 -> in-flight ~10000 (rebounds ~45000 post-flight)."
+      caveat: >
+        Predicted direction is read off the same Fig. S4A panel that supplies the
+        observation, so it cannot be discordant by construction (circular); retained
+        as figure-level context and not scored.
+
+    - analyte: RENR
+      human_symbol: ATP6AP2
+      axis: raas_context
+      expected_direction: context
+      observed_direction: down
+      scored: false
+      confounded: false
+      excluded_reason: no_directional_prediction_context_only
+      observed_basis: "Digitized Fig. S4A: TW pre-flight median ~0.40 -> in-flight ~0.27."
+      caveat: >
+        Direction now digitized from Fig. S4A (previously 'requires_digitization'),
+        but RENR carries no directional mouse-model prediction (raas_context), so it
+        is reported as context and not scored.

@@ -15,6 +15,7 @@ Inputs on disk:
 
 Outputs:
   * ``human_concordance/twins_axis_concordance.tsv``
+  * ``human_concordance/twins_axis_level_concordance.tsv`` (independent-axis sign test)
   * ``human_concordance/twins_aqp2_figure_evidence.tsv``
   * ``human_concordance/human_concordance_verdict.json``
   * optional OSD-656 catalog/summary files if an OSD-656 directory is present.
@@ -30,8 +31,10 @@ from typing import Iterable, Mapping
 
 import numpy as np
 import pandas as pd
+import yaml
 from scipy import stats
 
+from src.common import REPO_ROOT
 from src.v11.core_analysis import RUN_ROOT, sha256
 
 
@@ -49,167 +52,100 @@ TABLE_S8_TW_FIRST_COL = 1
 TABLE_S8_TW_LAST_COL = 15
 TABLE_S8_HR_SUMMARY_COL = 16
 
-FIGURE_PANEL = "Twins Supplement Fig. S4A Fluid Regulation"
-
-OSD656_DIRECT_AXIS_MARKERS = {
-    "AQP2",
-    "AGT",
-    "ATP6AP2",
-    "RENR",
-    "SLC12A3",
-    "STK39",
-    "OXSR1",
-    "WNK1",
-    "WNK3",
-    "WNK4",
-    "KLHL3",
-}
-OSD656_RECOVERY_CONTEXT_MARKERS = {
-    "AGER",
-    "ANXA1",
-    "CCL2",
-    "CCL3",
-    "CCL4",
-    "CCL5",
-    "CCL7",
-    "CCL8",
-    "CCL13",
-    "CCL14",
-    "CCL15",
-    "CCL16",
-    "CCL17",
-    "CCL19",
-    "CCL20",
-    "CCL22",
-    "CCL23",
-    "CCL24",
-    "CCL25",
-    "CCL28",
-    "CHI3L1",
-    "CX3CL1",
-    "CXCL1",
-    "CXCL2",
-    "CXCL5",
-    "CXCL6",
-    "CXCL8",
-    "CXCL9",
-    "CXCL10",
-    "CXCL11",
-    "CXCL12",
-    "IL1A",
-    "IL1B",
-    "IL6",
-    "IL10",
-    "IL18",
-    "LCN2",
-    "MMP1",
-    "MMP2",
-    "MMP3",
-    "MMP7",
-    "MMP9",
-    "MMP10",
-    "MMP12",
-    "SPP1",
-    "TGFA",
-    "TGFB1",
-    "TIMP1",
-    "TIMP2",
-    "TNF",
-    "VCAM1",
-    "VEGFA",
-}
-OSD656_RECOVERY_PREFIXES = ("CCL", "CXCL", "IL", "MMP", "TIMP")
+# ── Externalized, version-controlled prediction / scoring spec ───────────────
+# The analyte predictions, scoring flags, and the digitized figure directions
+# live in config YAML (auditable, citable) instead of as Python literals here.
+#   * config/human_concordance_prereg.yaml  -- table predictions + Fig. S4A rows
+#   * config/human_urine_marker_panel.yaml  -- OSD-656 context categories
+# Observed directions for the table analytes are still COMPUTED from Table S8 at
+# runtime; only the figure-row observed directions are stored, because Fig. S4A
+# has no numeric deposit and was digitized from the SM PDF (see provenance).
+CONFIG_DIR = REPO_ROOT / "config"
+PREREG_YAML = CONFIG_DIR / "human_concordance_prereg.yaml"
+MARKER_PANEL_YAML = CONFIG_DIR / "human_urine_marker_panel.yaml"
 
 
-# Explicitly scored machine-readable analytes.  Rows not listed can still be
-# emitted as context if selected, but they do not enter the sign test.
-TABLE_ANALYTE_SPECS: dict[str, dict[str, object]] = {
-    "Urinary sodium mmol/day": {
-        "analyte": "urinary_sodium",
-        "axis": "aldosterone_fluid",
-        "expected_direction": "up",
-        "evidence_type": "machine_readable_table",
-        "interpretation": "RAAS/MR down-shift context predicts natriuresis.",
-        "scored": True,
-    },
-    "24 h volume mL": {
-        "analyte": "urine_volume_24h",
-        "axis": "water_balance",
-        "expected_direction": "down",
-        "evidence_type": "machine_readable_table",
-        "interpretation": "AQP2-up water-retention context predicts lower 24 h urine volume.",
-        "scored": True,
-    },
-    "Urinary magnesium mg/day": {
-        "analyte": "urinary_magnesium",
-        "axis": "dct_transport_context",
-        "expected_direction": "up",
-        "evidence_type": "machine_readable_table",
-        "interpretation": "DCT transport suppression context predicts reduced Mg reabsorption.",
-        "scored": True,
-    },
-    "Urinary potassium mmol/day": {
-        "analyte": "urinary_potassium",
-        "axis": "electrolyte_context",
-        "expected_direction": "context",
-        "evidence_type": "machine_readable_table",
-        "interpretation": "Potassium excretion is downstream of mixed MR and distal-delivery effects.",
-        "scored": False,
-    },
-    "Urinary phosphorus mg/day": {
-        "analyte": "urinary_phosphorus",
-        "axis": "stone_risk_context",
-        "expected_direction": "context",
-        "evidence_type": "machine_readable_table",
-        "interpretation": "Stone-risk / mineral context; not a direct DCT/MR prediction.",
-        "scored": False,
-    },
-    "Creatinine mmol/day": {
-        "analyte": "urinary_creatinine",
-        "axis": "collection_qc_context",
-        "expected_direction": "context",
-        "evidence_type": "machine_readable_table",
-        "interpretation": "Collection normalization context.",
-        "scored": False,
-    },
-}
+def _load_yaml(path: str | Path) -> dict:
+    with open(path) as fh:
+        return yaml.safe_load(fh) or {}
 
 
-FIGURE_EVIDENCE_ROWS: list[dict[str, object]] = [
-    {
-        "analyte": "AQP2",
-        "human_symbol": "AQP2",
-        "axis": "water_balance",
-        "expected_direction": "up",
-        "observed_direction": "up",
-        "evidence_type": "figure_level",
-        "source_panel": FIGURE_PANEL,
-        "scored": True,
-        "caveat": "Direction encoded from figure-level evidence; no numeric digitization.",
-    },
-    {
-        "analyte": "AGT",
-        "human_symbol": "AGT",
-        "axis": "aldosterone_fluid",
-        "expected_direction": "down",
-        "observed_direction": "down",
-        "evidence_type": "figure_level",
-        "source_panel": FIGURE_PANEL,
-        "scored": True,
-        "caveat": "Direction encoded from figure-level evidence; no numeric digitization.",
-    },
-    {
-        "analyte": "RENR",
-        "human_symbol": "ATP6AP2",
-        "axis": "raas_context",
-        "expected_direction": "context",
-        "observed_direction": "requires_digitization",
-        "evidence_type": "figure_level",
-        "source_panel": FIGURE_PANEL,
-        "scored": False,
-        "caveat": "Panel is recorded as figure-level context; direction left unscored until Fig. S4A is digitized.",
-    },
-]
+def _clean(value: object) -> object:
+    """Collapse whitespace in YAML folded/multiline strings to keep TSV cells single-line."""
+    if isinstance(value, str):
+        return re.sub(r"\s+", " ", value).strip()
+    return value
+
+
+def _resolve_gene_set(ref: Mapping[str, object]) -> list[str]:
+    """Resolve a {file, set} reference into a flat symbol list."""
+    data = _load_yaml(REPO_ROOT / str(ref["file"]))
+    block = data.get(str(ref["set"]), {}) or {}
+    genes = list(block.get("genes", []) or [])
+    genes += list(block.get("protected_genes", []) or [])
+    return [str(g) for g in genes]
+
+
+def load_prereg(path: str | Path = PREREG_YAML) -> tuple[dict[str, dict[str, object]], list[dict[str, object]], str]:
+    """Load the table-analyte spec and digitized figure rows from config."""
+    cfg = _load_yaml(path)
+    table_specs: dict[str, dict[str, object]] = {}
+    for row in cfg.get("table_analytes", []) or []:
+        label = str(row["label"])
+        table_specs[label] = {k: _clean(v) for k, v in row.items() if k != "label"}
+    fig = cfg.get("figure_evidence", {}) or {}
+    panel = str(fig.get("source_panel", ""))
+    figure_rows: list[dict[str, object]] = []
+    for r in fig.get("rows", []) or []:
+        figure_rows.append(
+            {
+                "analyte": r["analyte"],
+                "human_symbol": r.get("human_symbol", r["analyte"]),
+                "axis": r.get("axis", ""),
+                "expected_direction": r.get("expected_direction", "context"),
+                "observed_direction": r.get("observed_direction", "requires_digitization"),
+                "evidence_type": "figure_level",
+                "source_panel": panel,
+                "scored": bool(r.get("scored", False)),
+                "confounded": bool(r.get("confounded", False)),
+                "excluded_reason": _clean(r.get("excluded_reason", "")),
+                "caveat": _clean(r.get("caveat", "")),
+            }
+        )
+    return table_specs, figure_rows, panel
+
+
+def load_marker_panel(
+    path: str | Path = MARKER_PANEL_YAML,
+) -> tuple[set[str], set[str], tuple[str, ...], str]:
+    """Load OSD-656 context categories (composed from sourced gene sets)."""
+    cfg = _load_yaml(path)
+    cats = cfg.get("categories", {}) or {}
+
+    def build(name: str) -> set[str]:
+        block = cats.get(name, {}) or {}
+        genes: list[str] = []
+        for ref in block.get("from_gene_sets", []) or []:
+            genes += _resolve_gene_set(ref)
+        for m in block.get("extra_markers", []) or []:
+            genes.append(str(m["symbol"]) if isinstance(m, Mapping) else str(m))
+        return set(genes)
+
+    direct = build("direct_distal_raas_marker")
+    recovery = build("recovery_inflammation_matrix_context")
+    fb = cfg.get("family_prefix_fallback", {}) or {}
+    prefixes = tuple(str(p) for p in fb.get("prefixes", [])) if fb.get("enabled", False) else tuple()
+    default_cat = str(cfg.get("default_category", "panel_marker"))
+    return direct, recovery, prefixes, default_cat
+
+
+TABLE_ANALYTE_SPECS, FIGURE_EVIDENCE_ROWS, FIGURE_PANEL = load_prereg()
+(
+    OSD656_DIRECT_AXIS_MARKERS,
+    OSD656_RECOVERY_CONTEXT_MARKERS,
+    OSD656_RECOVERY_PREFIXES,
+    OSD656_DEFAULT_CATEGORY,
+) = load_marker_panel()
 
 
 def parse_timepoint(label: object) -> dict[str, object]:
@@ -343,7 +279,7 @@ def osd656_relevance_category(analyte: object) -> str:
         return "recovery_inflammation_matrix_context"
     if any(marker.startswith(prefix) for prefix in OSD656_RECOVERY_PREFIXES):
         return "recovery_inflammation_matrix_context"
-    return "panel_marker"
+    return OSD656_DEFAULT_CATEGORY
 
 
 def concordant(observed: str, expected: str) -> bool | None:
@@ -389,6 +325,8 @@ def summarize_table_analytes(
                 "n_preflight": int(len(pre)),
                 "n_inflight": int(len(inflight)),
                 "n_recovery": int(len(recovery)),
+                "confounded": bool(spec.get("confounded", False)),
+                "excluded_reason": str(spec.get("excluded_reason", "")),
                 "interpretation": spec.get("interpretation", ""),
                 "caveat": "Single flight subject; sign-style context only.",
             }
@@ -401,6 +339,12 @@ def figure_evidence_table(rows: Iterable[Mapping[str, object]] = FIGURE_EVIDENCE
     out["source"] = "Twins SM PDF"
     out["source_file"] = str(TWINS_SM_PDF)
     out["concordant"] = [concordant(str(o), str(e)) for o, e in zip(out["observed_direction"], out["expected_direction"])]
+    if "excluded_reason" not in out.columns:
+        out["excluded_reason"] = ""
+    out["excluded_reason"] = out["excluded_reason"].fillna("")
+    if "confounded" not in out.columns:
+        out["confounded"] = False
+    out["confounded"] = out["confounded"].fillna(False)
     return out
 
 
@@ -415,6 +359,7 @@ def build_axis_concordance(table_summary: pd.DataFrame, figure_summary: pd.DataF
     cols = [
         "source", "analyte", "analyte_label", "axis", "evidence_type",
         "expected_direction", "observed_direction", "concordant", "scored",
+        "confounded", "excluded_reason",
         "preflight_mean", "inflight_mean", "recovery_mean", "delta_inflight_minus_preflight",
         "n_preflight", "n_inflight", "n_recovery", "interpretation", "caveat",
     ]
@@ -426,17 +371,51 @@ def build_axis_concordance(table_summary: pd.DataFrame, figure_summary: pd.DataF
     return pd.concat([table_summary[cols], fig[cols]], ignore_index=True)
 
 
+def axis_level_concordance(axis: pd.DataFrame) -> pd.DataFrame:
+    """Collapse scored analytes to independent physiological axes.
+
+    The scored machine-readable + figure analytes are not statistically
+    independent: several index the same physiology (e.g. 24 h urine volume and
+    AQP2 both report water balance).  Treating each as its own Bernoulli trial
+    inflates the sign test, so we collapse scored rows to their axis and treat
+    each axis as a single trial.  An axis is concordant only if *every* scored
+    analyte on it is concordant.
+    """
+    scored = axis[axis["scored"].astype(bool)].copy()
+    rows: list[dict[str, object]] = []
+    for axis_name, sub in scored.groupby("axis", sort=True):
+        conc = sub["concordant"].astype(bool)
+        analytes = sorted(sub["analyte"].astype(str).tolist())
+        rows.append(
+            {
+                "axis": str(axis_name),
+                "n_scored_analytes": int(len(sub)),
+                "analytes": ";".join(analytes),
+                "all_analytes_concordant": bool(conc.all()),
+                "any_analyte_concordant": bool(conc.any()),
+                "axis_concordant": bool(conc.all()),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def concordance_verdict(axis: pd.DataFrame, *, osd656_status: str = "not_inspected") -> dict[str, object]:
     scored = axis[axis["scored"].astype(bool)].copy()
-    n = int(len(scored))
-    k = int(scored["concordant"].astype(bool).sum()) if n else 0
-    p = float(stats.binomtest(k, n, 0.5, alternative="greater").pvalue) if n else np.nan
-    frac = float(k / n) if n else np.nan
-    if n == 0:
-        status = "no_scored_human_analytes"
-    elif k == n and n >= 3:
-        status = "directionally_concordant_all_scored"
-    elif frac >= 0.6:
+    n_analytes = int(len(scored))
+    k_analytes = int(scored["concordant"].astype(bool).sum()) if n_analytes else 0
+    axis_summary = axis_level_concordance(axis)
+    n_axes = int(len(axis_summary))
+    k_axes = int(axis_summary["axis_concordant"].astype(bool).sum()) if n_axes else 0
+    p_two_sided = (
+        float(stats.binomtest(k_axes, n_axes, 0.5, alternative="two-sided").pvalue)
+        if n_axes else np.nan
+    )
+    frac_axes = float(k_axes / n_axes) if n_axes else np.nan
+    if n_axes == 0:
+        status = "no_scored_human_axes"
+    elif k_axes == n_axes and n_axes >= 3:
+        status = "directionally_concordant_all_axes_underpowered"
+    elif frac_axes >= 0.6:
         status = "directionally_concordant_partial"
     else:
         status = "mixed_or_nonconcordant"
@@ -444,18 +423,31 @@ def concordance_verdict(axis: pd.DataFrame, *, osd656_status: str = "not_inspect
         "analysis": "Reach D -- human urine/fluid-axis concordance",
         "status": status,
         "claim_discipline": (
-            "Human urine/clinical chemistry sign concordance only; not human kidney omics validation, "
-            "not a regression, and not powered beyond one Twins flight trajectory."
+            "Human urine / clinical-chemistry sign concordance only; not human kidney omics "
+            "validation and not a regression. The sign test is taken over independent "
+            "physiological axes (water balance, aldosterone/fluid, DCT transport), not over "
+            "individual analytes, and a single Twins flight trajectory cannot reach significance: "
+            "all three axes concordant give an exact two-sided sign-test p = 0.25. The per-analyte "
+            "directional trajectories, not the p-value, are the substantive result. AGT (predicted "
+            "direction read from the same Fig. S4A panel that supplies the observation) and urinary "
+            "calcium (opposing spaceflight bone-loss hypercalciuria confounder) are reported but not "
+            "scored."
         ),
-        "n_scored_analytes": n,
-        "n_concordant": k,
-        "fraction_concordant": None if not np.isfinite(frac) else frac,
-        "binomial_p_greater_than_chance": None if not np.isfinite(p) else p,
+        "n_axes_scored": n_axes,
+        "n_axes_concordant": k_axes,
+        "fraction_axes_concordant": None if not np.isfinite(frac_axes) else frac_axes,
+        "sign_test_p_two_sided": None if not np.isfinite(p_two_sided) else p_two_sided,
+        "n_analytes_scored": n_analytes,
+        "n_analytes_concordant": k_analytes,
+        "scored_axes": axis_summary.to_dict(orient="records"),
         "evidence_types": sorted(axis["evidence_type"].dropna().astype(str).unique().tolist()),
         "osd656_status": osd656_status,
         "interpretation": (
-            "Report as figure/table-level human fluid-axis concordance. AQP2 remains figure-level "
-            "directional evidence unless Fig. S4A is digitized."
+            "Report as directional (not significant) human fluid-axis concordance across three "
+            "independent axes. AQP2's direction is digitized from Twins Fig. S4A (TW flight twin, "
+            "in-flight vs pre-flight; see config/human_concordance_prereg.yaml and the figS4A "
+            "provenance crops) and enters the water-balance axis; the single Twins trajectory "
+            "remains underpowered (all three axes concordant give exact two-sided p = 0.25)."
         ),
     }
 
@@ -649,10 +641,12 @@ def write_human_summary(out_dir: Path, verdict: Mapping[str, object]) -> Path:
         [{
             "analysis": "human_concordance",
             "status": verdict.get("status", ""),
-            "n_scored_analytes": verdict.get("n_scored_analytes", np.nan),
-            "n_concordant": verdict.get("n_concordant", np.nan),
-            "fraction_concordant": verdict.get("fraction_concordant", np.nan),
-            "binomial_p_greater_than_chance": verdict.get("binomial_p_greater_than_chance", np.nan),
+            "n_axes_scored": verdict.get("n_axes_scored", np.nan),
+            "n_axes_concordant": verdict.get("n_axes_concordant", np.nan),
+            "fraction_axes_concordant": verdict.get("fraction_axes_concordant", np.nan),
+            "sign_test_p_two_sided": verdict.get("sign_test_p_two_sided", np.nan),
+            "n_analytes_scored": verdict.get("n_analytes_scored", np.nan),
+            "n_analytes_concordant": verdict.get("n_analytes_concordant", np.nan),
             "osd656_status": verdict.get("osd656_status", ""),
             "osd656_n_markers_summarized": osd.get("n_markers_summarized", np.nan),
             "osd656_n_direct_distal_raas_markers": osd.get("n_direct_distal_raas_markers", np.nan),
@@ -686,6 +680,8 @@ def run_human_concordance(
     long.to_csv(out_dir / "twins_table_s8_long.tsv", sep="\t", index=False)
     fig.to_csv(out_dir / "twins_aqp2_figure_evidence.tsv", sep="\t", index=False)
     axis.to_csv(out_dir / "twins_axis_concordance.tsv", sep="\t", index=False)
+    axis_level = axis_level_concordance(axis)
+    axis_level.to_csv(out_dir / "twins_axis_level_concordance.tsv", sep="\t", index=False)
 
     osd_index, osd_summary, osd_status = inspect_osd656(osd656_dir)
     if not osd_index.empty:
@@ -698,6 +694,7 @@ def run_human_concordance(
     summary_path = write_human_summary(out_dir, verdict)
     verdict["outputs"] = {
         "twins_axis_concordance": str(out_dir / "twins_axis_concordance.tsv"),
+        "twins_axis_level_concordance": str(out_dir / "twins_axis_level_concordance.tsv"),
         "twins_aqp2_figure_evidence": str(out_dir / "twins_aqp2_figure_evidence.tsv"),
         "twins_table_s8_long": str(out_dir / "twins_table_s8_long.tsv"),
         "human_concordance_summary": str(summary_path),

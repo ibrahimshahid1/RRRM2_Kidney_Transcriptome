@@ -35,7 +35,7 @@
 \makeatother
 
 \title{\textbf{Curated Results, Tables, and Figure Compendium}\\[0.3em]
-\large Companion to Manuscript v11 -- distal-nephron subtype-prior phosphosite enrichment in mouse spaceflight kidney}
+\large Companion to Manuscript v11 -- matched multi-omic constraints on the spaceflight kidney NCC/SPAK/WNK phospho-phenotype}
 \author{Ibrahim Shahid}
 \date{Draft v11 results compendium, May 2026}
 
@@ -44,7 +44,7 @@
 \thispagestyle{fancy}
 
 \noindent
-This document collects the curated results, manuscript tables, figure gallery, and artifact index supporting Manuscript v11. It is the technical supplement for the streamlined manuscript: cross-cohort RNA recurrence, matched OSD-462 RNA/protein/phosphoprotein mismatch, distal-nephron DCT-subtype-prior phosphosite enrichment, parent-protein and compartment-score sensitivity models, exploratory covariance decomposition, external spatial-reference context, and the public perturbation-reference pass (low-K DCT, parent-protein-normalized phosphosite effects, IRI DCT-transport spatial context, dDAVP/mpkDCT, KLHL3/CUL3 turnover). The main manuscript carries the story; this compendium carries the extra tables, secondary analyses, and run artifacts.
+This document collects the curated results, manuscript tables, figure gallery, and artifact index supporting Manuscript v11. It is the technical supplement for the streamlined manuscript: cross-cohort RNA recurrence, matched OSD-462 RNA/protein/phosphoprotein mismatch, distal-nephron DCT-subtype-prior phosphosite enrichment, parent-protein and compartment-score sensitivity models, exploratory covariance decomposition, external spatial-reference context, and the public perturbation-reference pass (low-K DCT, parent-protein-normalized phosphosite effects, IRI DCT-transport spatial context, dDAVP/mpkDCT, KLHL3/CUL3 turnover). The main manuscript frames these analyses as a constraint map around the established spaceflight kidney NCC/SPAK/WNK phospho-phenotype; this compendium carries the extra tables, secondary analyses, and run artifacts.
 
 \tableofcontents
 \clearpage
@@ -63,7 +63,7 @@ Plan & \path{docs/v11_execution_research_plan.md} \\
 Execution report & \path{docs/v11_execution_results.md} \\
 Plan checksum & \code{d8b7465e09257dd4444fc2abb969a02066f2d360e4fbc04056791a60c9755e3f} \\
 Pipeline entrypoint & \code{python -m src.run_all_phases --v11-only --run-id <run_id>} \\
-Canonical v11 modules & \path{src/v11/build_gse228367_dct_prior.R}; \path{src/v11/core_analysis.py}; \path{src/v11/h2_composition_aware_phospho.py}; \path{src/v11/spatial_reference_projection.py}; \path{src/v11/publication_figures.py} \\
+Canonical v11 modules & \path{src/v11/build_gse228367_dct_prior.R}; \path{src/v11/core_analysis.py}; \path{src/v11/h2_composition_aware_phospho.py}; \path{src/v11/rna_protein_propagation.py}; \path{src/v11/observability_audit.py}; \path{src/v11/spatial_reference_projection.py}; \path{src/v11/publication_figures.py} \\
 Public perturbation-reference modules & \path{src/v11/perturbation_gse228367_lowk.py}; \path{src/v11/h2_occupancy_normalized_phospho.py}; \path{src/v11/spatial_dct_transport_check.py}; \path{src/v11/perturbation_triage_summary.py} \\
 \bottomrule
 \end{tabularx}
@@ -99,8 +99,8 @@ Spatial annotation context & GSE269719 & Targeted 299-gene Xenium object used fo
 Hypothesis & Question & Verdict \\
 \midrule
 RNA recurrence & Does a recurrent matrix/endothelial-high and DCT-low RNA remodeling state recur across cohorts and in OSD-462 RNA? & Supported; remains the backbone. \\
-DCT-subtype-prior enrichment & Are OSD-462 flight-suppressed phosphosites enriched among distal-nephron subtype-prior parent-gene extremes? & Supported for DCT1 top-decile and DCT2-bottom-decile bins; DCT1 is not exclusive. \\
-Sensitivity models & Does the enrichment remain after parent-protein, parent-gene, observability, and compartment-score sensitivity checks? & Top-decile DCT1 subset survives many checks but attenuates in matched parent-gene permutation; DCT2-bottom is stronger in several parent-gene-aware summaries. \\
+DCT-subtype-prior enrichment & Are OSD-462 flight-suppressed phosphosites enriched among distal-nephron subtype-prior parent-gene extremes? & Supported for DCT1-high and DCT2-leaning decile bins; DCT1 is not exclusive. \\
+Sensitivity models & Does the enrichment remain after parent-protein, parent-gene, observability, and compartment-score sensitivity checks? & Top-decile DCT1 subset survives many checks but attenuates in matched parent-gene permutation; DCT2-leaning is stronger in several parent-gene-aware summaries. \\
 Exploratory covariance decomposition & Are remodeling scores statistically related to NCC/SPAK phospho suppression? & Endothelial and matrix/endothelial covariance summaries are directionally consistent; temporal order remains experimental. \\
 Spatial supplement & Which injury/repair spatial niches resemble the bulk spaceflight RNA vector? & Contextualized to repair-stage, DCT-adjacent/injured-tubule and fibro-inflammatory/endothelial niches. \\
 Public perturbation references & Do public perturbation references (low-K DCT, parent-protein normalization, IRI DCT-transport, dDAVP, KLHL3/CUL3) identify the upstream WNK-suppressing mechanism? & No single upstream signal identified; parent-protein-normalized DCT-prior enrichment is a robustness upgrade; IRI Visium DCT-adjacent transport drop is a testable spatial prediction. \\
@@ -117,7 +117,7 @@ Public perturbation references & Do public perturbation references (low-K DCT, p
 Topic & Preferred wording & Avoid \\
 \midrule
 Overall frame & Distal-nephron subtype-prior phosphosite parent-gene enrichment within recurrent kidney remodeling. & DCT1-anchored mechanism without qualification. \\
-DCT-prior enrichment & DCT1 top-decile and DCT2-bottom-decile enrichment of flight-suppressed whole-kidney phosphosites. & DCT1-specific phosphoproteomics or DCT1 exclusivity. \\
+DCT-prior enrichment & DCT1-high and DCT2-leaning decile enrichment of flight-suppressed whole-kidney phosphosites. & DCT1-specific phosphoproteomics or DCT1 exclusivity. \\
 Composition models & Bulk sensitivity adjustment for parent protein abundance and estimated compartments. & Fully deconfounded or deconvolved cell-of-origin analysis. \\
 Covariance decomposition & Remodeling scores covary with NCC regulatory phosphorylation after conditioning choices. & Endothelial remodeling causes NCC dephosphorylation. \\
 Spatial & External IRI spatial reference contextualization. & Spatial validation of the spaceflight lesion. \\
@@ -141,6 +141,7 @@ OSD-462 protein abundance & null & RNA remodeling does not propagate cleanly as 
 NCC regulatory phospho score & -0.832 & NCC regulatory phosphosites are suppressed while total NCC protein is flat. \\
 Targeted KSEA SPAK/OSR1 & -6.31 & Inferred kinase-output down; three quantified curated substrates. \\
 Targeted KSEA WNK & -4.12 & Inferred WNK-output down; three quantified curated substrates, interpreted as pathway coherence. \\
+Kinome-wide atlas SPAK/OSR1 & $+1.44/+1.57$ & Slightly positive and non-significant in the unbiased substrate atlas; discordant with targeted SPAK/OSR1 KSEA. \\
 Endothelial score vs NCC phospho & -0.762 & Strongest compartment anti-correlation with NCC regulatory phosphorylation. \\
 \bottomrule
 \end{tabularx}
@@ -148,6 +149,29 @@ Endothelial score vs NCC phospho & -0.762 & Strongest compartment anti-correlati
 
 \noindent
 Interpretation: recurrent RNA remodeling is strong, targeted protein-abundance concordance is null, and the transporter lesion resolves at the phospho/activity layer.
+
+\begin{table}[H]
+\centering\scriptsize
+\caption{\textbf{OSD-462 cross-layer pathway matrix.} RNA effects are curated pathway-score flight effects. Protein effects are mean gene-level abundance effects over matched pathway genes. Phosphosite effects are parent-gene-level mean phosphosite effects, averaged over matched pathway genes so multi-site genes do not dominate the pathway summary. Direction calls are descriptive thresholds, not individual-feature significance tests. The final column gives the matched-null-calibrated layer assignment from \texttt{src/v11/rna\_protein\_propagation.py} (two pathways calibrated protein-inverted, three RNA$\to$phospho carry candidates, six RNA-not-propagated within the abundance$\times$peptide-count null); see Section~\ref{app:observability} for the detectability robustness of these assignments.}
+\label{tab:crosslayerfull}
+\begin{tabularx}{\textwidth}{p{0.19\textwidth}rrr p{0.18\textwidth} X}
+\toprule
+Pathway & RNA & Protein & Phospho & Pattern & Layer assignment (calibrated) \\
+\midrule
+ECM organization & $+0.222$ & $-0.107$ & $-0.011$ & RNA--protein opposite & protein-inverted (calibrated) \\
+MMP/ADAM proteolysis & $+0.197$ & $+0.012$ & $-0.289$ & protein-flat; phosphosite down & RNA not propagated \\
+Preservation/stress response & $+0.157$ & $-0.014$ & $-0.024$ & protein-flat; phosphosite down & RNA not propagated \\
+Fibrosis/TGF$\beta$/EMT & $+0.149$ & $-0.060$ & $-0.034$ & RNA--protein opposite & RNA not propagated \\
+S1P/S1PR3 & $+0.123$ & $-0.045$ & $+0.079$ & RNA--protein opposite & RNA$\to$phospho candidate \\
+Integrin/cell adhesion & $+0.119$ & $+0.005$ & $+0.022$ & protein-flat; phosphosite up & RNA not propagated \\
+Macrophage inflammation & $+0.109$ & $-0.070$ & $-0.154$ & RNA--protein opposite & RNA not propagated \\
+TLR4/innate & $+0.075$ & $-0.034$ & $+0.000$ & RNA--protein opposite & protein-inverted (calibrated) \\
+Oxidative stress/NRF2 & $+0.021$ & $-0.010$ & $+0.021$ & RNA--protein concordant/near-flat & RNA not propagated \\
+Broad tubular transport & $-0.048$ & $+0.044$ & $-0.242$ & RNA--protein opposite & RNA$\to$phospho candidate \\
+DCT/NCC-WNK transport & $-0.130$ & $+0.057$ & $-0.119$ & RNA--protein opposite; phosphosite down & RNA$\to$phospho candidate \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 % =====================================================================
 \section{GSE228367 DCT subtype prior}
@@ -188,7 +212,7 @@ Gene & DCT1 mean & DCT2 mean & Read \\
 \end{table}
 
 \noindent
-Interpretation: the strict FDR marker sets are too sparse for binary enrichment. V11 therefore uses continuous DCT1/DCT2 subtype-prior scores and percentile bins. Leave-one-replicate-out mean-difference priors were stable for the DCT1 top decile and DCT2 bottom decile (Jaccard approximately 0.85--0.86), while log-ratio and rank-average score definitions changed bin membership more strongly.
+Interpretation: the strict FDR marker sets are too sparse for binary enrichment. V11 therefore uses continuous DCT1/DCT2 subtype-prior scores and percentile bins. Leave-one-replicate-out mean-difference priors were stable for the DCT1-high and DCT2-leaning decile bins (Jaccard approximately 0.85--0.86), while log-ratio and rank-average score definitions changed bin membership more strongly.
 
 % =====================================================================
 \section{Distal-nephron subtype-prior phosphosite enrichment}
@@ -196,7 +220,7 @@ Interpretation: the strict FDR marker sets are too sparse for binary enrichment.
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{v11_dct1_parent_gene_enrichment.pdf}
-\caption{\textbf{Distal-nephron subtype-prior parent-gene enrichment.} DCT1 top-decile, DCT2-bottom-decile, and DCT1 top-quartile reference bins are tested across primary and sensitivity definitions. The safest claim is enrichment in distal-nephron subtype-prior extremes rather than DCT1 exclusivity.}
+\caption{\textbf{Distal-nephron subtype-prior parent-gene enrichment.} DCT1-high, DCT2-leaning, and DCT1 top-quartile reference bins are tested across primary and sensitivity definitions. The safest claim is enrichment in distal-nephron subtype-prior extremes rather than DCT1 exclusivity.}
 \label{fig:h2primary}
 \end{figure}
 
@@ -226,7 +250,7 @@ Cluster bootstrap & row-level p<0.05 suppressed sites & OR 1.51 & 1.22--1.81 & p
 
 \begin{table}[H]
 \centering\small
-\caption{\textbf{DCT2-bottom-decile comparator across the same sensitivity ladder.} The DCT2-bottom-decile bin contains the 10\% of detected parent genes with the lowest DCT1 enrichment score (most DCT2-leaning). Both DCT1-top-decile and DCT2-bottom-decile use the same one-sided Fisher exact alternative. In several parent-gene-aware summaries the DCT2-bottom-decile odds ratio is larger than the DCT1-top-decile.}
+\caption{\textbf{DCT2-leaning comparator across the same sensitivity ladder.} The DCT2-leaning bin contains the 10\% of detected parent genes with the lowest DCT1 enrichment score. Both DCT1-high and DCT2-leaning deciles use the same one-sided Fisher exact alternative. In several parent-gene-aware summaries the DCT2-leaning odds ratio is larger than the DCT1-high odds ratio.}
 \label{tab:dct2comparesupp}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{lrrrrl}
@@ -247,7 +271,7 @@ Matched parent-gene permutation & 1.51 & 0.107 & \textbf{1.70} & \textbf{0.017} 
 \end{table}
 
 \noindent
-Interpretation: suppressed whole-kidney OSD-462 phosphosites are enriched among parent genes in distal-nephron subtype-prior extremes. The DCT1 top decile is biologically motivated by NCC/SPAK/WNK anchors, while the DCT2-bottom-decile comparator is also enriched and is stronger in several parent-gene-aware summaries. The supported claim is therefore distal-nephron subtype-prior enrichment rather than DCT1 exclusivity. Direct cell-of-origin assignment would require DCT-enriched or spatially resolved spaceflight phosphoproteomics.
+Interpretation: suppressed whole-kidney OSD-462 phosphosites are enriched among parent genes in distal-nephron subtype-prior extremes. The DCT1 top decile is biologically motivated by NCC/SPAK/WNK anchors, while the DCT2-leaning comparator is also enriched and is stronger in several parent-gene-aware summaries. The supported claim is therefore distal-nephron subtype-prior enrichment rather than DCT1 exclusivity. Direct cell-of-origin assignment would require DCT-enriched or spatially resolved spaceflight phosphoproteomics.
 
 % =====================================================================
 \section{Parent-protein and composition-score sensitivity}
@@ -441,7 +465,7 @@ Interpretation: spatial evidence is a contextual supplement. It supports the wor
 Mechanism branch & Reference and analysis & Headline result & Paper role \\
 \midrule
 Low-K/WNK reference & GSE228367 low-K DCT-enriched pseudobulk anti-alignment & Directional anti-alignment in 14-gene transport-target subset (cosine $-0.286$ OSD-462, $-0.311$ RRRM-2 ISS-T, $-0.146$ OSD-513), wide bootstrap CIs, did not meet promotion rule. & Mechanism triage, not primary upstream mechanism. \\
-Parent-protein normalization & OSD-462 parent-protein-normalized phosphosite re-test & DCT1 top-decile OR 1.52 (CI 1.36--1.70, q=$1.04\times10^{-11}$); DCT2-bottom-decile also enriched; paired sample-level contrast supportive. & Robustness upgrade to the DCT-subtype-prior result; not direct biochemical occupancy. \\
+Parent-protein normalization & OSD-462 parent-protein-normalized phosphosite re-test & DCT1 top-decile OR 1.52 (CI 1.36--1.70, q=$1.04\times10^{-11}$); DCT2-leaning decile also enriched; paired sample-level contrast supportive. & Robustness upgrade to the DCT-subtype-prior result; not direct biochemical occupancy. \\
 Injury/repair spatial context & GSE269622 IRI Visium DCT-transport score by spatial niche & DCT-adjacent spots drop at day 14 ($-0.044$) and week 6 ($-0.034$); DCT-marker-high spots rise at the same timepoints. & Spatial prediction/context for future spaceflight kidney sections. \\
 Vasopressin/cAMP & PXD001729 mpkDCT dDAVP & 60 shared single sites, 0 shared transport-target sites; key DCT/WNK targets do not map. & Secondary negative; coverage-bounded. \\
 KLHL3/CUL3 turnover & OSD-462 KLHL3/CUL3/WNK coverage & 0 \gene{Klhl3} phosphosites, 1 \gene{Cul3} site, flat WNK/SPAK/NCC protein abundance; no public kidney ubiquitinomics. & Future-data rationale. \\
@@ -480,15 +504,15 @@ Interpretation: the 14-gene transport-target subset moves directionally opposite
 Analysis & DCT-prior subset & OR & 95\% CI & q & Read \\
 \midrule
 parent-normalized $p<0.05$ & DCT1 top decile & 1.52 & 1.36--1.70 & $1.04\times10^{-11}$ & robustness upgrade holds \\
-parent-normalized $p<0.05$ & DCT2 bottom decile & 1.32 & 1.18--1.48 & $4.27\times10^{-6}$ & comparator also enriched \\
+parent-normalized $p<0.05$ & DCT2-leaning decile & 1.32 & 1.18--1.48 & $4.27\times10^{-6}$ & comparator also enriched \\
 parent-normalized strict $q<0.10$ & DCT1 top decile & 1.61 & 1.42--1.82 & $1.04\times10^{-11}$ & stricter set, OR rises \\
-parent-normalized strict $q<0.10$ & DCT2 bottom decile & 1.28 & 1.13--1.46 & $3.01\times10^{-4}$ & comparator also enriched \\
+parent-normalized strict $q<0.10$ & DCT2-leaning decile & 1.28 & 1.13--1.46 & $3.01\times10^{-4}$ & comparator also enriched \\
 exclude anchor genes & DCT1 top decile & 1.51 & 1.34--1.69 & $2.73\times10^{-11}$ & survives anchor exclusion \\
 exclude NCC sites & DCT1 top decile & 1.51 & 1.35--1.69 & $2.73\times10^{-11}$ & survives NCC exclusion \\
 one row per gene & DCT1 top decile & 1.50 & 1.19--1.90 & 0.00101 & survives parent-gene representative-row sensitivity \\
 single-position row per gene & DCT1 top decile & 1.48 & 1.17--1.88 & 0.00147 & stricter representative-row sensitivity passes \\
 paired sample-level contrast & DCT1 top decile & 1.56 & 1.37--1.77 & $1.90\times10^{-10}$ & matched animal-level contrast supportive \\
-paired sample-level contrast & DCT2 bottom decile & 1.54 & 1.36--1.75 & $2.22\times10^{-10}$ & matched animal-level comparator supportive \\
+paired sample-level contrast & DCT2-leaning decile & 1.54 & 1.36--1.75 & $2.22\times10^{-10}$ & matched animal-level comparator supportive \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -520,7 +544,7 @@ Interpretation: per-site parent-protein normalization sharpens the suppressed-si
 \centering\small
 \caption{\textbf{Visium DCT-transport score versus sham, by spatial group and timepoint.} Spot-level descriptive two-sample $t$; no animal-level replication.}
 \label{tab:dctxport}
-\begin{tabular}{lllrrr}
+\begin{tabularx}{\textwidth}{p{0.29\textwidth}lrrrX}
 \toprule
 Spatial group & Timepoint & Mean diff vs sham & $t$ & $p$ & $n$ spots vs sham \\
 \midrule
@@ -529,7 +553,7 @@ DCT-adjacent spots & week 6 & $-0.034$ & $-2.36$ & 0.0182 & 1{,}574 vs 1{,}134 \
 DCT-marker-high spots (top quartile) & day 14 & $+0.199$ & $+8.02$ & $2.25\times10^{-15}$ & 693 vs 715 \\
 DCT-marker-high spots (top quartile) & week 6 & $+0.132$ & $+5.98$ & $2.70\times10^{-9}$ & 979 vs 715 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 \noindent
@@ -561,9 +585,9 @@ Interpretation: the cultured DCT-lineage dDAVP reference is coverage-bounded for
 \centering\small
 \caption{\textbf{KLHL3/CUL3/WNK coverage in OSD-462 and PXD001729.}}
 \label{tab:klhlcoverage}
-\begin{tabular}{lrrrl}
+\begin{tabularx}{\textwidth}{lccp{0.14\textwidth}X}
 \toprule
-Gene & OSD-462 phosphosites & PXD phosphosites & OSD-462 protein effect & Read \\
+Gene & \shortstack{OSD-462\\phosphosites} & \shortstack{PXD\\phosphosites} & \shortstack{OSD-462\\protein effect} & Read \\
 \midrule
 \gene{Klhl3} & 0 & 0 & $+0.013$ & no phosphosite evidence \\
 \gene{Cul3} & 1 & 0 & $-0.001$ & no turnover signal \\
@@ -572,11 +596,58 @@ Gene & OSD-462 phosphosites & PXD phosphosites & OSD-462 protein effect & Read \
 \gene{Stk39}/SPAK & 5 & 3 & $+0.081$ & phospho suppressed despite flat protein \\
 \gene{Slc12a3}/NCC & 16 & 0 & $+0.089$ & phospho suppressed with protein flat/up \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 \noindent
 Interpretation: public data cannot distinguish KLHL3/CUL3-mediated WNK turnover from ionic/osmotic suppression. The next experiment requires DCT-enriched or targeted ubiquitinomics and direct WNK protein turnover assays.
+
+% =====================================================================
+\section{Human, aldosterone, and CMap appendix context}
+
+These analyses are not used as validation of the mouse kidney phosphoproteomic result. They document human-facing fluid-axis context, a directional mineralocorticoid hypothesis, and an approximate perturbagen-class screen.
+
+\begin{table}[H]
+\centering\small
+\caption{\textbf{Human urine/fluid-axis context and OSD-656 recovery-panel inventory.}}
+\label{tab:humancontext}
+\begin{tabularx}{\textwidth}{p{0.28\textwidth}p{0.22\textwidth}X}
+\toprule
+Analysis & Headline value & Interpretation \\
+\midrule
+Twins urine/fluid-axis concordance & Three physiological axes concordant; exact two-sided sign test $p=0.25$ & Directional single-flight-subject context only; not human kidney-omics validation. \\
+Figure-level \gene{AQP2} direction & Up in Supplementary Fig.~S4A & Encoded as direction only; not machine-readable kidney tissue evidence. \\
+OSD-656 Inspiration4 urine panel & 203 summarized markers; 92 inflammation/matrix-context markers; 0 direct distal-nephron/RAAS markers in predefined category & Post-flight recovery context; not independent inflight distal-nephron validation. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{\textbf{Appendix mechanism-context screens.}}
+\label{tab:appendixmechanisms}
+\begin{tabularx}{\textwidth}{p{0.26\textwidth}p{0.25\textwidth}X}
+\toprule
+Analysis & Headline value & Interpretation \\
+\midrule
+Mineralocorticoid/aldosterone axis & Meta-effect $-0.840$, $p=0.060$ & Directional hypothesis-generating context; below the declared significance threshold. \\
+LINCS/CMap local screen & 50 up and 50 down BING-compatible query genes; 473,647 Level-5 signatures scored after \code{sig\_info} merge & Approximate cell-line perturbagen-class screen; not a treatment or countermeasure analysis. \\
+Ortholog/symbol mapping & Uppercase mouse-to-human matching unless a dedicated ortholog table is supplied & Mapping limitation; candidate lists should not be over-interpreted. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+{\small
+\noindent Source artifacts:
+\begin{itemize}
+  \item \path{human_concordance/human_concordance_summary.tsv}
+  \item \path{human_concordance/twins_axis_level_concordance.tsv}
+  \item \path{human_concordance/twins_aqp2_figure_evidence.tsv}
+  \item \path{human_concordance/osd656_prepost_summary.tsv}
+  \item \path{regulator_activity/aldosterone_axis_summary.tsv}
+  \item \path{cmap_screen/cmap_summary.tsv}
+\end{itemize}
+}
 
 % =====================================================================
 \section{Complete artifact index}
@@ -595,12 +666,16 @@ Category & Source artifact(s) \\
 \endfoot
 Run report & \path{docs/v11_execution_research_plan.md}; \path{docs/v11_execution_results.md} \\
 Headline-number index & \path{latex_paper/v11_headline_number_index.tsv}; maps reported manuscript numbers to source artifacts, filters, and columns. \\
-V11 source modules & \path{src/v11/build_gse228367_dct_prior.R}; \path{src/v11/core_analysis.py}; \path{src/v11/h2_composition_aware_phospho.py}; \path{src/v11/spatial_reference_projection.py}; \path{src/v11/publication_figures.py}; \path{src/v11/perturbation_gse228367_lowk.py}; \path{src/v11/h2_occupancy_normalized_phospho.py}; \path{src/v11/spatial_dct_transport_check.py}; \path{src/v11/perturbation_triage_summary.py} \\
+V11 source modules & \path{src/v11/build_gse228367_dct_prior.R}; \path{src/v11/core_analysis.py}; \path{src/v11/h2_composition_aware_phospho.py}; \path{src/v11/channel_centering_sensitivity.py}; \path{src/v11/kinome_atlas_ksea.py}; \path{src/v11/recurrence_meta.py}; \path{src/v11/rna_protein_propagation.py}; \path{src/v11/observability_audit.py}; \path{src/v11/spatial_reference_projection.py}; \path{src/v11/publication_figures.py}; \path{src/v11/perturbation_gse228367_lowk.py}; \path{src/v11/h2_occupancy_normalized_phospho.py}; \path{src/v11/spatial_dct_transport_check.py}; \path{src/v11/perturbation_triage_summary.py} \\
 Runner integration & \path{src/run_all_phases.py} phase 11; \code{--v11}; \code{--v11-only}; \code{--v11-site-scope}; \code{--v11-skip-spatial}; \code{--v11-skip-visium}; \code{--v11-skip-xenium}; \code{--v11-skip-figures} \\
 Baseline lock & \path{data/results/run_20260526_v11_dct1_phospho_mediation/baseline/v11_baseline_lock_summary.tsv}; \path{baseline/v11_baseline_input_manifest.json}; \path{baseline/osd462_targeted_ksea_substrates.tsv}; \path{baseline/rna_recurrence_gene_set_members.tsv}; \path{baseline/osd462_rna_recurrence_leave_one_family.tsv}; \path{baseline/osd462_rna_recurrence_paired_pathway_bootstrap.tsv}; \path{baseline/osd462_tmt_channel_qc.tsv}; \path{baseline/osd462_tmt_missingness_by_condition.tsv} \\
+Cross-layer pathway matrix & \path{cross_layer/osd462_cross_layer_pathway_matrix.tsv}; \path{cross_layer/osd462_cross_layer_pattern_summary.tsv}; descriptive RNA/protein/phosphosite pathway-layer summary generated by \path{src/v11/core_analysis.py}. \\
+Calibrated RNA$\to$protein propagation & \path{run_20260606_v11_layer_specificity/propagation/rna_protein_propagation_summary.tsv}; \path{propagation/rna_protein_propagation_gene_classes.tsv}; \path{propagation/rna_protein_propagation_coverage.tsv}; \path{figures/v11_rna_protein_propagation.pdf}; matched-null per-pathway layer assignments from \path{src/v11/rna_protein_propagation.py}. \\
+Proteome observability audit & \path{run_20260606_v11_layer_specificity/observability/v11_observability_per_gene.tsv}; \path{observability/v11_observability_detectability_gradient.tsv}; \path{observability/v11_observability_matched_propagation.tsv}; \path{observability/v11_observability_q_delta.tsv}; \path{observability/v11_observability_high_coverage_propagation.tsv}; \path{observability/v11_observability_ncc_site_audit.tsv}; detectability-bias control from \path{src/v11/observability_audit.py}. \\
 DCT reference prior & \path{dct_prior/gse228367_gene_stats_overall.tsv}; \path{dct_prior/gse228367_gene_stats_by_rep.tsv}; \path{dct_prior/gse228367_dct1_vs_dct2_de.tsv}; \path{dct_prior/gse228367_dct_prior_summary.json}; \path{dct_prior/gse228367_dct_prior_score_sensitivity.tsv}; \path{dct_prior/gse228367_anchor_gene_prior_positions.tsv}; \path{dct_prior/gse228367_prior_bin_stability.tsv} \\
 External QC & \path{external_qc/gse228367_object_inventory.tsv}; \path{external_qc/gse228367_marker_qc.tsv}; \path{external_qc/pxd001729_table_inventory.tsv}; \path{external_qc/pxd001729_phosphosite_effects.tsv} \\
-DCT-subtype-prior enrichment & \path{h2_enrichment/h2_dct1_sensitivity_summary.tsv}; \path{h2_enrichment/h2_dct1_parent_gene_level_summary.tsv}; \path{h2_enrichment/h2_dct1_site_count_stratified_permutation.tsv}; \path{h2_enrichment/h2_dct_extreme_bin_cluster_bootstrap.tsv}; \path{h2_enrichment/h2_dct_matched_parent_gene_permutation.tsv}; \path{h2_enrichment/h2_dct_threshold_free_summary.tsv}; \path{h2_enrichment/h2_dct_percentile_threshold_sensitivity.tsv}; \path{h2_enrichment/h2_dct1_enrichment_verdict.json} \\
+DCT-subtype-prior enrichment & \path{h2_enrichment/h2_dct1_sensitivity_summary.tsv}; \path{h2_enrichment/h2_dct1_parent_gene_level_summary.tsv}; \path{h2_enrichment/h2_dct1_site_count_stratified_permutation.tsv}; \path{h2_enrichment/h2_dct_extreme_bin_cluster_bootstrap.tsv}; \path{h2_enrichment/h2_dct_matched_parent_gene_permutation.tsv}; \path{h2_enrichment/h2_dct_threshold_free_summary.tsv}; \path{h2_enrichment/h2_dct_percentile_threshold_sensitivity.tsv}; \path{h2_enrichment/h2_dct_channel_centering_sensitivity.tsv}; \path{h2_enrichment/h2_dct_channel_centering_effect_comparison.tsv}; \path{h2_enrichment/h2_dct_channel_centering_verdict.json}; \path{h2_enrichment/h2_dct1_enrichment_verdict.json} \\
+Kinome and recurrence extensions & \path{regulator_activity/osd462_kinome_atlas_ksea.tsv}; \path{regulator_activity/osd462_kinome_atlas_net_summary.tsv}; \path{cross_osdr_recurrence/recurrence_meta_summary.tsv}; \path{cross_osdr_recurrence/recurrence_meta_gene_set_scores.tsv}; \path{cross_osdr_recurrence/recurrence_meta_verdict.json} \\
 PXD001729 checks & \path{h2_pxd/h2_pxd001729_ddavp_antialignment_summary.tsv}; \path{h2_pxd/h2_pxd001729_shared_sites.tsv}; \path{h2_pxd/h2_pxd001729_verdict.json} \\
 KLHL3/CUL3 checks & \path{h2_klhl3/h2_klhl3_cul3_effects.tsv}; \path{h2_klhl3/h2_klhl3_cul3_verdict.json} \\
 Composition-aware models & \path{h2_composition_adjusted/h2_composition_adjusted_suppression_enrichment_single.tsv}; \path{h2_composition_adjusted/h2_composition_effect_level_dct1_ladder_single.tsv}; \path{h2_composition_adjusted/h2_composition_site_fixed_interaction_ladder_single.tsv}; \path{h2_composition_adjusted/h2_composition_fixed_set_ladder_single.tsv}; \path{h2_composition_adjusted/h2_composition_covariate_diagnostics_single.tsv}; \path{h2_composition_adjusted/h2_composition_aware_verdict_single.json}; \path{h2_composition_adjusted/h2_composition_manifest_single.json} \\
@@ -608,15 +683,50 @@ Exploratory covariance decomposition & \path{h3_mediation/h3_mediation_model_sum
 Spatial reference & \path{spatial_reference/spatial_reference_projection_verdict.json}; \path{spatial_reference/visium_timepoint_gene_cosines.tsv}; \path{spatial_reference/visium_timepoint_pathway_cosines.tsv}; \path{spatial_reference/visium_niche_cosines.tsv}; \path{spatial_reference/visium_spot_niche_counts.tsv}; \path{spatial_reference/xenium_annotation_inventory.tsv}; \path{spatial_reference/visium_dct_transport_by_niche.tsv}; \path{spatial_reference/visium_dct_transport_timepoint_summary.tsv}; \path{spatial_reference/visium_dct_transport_spot_scores.tsv.gz}; \path{spatial_reference/visium_dct_transport_verdict.json} \\
 Perturbation triangulation & \path{perturbation/lowk_dct_pseudobulk_effects.tsv}; \path{perturbation/lowk_dct_alignment_summary.tsv}; \path{perturbation/lowk_target_gene_table.tsv}; \path{perturbation/lowk_dct1_dct2_specificity.tsv}; \path{perturbation/lowk_alignment_verdict.json}; \path{perturbation/perturbation_triage_summary.tsv}; \path{perturbation/perturbation_triage_verdict.json} \\
 Parent-protein-normalized re-test & \path{h2_occupancy/h2_occupancy_site_effects.tsv}; \path{h2_occupancy/h2_occupancy_dct1_enrichment.tsv}; \path{h2_occupancy/h2_occupancy_target_sites.tsv}; \path{h2_occupancy/h2_parent_normalized_paired_site_effects.tsv.gz}; \path{h2_occupancy/h2_parent_normalized_paired_enrichment.tsv}; \path{h2_occupancy/h2_occupancy_verdict.json} \\
-V11 figures & \path{figures/v11/v11_dct1_parent_gene_enrichment.pdf}; \path{figures/v11/v11_distal_nephron_prior_enrichment.pdf}; \path{figures/v11/v11_parent_protein_composition_sensitivity.pdf}; \path{figures/v11/v11_exploratory_mediation_forest.pdf}; \path{figures/v11/v11_exploratory_covariance_decomposition.pdf}; \path{figures/v11/v11_spatial_reference_projection.pdf}; \path{figures/v11/v11_xenium_annotation_inventory.pdf}; \path{figures/v11/v11_perturbation_triangulation.pdf} \\
+Human context & \path{human_concordance/human_concordance_summary.tsv}; \path{human_concordance/human_concordance_verdict.json}; \path{human_concordance/twins_axis_concordance.tsv}; \path{human_concordance/twins_axis_level_concordance.tsv}; \path{human_concordance/twins_aqp2_figure_evidence.tsv}; \path{human_concordance/osd656_prepost_summary.tsv} \\
+Aldosterone and CMap appendix & \path{regulator_activity/aldosterone_axis_summary.tsv}; \path{regulator_activity/aldosterone_axis_verdict.json}; \path{cmap_screen/cmap_summary.tsv}; \path{cmap_screen/query_genes.tsv}; \path{cmap_screen/signature_connectivity.tsv}; \path{cmap_screen/perturbagen_summary.tsv}; \path{cmap_screen/moa_summary.tsv} \\
+V11 figures & \path{figures/v11/v11_dct1_vs_dct2_evidence_ladder.pdf}; \path{figures/v11/v11_tmt_channel_centering_qc.pdf}; \path{figures/v11/v11_extension_kinome_recurrence.pdf}; \path{figures/v11/v11_dct1_parent_gene_enrichment.pdf}; \path{figures/v11/v11_distal_nephron_prior_enrichment.pdf}; \path{figures/v11/v11_parent_protein_composition_sensitivity.pdf}; \path{figures/v11/v11_exploratory_mediation_forest.pdf}; \path{figures/v11/v11_exploratory_covariance_decomposition.pdf}; \path{figures/v11/v11_spatial_reference_projection.pdf}; \path{figures/v11/v11_xenium_annotation_inventory.pdf}; \path{figures/v11/v11_perturbation_triangulation.pdf} \\
 Downloaded spatial data & \path{data/external/spatial_reference/GSE269622_Visium/*.tar.gz}; \path{data/external/spatial_reference/GSE269719_Xenium/Xenium.h5ad} \\
 \end{longtable}
+
+% =====================================================================
+\section{Proteome observability-bias audit}\label{app:observability}
+
+Detectability-bias control for the cross-layer propagation pattern. Per-gene observability features (\texttt{n\_peptides}, \texttt{abundance\_log2}, and a peptide-weighted \texttt{missing\_fraction}) were collapsed from \path{protein_effects_by_row.tsv}, and the per-pathway matched-null tests behind Table~\ref{tab:crosslayerfull} were re-run with the abundance$\times$peptide null extended to a $5\times4\times3$ abundance$\times$peptide$\times$missing-fraction stratum.
+
+\paragraph{Detectability gradient.} Fraction of RNA-detected genes also protein-quantified, by $|\text{RNA effect}|$ decile: $0.468$, $0.489$, $0.478$, $0.445$, $0.387$ (top decile). The relationship is roughly flat with a ${\sim}10$ p.p.\ dip in the top decile---not steep enough to explain the 7-of-11-pathway discordance.
+
+\paragraph{Observability-matched re-test.} Per-pathway $|\Delta\text{BH }q|$ between the standard and observability-extended stratifications is at most $0.041$ (full table: \path{observability/v11_observability_q_delta.tsv}). Adding missingness to the null does not shift any layer assignment.
+
+\paragraph{High-coverage subset.} Restriction to $n_\text{peptides}\ge3$ and $\text{missing\_fraction}\le0.20$ retains $6{,}282/6{,}549=95.9\%$ of the pool, and the propagation pattern reproduces on the subset (\path{observability/v11_observability_high_coverage_propagation.tsv}).
+
+\paragraph{NCC/SPAK phosphosite observability.} The five pre-specified NCC/SPAK regulatory phosphosites all sit in the top $0.9\%$ of phosphoproteome effect magnitude, while the four non-regulatory NCC control sites sit at the 15--28th percentile---the suppression is concentrated in the most-confidently-measured sites, not in a low-coverage tail.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{llrrr}
+\toprule
+Gene & Site & Role & Coverage pct & $|$effect$|$ pct \\
+\midrule
+Slc12a3 & S53  & regulatory & 66.7 & \textbf{99.37} \\
+Slc12a3 & S65  & regulatory & 66.7 & 99.15 \\
+Slc12a3 & S68  & regulatory & 66.7 & 99.18 \\
+Stk39   & S382 & regulatory & 16.7 & 99.29 \\
+Stk39   & S383 & regulatory & 66.7 & 99.18 \\
+Slc12a3 & S96  & non-regulatory control & 66.7 & 26.07 \\
+Slc12a3 & S120 & non-regulatory control & 66.7 & \textbf{14.71} \\
+Slc12a3 & S122 & non-regulatory control & 66.7 & 24.23 \\
+Slc12a3 & S124 & non-regulatory control & 66.7 & 27.62 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % =====================================================================
 \section{Verification notes}
 
 \begin{itemize}
-  \item The v11 figure module generated PNG/PDF figure sets under \path{figures/v11/}, including the distal-nephron prior enrichment alias, parent-protein composition sensitivity, exploratory covariance-decomposition alias, spatial-reference projection, Xenium annotation inventory, and perturbation triangulation.
+  \item The v11 figure module generated PNG/PDF figure sets under \path{figures/v11/}, including the DCT1-vs-DCT2 evidence ladder, TMT channel-centering QC, kinome/recurrence extension panel, distal-nephron prior enrichment alias, parent-protein composition sensitivity, exploratory covariance-decomposition alias, spatial-reference projection, Xenium annotation inventory, and perturbation triangulation.
   \item The direct v11 figure generator and integrated \path{src.visualization.publication_figures} path both detect and regenerate v11 figures.
   \item Python syntax checks passed for the v11 core, composition-aware, spatial-reference, figure, perturbation low-K, parent-protein-normalized phosphosite, spatial DCT-transport, and triage modules, plus the runner and publication-figure integration.
   \item The runner dry-run passed for \code{python -m src.run_all_phases --v11-only --dry-run --run-id run\_20260526\_v11\_dryrun --v11-skip-spatial} and for the perturbation-triangulation modules.
@@ -627,6 +737,6 @@ Downloaded spatial data & \path{data/external/spatial_reference/GSE269622_Visium
 
 \vspace{1em}
 \noindent\itshape
-Curated results compendium for Manuscript v11. This document should travel with \path{manuscript_v11.tex} and \path{manuscript_v11.pdf}. The manuscript result is a distal-nephron subtype-prior phosphosite enrichment model embedded in recurrent kidney remodeling.
+Curated results compendium for Manuscript v11. This document should travel with \path{manuscript_v11.tex} and \path{manuscript_v11.pdf}. The manuscript result is a matched RNA/protein/phosphoprotein constraint map around the established spaceflight kidney NCC/SPAK/WNK phospho-phenotype, with distal-nephron subtype-prior enrichment as a bounded secondary prioritization layer.
 
 \end{document}

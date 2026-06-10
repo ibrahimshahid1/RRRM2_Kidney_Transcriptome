@@ -291,15 +291,16 @@ def compute_flight_effect(
 def compute_site_flight_effect_lm(
     table: TmtTable,
     min_per_condition: int = 3,
-    channel_center: bool = False,
+    channel_center: bool = True,
 ) -> pd.DataFrame:
     """Per-row FL - GC effect with CI from a plex-adjusted linear model.
 
     For each row, log2 scaled FL/GC channels (both plexes) are fit with
     ``y ~ flight + plex``; the flight coefficient is the plex-corrected
-    FL - GC effect.  Returns effect, SE, 95% CI, two-sided p, and channel
-    counts.  Suitable for the small phosphosite tables where a per-site
-    interval is wanted.
+    FL - GC effect.  By default, per-channel median centering performs the same
+    within-plex TMT loading normalization used for protein effects.  Returns
+    effect, SE, 95% CI, two-sided p, and channel counts.  Suitable for the
+    small phosphosite tables where a per-site interval is wanted.
     """
     from scipy.stats import t as t_dist
 

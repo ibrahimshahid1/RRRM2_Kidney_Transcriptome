@@ -754,6 +754,13 @@ def phase_v11(
         return False
 
     if not run_python(
+        "src.v11.channel_centering_sensitivity",
+        [f"--run-root={results_dir}"],
+        dry_run=dry_run,
+    ):
+        return False
+
+    if not run_python(
         "src.v11.kinome_atlas_ksea",
         [
             f"--run-root={results_dir}",

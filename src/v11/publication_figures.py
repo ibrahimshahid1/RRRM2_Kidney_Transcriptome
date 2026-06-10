@@ -284,14 +284,14 @@ def fig_cross_cohort_recurrence(run_root: Path, out_dir: Path) -> bool:
             capsize=3,
             ms=7,
         )
-        ax1.text(row["cosine"], i - 0.16, f"{row['cosine']:.2f}", ha="center", va="bottom", fontsize=8)
+        ax1.text(row["ci_high"] + 0.03, i, f"{row['cosine']:.2f}", ha="left", va="center", fontsize=8)
     ax1.axvline(0, color="#495057", lw=1, ls="--")
     ax1.set_yticks(y)
     ax1.set_yticklabels(align["label"])
     ax1.invert_yaxis()
-    ax1.set_xlim(-0.85, 1.0)
+    ax1.set_xlim(-0.95, 1.2)
     ax1.set_xlabel("Pathway-vector cosine")
-    ax1.set_title("Canonical recurrence estimates")
+    ax1.set_title("Canonical recurrence estimates", pad=10)
     clean_axis(ax1, xgrid=True)
     panel_label(ax1, "A")
 
@@ -367,7 +367,7 @@ def fig_h2_primary_enrichment(run_root: Path, out_dir: Path) -> bool:
     sub["test_label"] = sub["test"].map(
         {
             "fisher_dct1_top_decile": "DCT1 top decile",
-            "fisher_dct2_bottom_decile": "DCT2-bottom decile",
+            "fisher_dct2_bottom_decile": "DCT2-leaning decile",
             "fisher_dct1_top_quartile": "DCT1 top quartile",
         }
     )
@@ -386,8 +386,8 @@ def fig_h2_primary_enrichment(run_root: Path, out_dir: Path) -> bool:
     }
 
     fig, ax = plt.subplots(figsize=(9.2, 5.4))
-    offsets = {"DCT1 top decile": -0.18, "DCT2-bottom decile": 0.0, "DCT1 top quartile": 0.18}
-    colors = {"DCT1 top decile": PALETTE["red"], "DCT2-bottom decile": PALETTE["teal"], "DCT1 top quartile": PALETTE["blue"]}
+    offsets = {"DCT1 top decile": -0.18, "DCT2-leaning decile": 0.0, "DCT1 top quartile": 0.18}
+    colors = {"DCT1 top decile": PALETTE["red"], "DCT2-leaning decile": PALETTE["teal"], "DCT1 top quartile": PALETTE["blue"]}
     y_base = np.arange(len(keep_analyses))
     for label, part in sub.groupby("test_label", sort=False):
         if label not in offsets:
@@ -484,8 +484,7 @@ def fig_h2_composition_robustness(run_root: Path, out_dir: Path) -> bool:
     coef["ci_low"] = coef["coefficient"] - 1.96 * coef["se"]
     coef["ci_high"] = coef["coefficient"] + 1.96 * coef["se"]
 
-    fig, axes = plt.subplots(1, 2, figsize=(12.6, 5.4), gridspec_kw={"width_ratios": [1.08, 1]})
-    ax = axes[0]
+    fig, ax = plt.subplots(1, 1, figsize=(8.8, 5.4))
     offsets = {"DCT1 top decile": -0.12, "DCT1 top quartile": 0.12}
     colors = {"DCT1 top decile": PALETTE["red"], "DCT1 top quartile": PALETTE["blue"]}
     y_base = np.arange(len(MODEL_ORDER))
@@ -524,40 +523,8 @@ def fig_h2_composition_robustness(run_root: Path, out_dir: Path) -> bool:
     ax.set_title("Top-decile enrichment persists after adjustment")
     ax.legend(loc="upper left", bbox_to_anchor=(0.0, -0.16), frameon=True)
     clean_axis(ax)
-    panel_label(ax, "A")
-
-    ax = axes[1]
-    source_offsets = {"Two-stage adjusted effect": -0.11, "One-shot site-fixed interaction": 0.11}
-    source_colors = {
-        "Two-stage adjusted effect": PALETTE["purple"],
-        "One-shot site-fixed interaction": PALETTE["teal"],
-    }
-    for label, part in coef.groupby("source", sort=False):
-        ys = np.array([MODEL_ORDER.index(str(m)) for m in part["model"]]) + source_offsets[label]
-        ax.errorbar(
-            part["coefficient"],
-            ys,
-            xerr=np.vstack([part["coefficient"] - part["ci_low"], part["ci_high"] - part["coefficient"]]),
-            fmt="o",
-            color=source_colors[label],
-            ecolor=source_colors[label],
-            elinewidth=1.15,
-            capsize=2,
-            ms=5,
-            label=label,
-        )
-    ax.axvline(0, color="#495057", lw=1, ls="--")
-    ax.set_yticks(y_base)
-    ax.set_yticklabels([])
-    ax.invert_yaxis()
-    ax.set_xlabel("DCT1 reference coefficient\nnegative = stronger flight suppression")
-    ax.set_title("Continuous gradient models remain weak")
-    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=True)
-    clean_axis(ax)
-    panel_label(ax, "B")
-    fig.suptitle("Parent-protein and composition-score sensitivity", fontsize=13, fontweight="bold", y=1.02)
-    qa_axis(axes[0], "composition enrichment panel")
-    qa_axis(axes[1], "composition gradient panel")
+    fig.suptitle("Parent-protein and composition-score sensitivity", fontsize=13, fontweight="bold", y=1.0)
+    qa_axis(ax, "composition enrichment panel")
     save(fig, out_dir, "v11_parent_protein_composition_sensitivity")
     return True
 
@@ -801,12 +768,11 @@ def fig_perturbation_triangulation(run_root: Path, out_dir: Path) -> bool:
     occ = read_tsv(occ_path)
     spatial = read_tsv(spatial_path)
 
-    fig = plt.figure(figsize=(13.8, 10.2))
-    gs = fig.add_gridspec(2, 2, hspace=0.50, wspace=0.48)
+    fig = plt.figure(figsize=(13.0, 9.4))
+    gs = fig.add_gridspec(2, 2, hspace=0.50, wspace=0.42)
     ax1 = fig.add_subplot(gs[0, 0])
     ax2 = fig.add_subplot(gs[0, 1])
-    ax3 = fig.add_subplot(gs[1, 0])
-    gs_d = gs[1, 1].subgridspec(2, 1, hspace=0.42)
+    gs_d = gs[1, :].subgridspec(2, 1, hspace=0.42)
     ax4a = fig.add_subplot(gs_d[0, 0])
     ax4b = fig.add_subplot(gs_d[1, 0], sharex=ax4a)
 
@@ -883,49 +849,6 @@ def fig_perturbation_triangulation(run_root: Path, out_dir: Path) -> bool:
         tick.set_ha("right")
     panel_label(ax2, "B")
 
-    occ_sub = occ[
-        occ["analysis"].isin(["occupancy_p05", "occupancy_q10", "occupancy_one_row_per_parent_gene_p05", "occupancy_single_position_one_row_per_parent_gene_p05"])
-        & occ["flag"].isin(["dct1_top_decile", "dct1_top_quartile"])
-    ].copy()
-    if not occ_sub.empty:
-        occ_sub["analysis_label"] = occ_sub["analysis"].map(
-            {
-                "occupancy_p05": "Nominal p<0.05",
-                "occupancy_q10": "Strict q<0.10",
-                "occupancy_one_row_per_parent_gene_p05": "One row per gene",
-                "occupancy_single_position_one_row_per_parent_gene_p05": "Single-position row per gene",
-            }
-        )
-        occ_sub["flag_label"] = occ_sub["flag"].map(
-            {"dct1_top_decile": "DCT1 top decile", "dct1_top_quartile": "DCT1 top quartile"}
-        )
-        order = ["Nominal p<0.05", "Strict q<0.10", "One row per gene", "Single-position row per gene"]
-        y_base = np.arange(len(order))
-        offsets = {"DCT1 top decile": -0.12, "DCT1 top quartile": 0.12}
-        colors = {"DCT1 top decile": PALETTE["red"], "DCT1 top quartile": PALETTE["blue"]}
-        for label, part in occ_sub.groupby("flag_label", sort=False):
-            ys = np.array([order.index(x) for x in part["analysis_label"]]) + offsets[label]
-            ax3.errorbar(
-                part["odds_ratio"],
-                ys,
-                xerr=np.vstack([part["odds_ratio"] - part["ci_low"], part["ci_high"] - part["odds_ratio"]]),
-                fmt="o",
-                ms=5,
-                color=colors[label],
-                ecolor=colors[label],
-                capsize=2,
-                label=label,
-            )
-        ax3.axvline(1, color="#495057", lw=1, ls="--")
-        ax3.set_yticks(y_base)
-        ax3.set_yticklabels(order)
-        ax3.invert_yaxis()
-        ax3.set_xlabel("Odds ratio")
-        ax3.set_title("Parent-protein-normalized phosphosite enrichment")
-        ax3.legend(loc="upper left", bbox_to_anchor=(0.0, -0.20), ncol=2, frameon=True)
-        clean_axis(ax3)
-        panel_label(ax3, "C")
-
     sp = spatial[
         spatial["group"].isin(["all_spots", "dct_marker_top_quartile", "dct_adjacent_spots"])
         & spatial["comparison"].str.endswith("minus_sham_same_group")
@@ -960,7 +883,7 @@ def fig_perturbation_triangulation(run_root: Path, out_dir: Path) -> bool:
             ax.set_title(title)
             ax.legend(frameon=True, loc="center left", bbox_to_anchor=(1.02, 0.5))
             clean_axis(ax, ygrid=True)
-        panel_label(ax4a, "D")
+        panel_label(ax4a, "C")
         ax4b.set_xlabel("IRI timepoint")
         plt.setp(ax4a.get_xticklabels(), visible=False)
 
@@ -973,10 +896,303 @@ def fig_perturbation_triangulation(run_root: Path, out_dir: Path) -> bool:
         fontsize=8,
         color=PALETTE["gray"],
     )
-    qa_axis(ax3, "parent-protein-normalized perturbation panel")
     qa_axis(ax4a, "DCT-marker-high spatial panel")
     qa_axis(ax4b, "DCT-adjacent spatial panel")
     save(fig, out_dir, "v11_perturbation_triangulation")
+    return True
+
+
+def fig_dct1_vs_dct2_evidence_ladder(run_root: Path, out_dir: Path) -> bool:
+    """Review-response forest plot comparing DCT1-high and DCT2-leaning bins."""
+    base = run_root / "h2_enrichment"
+    sens_path = base / "h2_dct1_sensitivity_summary.tsv"
+    parent_path = base / "h2_dct1_parent_gene_level_summary.tsv"
+    boot_path = base / "h2_dct_extreme_bin_cluster_bootstrap.tsv"
+    perm_path = base / "h2_dct_matched_parent_gene_permutation.tsv"
+    missing = [p for p in [sens_path, parent_path, boot_path, perm_path] if not p.exists()]
+    if missing:
+        print(f"  [skip] missing DCT1/DCT2 ladder inputs: {missing}")
+        return False
+
+    sens = read_tsv(sens_path)
+    parent = read_tsv(parent_path)
+    boot = read_tsv(boot_path)
+    perm = read_tsv(perm_path)
+    rows: list[dict[str, object]] = []
+
+    def add_row(label: str, bin_label: str, row: pd.Series, *, kind: str = "fisher") -> None:
+        if kind == "bootstrap":
+            odds = float(row["bootstrap_median_odds_ratio"])
+            lo = float(row["ci_low"])
+            hi = float(row["ci_high"])
+            p_value = np.nan
+        elif kind == "permutation":
+            odds = float(row["observed_parent_gene_odds_ratio"])
+            lo = np.nan
+            hi = np.nan
+            p_value = float(row["empirical_p_value"])
+        else:
+            odds = float(row["statistic"])
+            lo, hi = odds_ci(row)
+            p_value = float(row["p_value"]) if "p_value" in row.index and pd.notna(row["p_value"]) else np.nan
+        rows.append({"analysis": label, "bin": bin_label, "odds": odds, "ci_low": lo, "ci_high": hi, "p": p_value})
+
+    labels = {
+        "dct1": "DCT1-high (top decile)",
+        "dct2": "DCT2-leaning decile",
+    }
+    for analysis, label in [("primary_p05", "Row-level Fisher"), ("one_site_per_parent_gene", "One row / parent gene")]:
+        for key, test in [("dct1", "fisher_dct1_top_decile"), ("dct2", "fisher_dct2_bottom_decile")]:
+            match = sens[(sens["analysis"].eq(analysis)) & (sens["test"].eq(test))]
+            if not match.empty:
+                add_row(label, labels[key], match.iloc[0])
+
+    for key, test in [("dct1", "parent_gene_fisher_dct1_top_decile"), ("dct2", "parent_gene_fisher_dct2_bottom_decile")]:
+        match = parent[(parent["analysis"].eq("any_suppressed_p05")) & (parent["test"].eq(test))]
+        if not match.empty:
+            add_row("Parent-gene Fisher", labels[key], match.iloc[0])
+
+    for key, test in [("dct1", "parent_gene_logistic_dct1_top_decile"), ("dct2", "parent_gene_logistic_dct2_bottom_decile")]:
+        match = parent[(parent["analysis"].eq("any_suppressed_p05")) & (parent["test"].eq(test))]
+        if not match.empty:
+            add_row("Parent-gene logistic (adj.)", labels[key], match.iloc[0])
+
+    for key, flag in [("dct1", "dct1_top_decile"), ("dct2", "dct2_bottom_decile")]:
+        match = boot[(boot["analysis"].eq("all_phosphosite_rows")) & (boot["flag"].eq(flag))]
+        if not match.empty:
+            add_row("Cluster bootstrap", labels[key], match.iloc[0], kind="bootstrap")
+
+    for key, flag in [("dct1", "dct1_top_decile"), ("dct2", "dct2_bottom_decile")]:
+        match = perm[(perm["suppressed_col"].eq("any_suppressed_p05")) & (perm["flag"].eq(flag))]
+        if not match.empty:
+            add_row("Matched permutation", labels[key], match.iloc[0], kind="permutation")
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        print("  [skip] no DCT1/DCT2 ladder rows")
+        return False
+
+    order = [
+        "Row-level Fisher",
+        "One row / parent gene",
+        "Parent-gene Fisher",
+        "Parent-gene logistic (adj.)",
+        "Cluster bootstrap",
+        "Matched permutation",
+    ]
+    colors = {
+        labels["dct1"]: "#0877B6",
+        labels["dct2"]: "#D55E00",
+    }
+    offsets = {labels["dct1"]: -0.15, labels["dct2"]: 0.15}
+    y_base = np.arange(len(order))
+
+    fig, ax = plt.subplots(figsize=(11.2, 6.4))
+    for bin_label in [labels["dct1"], labels["dct2"]]:
+        part = df[df["bin"].eq(bin_label)].copy()
+        ys = np.array([order.index(a) for a in part["analysis"]]) + offsets[bin_label]
+        for _, row in part.iterrows():
+            y = order.index(str(row["analysis"])) + offsets[bin_label]
+            odds = float(row["odds"])
+            if np.isfinite(row["ci_low"]) and np.isfinite(row["ci_high"]):
+                ax.hlines(y, float(row["ci_low"]), float(row["ci_high"]), color=colors[bin_label], lw=2.4)
+            ax.plot(odds, y, "o", ms=7, color=colors[bin_label], label=bin_label if y == ys[0] else None)
+            label_y = y - 0.18 if bin_label == labels["dct1"] else y + 0.22
+            if str(row["analysis"]) == "Matched permutation" and bin_label == labels["dct2"]:
+                label_y = y - 0.22
+            ax.text(odds, label_y, f"{odds:.2f}", color=colors[bin_label], ha="center", va="center", fontsize=8.5)
+
+    ax.axvline(1.0, color="#495057", lw=1.1, ls="--")
+    ax.set_xscale("log")
+    ax.set_xlim(0.78, 2.45)
+    ax.set_xticks([0.8, 1.0, 1.25, 1.5, 2.0, 2.4])
+    ax.set_xticklabels(["0.8", "1.0", "1.25", "1.5", "2.0", "2.4"])
+    ax.set_yticks(y_base)
+    ax.set_yticklabels(order)
+    ax.invert_yaxis()
+    ax.set_xlabel("Odds ratio for suppressed-site enrichment (log scale)")
+    ax.set_title("Distal-nephron subtype-prior enrichment: DCT1-high vs DCT2-leaning", fontsize=14, fontweight="bold", pad=12)
+    clean_axis(ax)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=2, frameon=False)
+    ax.text(
+        0.995,
+        order.index("Matched permutation") - 0.45,
+        "DCT1 p=0.107 (n.s.)    DCT2 p=0.017",
+        transform=ax.get_yaxis_transform(),
+        ha="right",
+        va="center",
+        fontsize=8.5,
+        color=PALETTE["gray"],
+    )
+    fig.text(
+        0.5,
+        0.02,
+        "DCT1-high is strongest at site level; DCT2-leaning is stronger in parent-gene-aware tests and survives matched permutation.",
+        ha="center",
+        fontsize=8.5,
+        color=PALETTE["gray"],
+    )
+    qa_axis(ax, "DCT1-vs-DCT2 evidence ladder", check_legend=False)
+    save(fig, out_dir, "v11_dct1_vs_dct2_evidence_ladder")
+    return True
+
+
+def fig_tmt_channel_centering_qc(run_root: Path, out_dir: Path) -> bool:
+    """TMT raw-channel and centered-vs-uncentered enrichment QC panel."""
+    qc_path = run_root / "baseline" / "osd462_tmt_channel_qc.tsv"
+    sens_path = run_root / "h2_enrichment" / "h2_dct_channel_centering_sensitivity.tsv"
+    if not qc_path.exists() or not sens_path.exists():
+        print("  [skip] missing TMT channel-centering QC inputs")
+        return False
+    qc = read_tsv(qc_path)
+    sens = read_tsv(sens_path)
+
+    qc = qc[
+        qc["metric"].eq("scaled_signal_to_noise_row_sum_100")
+        & qc["condition"].isin(["BL", "GC", "FL"])
+        & qc["layer"].isin(["protein", "phosphosite_single", "phosphosite_composite"])
+    ].copy()
+    qc["log2_median"] = np.log2(qc["median"].astype(float))
+    gc = (
+        qc[qc["condition"].eq("GC")]
+        .groupby(["layer", "plex"], as_index=False)["log2_median"]
+        .mean()
+        .rename(columns={"log2_median": "gc_mean_log2"})
+    )
+    qc = qc.merge(gc, on=["layer", "plex"], how="left")
+    qc["centered_log2_median"] = qc["log2_median"] - qc["gc_mean_log2"]
+
+    layers = ["protein", "phosphosite_single", "phosphosite_composite"]
+    layer_labels = {
+        "protein": "Protein",
+        "phosphosite_single": "Phospho\n(single)",
+        "phosphosite_composite": "Phospho\n(composite)",
+    }
+    condition_colors = {"BL": "#ADB5BD", "GC": "#6C757D", "FL": "#D55E00"}
+    condition_offsets = {"BL": -0.20, "GC": 0.0, "FL": 0.20}
+
+    fig, axes = plt.subplots(1, 2, figsize=(13.6, 5.4), gridspec_kw={"width_ratios": [1.25, 1.0]})
+    ax = axes[0]
+    for i, layer in enumerate(layers):
+        for cond in ["BL", "GC", "FL"]:
+            part = qc[(qc["layer"].eq(layer)) & (qc["condition"].eq(cond))]
+            if part.empty:
+                continue
+            xs = np.full(len(part), i + condition_offsets[cond]) + np.linspace(-0.035, 0.035, len(part))
+            ax.scatter(xs, part["centered_log2_median"], s=25, color=condition_colors[cond], edgecolor="white", linewidth=0.4, alpha=0.9, label=cond if i == 0 else None)
+            ax.hlines(part["centered_log2_median"].mean(), i + condition_offsets[cond] - 0.10, i + condition_offsets[cond] + 0.10, color=condition_colors[cond], lw=2.4)
+        fl_mean = qc[(qc["layer"].eq(layer)) & (qc["condition"].eq("FL"))]["centered_log2_median"].mean()
+        ax.text(i + 0.27, 0.16, f"FL-GC\n{fl_mean:+.2f}", ha="center", va="top", color=condition_colors["FL"], fontsize=8.5)
+    ax.axhline(0, color="#495057", lw=1.0, ls="--")
+    ax.set_xticks(np.arange(len(layers)))
+    ax.set_xticklabels([layer_labels[l] for l in layers])
+    ax.set_ylabel("Per-channel log2 median, centered on GC within plex")
+    ax.set_ylim(-0.28, 0.20)
+    ax.set_title("Raw channels: flight phospho runs lower,\nprotein is near zero after GC centering", fontsize=11, fontweight="bold", pad=10)
+    ax.legend(loc="lower left", frameon=False, ncol=3, title=None)
+    clean_axis(ax, xgrid=False, ygrid=True)
+    panel_label(ax, "A")
+
+    sub = sens[
+        sens["analysis"].eq("primary_p05")
+        & sens["test"].isin(["fisher_dct1_top_decile", "fisher_dct2_bottom_decile"])
+        & sens["effect_estimator"].isin(["channel_centered_primary", "uncentered_sensitivity"])
+    ].copy()
+    sub["bin"] = sub["test"].map({"fisher_dct1_top_decile": "DCT1-high", "fisher_dct2_bottom_decile": "DCT2-leaning"})
+    sub["estimator"] = sub["effect_estimator"].map({"channel_centered_primary": "Centered primary", "uncentered_sensitivity": "Uncentered sensitivity"})
+    ax = axes[1]
+    bins = ["DCT1-high", "DCT2-leaning"]
+    estimators = ["Centered primary", "Uncentered sensitivity"]
+    width = 0.32
+    for j, est in enumerate(estimators):
+        part = sub[sub["estimator"].eq(est)].set_index("bin").reindex(bins)
+        xs = np.arange(len(bins)) + (-width / 2 if j == 0 else width / 2)
+        colors = ["#0877B6", "#F4A261"] if j == 1 else ["#0877B6", "#D55E00"]
+        bars = ax.bar(xs, part["odds_ratio"], width=width, color=colors, edgecolor="none", alpha=0.95 if j == 0 else 0.55, hatch="" if j == 0 else "//", label=est)
+        for bar, val in zip(bars, part["odds_ratio"]):
+            ax.text(bar.get_x() + bar.get_width() / 2, float(val) + 0.018, f"{val:.2f}", ha="center", va="bottom", fontsize=8.5)
+    ax.axhline(1.0, color="#495057", lw=1.0, ls="--")
+    ax.set_ylim(0.95, 1.64)
+    ax.set_xticks(np.arange(len(bins)))
+    ax.set_xticklabels(bins)
+    ax.set_ylabel("Enrichment odds ratio")
+    ax.set_title("Enrichment persists across\nchannel-centering sensitivity", fontsize=11, fontweight="bold", pad=10)
+    ax.legend(loc="upper right", frameon=False)
+    clean_axis(ax, xgrid=False, ygrid=True)
+    panel_label(ax, "B")
+
+    fig.suptitle("TMT channel-centering QC: subtype-prior enrichment persists after sensitivity checks", fontsize=14, fontweight="bold", y=0.99)
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    qa_axis(axes[0], "TMT raw-channel QC panel", check_legend=False)
+    qa_axis(axes[1], "TMT channel-centering enrichment panel", check_legend=False)
+    save(fig, out_dir, "v11_tmt_channel_centering_qc")
+    return True
+
+
+def fig_extension_kinome_recurrence(run_root: Path, out_dir: Path) -> bool:
+    """Kinome-wide KSEA and cross-cohort recurrence meta extension panel."""
+    kinome_path = run_root / "regulator_activity" / "osd462_kinome_atlas_ksea.tsv"
+    scores_path = run_root / "cross_osdr_recurrence" / "recurrence_meta_gene_set_scores.tsv"
+    if not kinome_path.exists() or not scores_path.exists():
+        print("  [skip] missing kinome/recurrence extension inputs")
+        return False
+    kinome = read_tsv(kinome_path)
+    scores = read_tsv(scores_path)
+    kinome["neg_log10_q"] = -np.log10(np.clip(kinome["q_value"].astype(float), 1e-300, 1.0))
+
+    fig, axes = plt.subplots(1, 2, figsize=(13.4, 5.4), gridspec_kw={"width_ratios": [1.55, 1.0]})
+    ax = axes[0]
+    ax.scatter(kinome["z_score"], kinome["neg_log10_q"], s=18, color="#BFC3C7", edgecolor="none", alpha=0.75)
+    highlights = {
+        "WNK1": "#D55E00",
+        "WNK3": "#D55E00",
+        "WNK4": "#495057",
+        "OSR1": "#495057",
+    }
+    for kinase, color in highlights.items():
+        match = kinome[kinome["kinase"].eq(kinase)]
+        if match.empty:
+            continue
+        row = match.iloc[0]
+        ax.scatter(row["z_score"], row["neg_log10_q"], s=95 if kinase in {"WNK1", "WNK3"} else 55, color=color, edgecolor="#212529", linewidth=0.8, zorder=3)
+        dy = 0.45 if kinase in {"WNK1", "WNK3"} else 0.22
+        ax.text(row["z_score"] + 0.20, row["neg_log10_q"] + dy, kinase, color=color, fontsize=10, fontweight="bold" if kinase in {"WNK1", "WNK3"} else "normal")
+    ax.axhline(-np.log10(0.05), color="#868E96", ls=":", lw=1.1)
+    ax.axvline(0, color="#CED4DA", lw=1.0)
+    ax.text(ax.get_xlim()[0], -np.log10(0.05) + 0.18, "q = 0.05", color="#868E96", fontsize=8.5, ha="left")
+    ax.set_xlabel("Kinome-wide KSEA z-score (negative = suppressed)")
+    ax.set_ylabel("-log10 q")
+    ax.set_title("Unbiased kinome-wide KSEA recovers WNK1/WNK3", fontsize=12, fontweight="bold", pad=10)
+    clean_axis(ax)
+    panel_label(ax, "A")
+
+    ax = axes[1]
+    plot_scores = scores.set_index("gene_set").reindex(["matrix_ecm_high", "dct_ncc_wnk_transport"]).reset_index()
+    x = np.arange(len(plot_scores))
+    colors = ["#1B7F3A", "#ADB5BD"]
+    hatches = ["", "//"]
+    bars = ax.bar(x, plot_scores["stouffer_z"], color=colors, edgecolor="#212529", linewidth=0.8)
+    for bar, hatch, pval in zip(bars, hatches, plot_scores["stouffer_p"]):
+        bar.set_hatch(hatch)
+        y = bar.get_height()
+        label = f"p={pval:.1e}" if pval < 0.01 else f"p={pval:.2f}"
+        ax.text(bar.get_x() + bar.get_width() / 2, y + (0.18 if y >= 0 else -0.25), label, ha="center", va="bottom" if y >= 0 else "top", fontsize=10, fontweight="bold" if pval < 0.01 else "normal")
+    ax.axhline(0, color="#495057", lw=1.0)
+    ax.axhline(1.96, color="#868E96", ls=":", lw=1.0)
+    ax.axhline(-1.96, color="#868E96", ls=":", lw=1.0)
+    ax.set_xticks(x)
+    ax.set_xticklabels(["Matrix / ECM-high", "DCT / NCC-WNK\ntransport"])
+    ax.set_ylabel("Cross-cohort Stouffer z")
+    ax.set_ylim(-2.55, 4.35)
+    ax.set_title("Five-cohort recurrence meta:\nmatrix recurs, transport heterogeneous", fontsize=12, fontweight="bold", pad=10)
+    clean_axis(ax, xgrid=False, ygrid=True)
+    panel_label(ax, "B")
+
+    fig.suptitle("Extension analyses: WNK-arm recovery and the matrix-vs-transport recurrence split", fontsize=14, fontweight="bold", y=0.99)
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    qa_axis(axes[0], "kinome-wide KSEA extension panel", check_legend=False)
+    qa_axis(axes[1], "recurrence meta extension panel", check_legend=False)
+    save(fig, out_dir, "v11_extension_kinome_recurrence")
     return True
 
 
@@ -991,6 +1207,9 @@ def generate_all(run_root: Path, out_dir: Path | None = None) -> int:
         fig_cross_cohort_recurrence,
         fig_h2_primary_enrichment,
         fig_h2_composition_robustness,
+        fig_dct1_vs_dct2_evidence_ladder,
+        fig_tmt_channel_centering_qc,
+        fig_extension_kinome_recurrence,
         fig_h3_mediation_forest,
         fig_spatial_reference,
         fig_perturbation_triangulation,

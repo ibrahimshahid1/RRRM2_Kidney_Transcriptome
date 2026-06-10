@@ -72,30 +72,37 @@ def dashboard(out_dir):
     net = pd.read_csv(out_dir / "network_translation.tsv", sep="\t")
     bg = pd.read_csv(out_dir / "protein_concordance_background.tsv", sep="\t").iloc[0]
 
-    fig, axes = plt.subplots(2, 2, figsize=(11, 9))
+    fig = plt.figure(figsize=(11, 9))
+    gs = fig.add_gridspec(2, 2, hspace=0.42, wspace=0.30)
+    axA = fig.add_subplot(gs[0, 0])
+    axB = fig.add_subplot(gs[0, 1])
+    axC = fig.add_subplot(gs[1, :])
 
-    # ── Panel A: RNA -> protein scatter ──────────────────────────────────────
-    ax = axes[0, 0]
-    core = master.dropna(subset=["rrrm2_iss_t_rna_effect", "protein_flight_effect"])
-    ax.scatter(core["rrrm2_iss_t_rna_effect"], core["protein_flight_effect"],
+    # ── Panel A: matched OSD-462 RNA -> OSD-462 protein scatter ───────────────
+    ax = axA
+    core = master.dropna(subset=["osd462_rna_effect", "protein_flight_effect"])
+    ax.scatter(core["osd462_rna_effect"], core["protein_flight_effect"],
                s=5, c=C_GREY, alpha=0.25, edgecolors="none", rasterized=True, label="all genes")
     for s, color in SET_COLORS.items():
-        sub = tgt[tgt["gene_set"] == s]
-        ax.scatter(sub["rrrm2_iss_t_rna_effect"], sub["protein_flight_effect"],
+        sub = tgt.dropna(subset=["osd462_rna_effect", "protein_flight_effect"])
+        sub = sub[sub["gene_set"] == s]
+        ax.scatter(sub["osd462_rna_effect"], sub["protein_flight_effect"],
                    s=34, c=color, edgecolors="k", linewidths=0.4, label=s.replace("_", " "))
     ax.axhline(0, color="k", lw=0.6, ls=":"); ax.axvline(0, color="k", lw=0.6, ls=":")
-    ax.set_xlabel("RRRM-2 ISS-T RNA flight effect (FLT−GC, log2)")
+    ax.set_xlabel("OSD-462 RNA flight effect (SF−GC, log2)")
     ax.set_ylabel("OSD-462 protein flight effect (FL−GC, log2)")
-    ax.set_title("A  Transcript→protein concordance", loc="left", fontweight="bold")
-    ax.text(0.03, 0.97, f"genome-wide Spearman = {bg['gw_spearman_rrrm2_rna_vs_protein']:.3f}\n"
-                        f"Pearson = {bg['gw_pearson_rrrm2_rna_vs_protein']:.3f}",
+    ax.set_title("A  Matched OSD-462 RNA → protein", loc="left", fontweight="bold")
+    _rx = core["osd462_rna_effect"].rank(); _ry = core["protein_flight_effect"].rank()
+    _sp = float(np.corrcoef(_rx, _ry)[0, 1])
+    _pe = float(np.corrcoef(core["osd462_rna_effect"], core["protein_flight_effect"])[0, 1])
+    ax.text(0.03, 0.97, f"matched genome-wide\nSpearman = {_sp:.3f}\nPearson = {_pe:.3f}",
             transform=ax.transAxes, va="top", fontsize=7.5,
             bbox=dict(boxstyle="round", fc="white", ec="0.7", alpha=0.9))
     ax.legend(loc="lower right", framealpha=0.9, markerscale=1.0)
     ax.set_ylim(-0.45, 0.45)
 
     # ── Panel B: DCT/NCC/WNK protein-abundance bars ──────────────────────────
-    ax = axes[0, 1]
+    ax = axB
     dct_genes = ["Slc12a3", "Wnk1", "Wnk4", "Stk39", "Oxsr1", "Calb1",
                  "Nedd4l", "Cul3", "Kcnj10", "Kcnj16"]
     d = master[master["gene_symbol"].isin(dct_genes)].set_index("gene_symbol").reindex(dct_genes).dropna(subset=["protein_flight_effect"])
@@ -110,11 +117,30 @@ def dashboard(out_dir):
     ax.text(0.97, 0.04, "abundance ≈ flat\n(NCC slightly up)", transform=ax.transAxes,
             ha="right", va="bottom", fontsize=7.5, color="0.3")
 
-    # ── Panel C: phosphosite effects with CI ─────────────────────────────────
-    ax = axes[1, 0]
+    # ── Panel C: phosphosite effects with CI (regulatory vs non-regulatory) ───
+    ax = axC
     show = phos[phos["gene_symbol"].isin(["Slc12a3", "Stk39", "Oxsr1"])].copy()
     show["label"] = show["gene_symbol"] + " " + show["site_position"].astype(str)
-    show = show.sort_values(["gene_symbol", "phospho_effect"])
+
+    def _maxpos(s):
+        try:
+            return max(int(x) for x in str(s).split(";"))
+        except Exception:
+            return 9999
+
+    def _is_reg(r):
+        g, mp = r["gene_symbol"], _maxpos(r["site_position"])
+        if g == "Slc12a3":
+            return mp <= 91          # NCC N-terminal activating cluster
+        if g == "Stk39":
+            return mp in (366, 380, 382, 383)  # SPAK regulatory sites
+        if g == "Oxsr1":
+            return mp in (325, 339)  # OSR1 T-loop / activation site
+        return False
+
+    show["regulatory"] = show.apply(_is_reg, axis=1)
+    # regulatory group on top, non-regulatory below; sort by effect within group
+    show = show.sort_values(["regulatory", "phospho_effect"], ascending=[False, True]).reset_index(drop=True)
     y = np.arange(len(show))
     sig = show["phospho_p_value"] < 0.05
     colors = [C_SIG if s else "0.6" for s in sig]
@@ -126,30 +152,21 @@ def dashboard(out_dir):
                linewidths=0.4, zorder=2)
     ax.set_yticks(y); ax.set_yticklabels(show["label"], fontsize=6.5)
     ax.axvline(0, color="k", lw=0.8)
+    n_reg = int(show["regulatory"].sum())
+    if 0 < n_reg < len(show):
+        from matplotlib.transforms import blended_transform_factory as _btf
+        ax.axhline(n_reg - 0.5, color="0.35", lw=0.9, ls="--", zorder=0)
+        _tr = _btf(ax.transAxes, ax.transData)
+        ax.text(0.985, (n_reg - 1) / 2.0, "regulatory", transform=_tr, rotation=90,
+                va="center", ha="right", fontsize=6.8, color="0.35")
+        ax.text(0.985, (n_reg + len(show) - 1) / 2.0, "non-regulatory", transform=_tr, rotation=90,
+                va="center", ha="right", fontsize=6.8, color="0.35")
     ax.invert_yaxis()
     ax.set_xlabel("phosphosite flight effect (FL−GC, log2)")
     ax.set_title("C  WNK-SPAK/OSR1-NCC phosphosites", loc="left", fontweight="bold")
     ax.scatter([], [], c=C_SIG, s=26, edgecolors="k", linewidths=0.4, label="p < 0.05")
     ax.scatter([], [], c="0.6", s=26, edgecolors="k", linewidths=0.4, label="n.s.")
     ax.legend(loc="lower left", framealpha=0.9)
-
-    # ── Panel D: network translation enrichment ──────────────────────────────
-    ax = axes[1, 1]
-    k = net["top_k"].astype(str)
-    x = np.arange(len(net)); w = 0.18
-    ax.bar(x - 1.5 * w, net["protein_mean_abs_effect"], w, color=C_DCT, label="protein obs")
-    ax.bar(x - 0.5 * w, net["protein_null_median"], w, color=C_DCT, alpha=0.4, label="protein null")
-    ax.bar(x + 0.5 * w, net["phospho_mean_max_abs_effect"], w, color=C_S1P, label="phospho obs")
-    ax.bar(x + 1.5 * w, net["phospho_null_median"], w, color=C_S1P, alpha=0.4, label="phospho null")
-    for xi, (_, r) in zip(x, net.iterrows()):
-        ax.text(xi - w, max(r["protein_mean_abs_effect"], r["protein_null_median"]) + 0.005,
-                f"p={r['protein_enrichment_p']:.2f}", ha="center", fontsize=6.2, color=C_DCT)
-        ax.text(xi + w, max(r["phospho_mean_max_abs_effect"], r["phospho_null_median"]) + 0.005,
-                f"p={r['phospho_enrichment_p']:.2f}", ha="center", fontsize=6.2, color=C_S1P)
-    ax.set_xticks(x); ax.set_xticklabels("top-" + k)
-    ax.set_ylabel("mean |effect| (log2)")
-    ax.set_title("D  Network-candidate translation", loc="left", fontweight="bold")
-    ax.legend(loc="upper right", ncol=2, framealpha=0.9)
 
     fig.suptitle("OSD-462 / RR-10 multi-omics anchor — protein & phosphoprotein test of the "
                  "RRRM-2 matrix-high / DCT-low remodeling signal", fontsize=11, fontweight="bold")

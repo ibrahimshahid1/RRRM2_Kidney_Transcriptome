@@ -1,0 +1,107 @@
+# OSD-656 (Inspiration4 urine inflammation panel) marker categorization.
+#
+# SCOPE: this file drives ONLY the relevance labeling/sorting of the optional
+# OSD-656 urine context output. OSD-656 never enters the Twins concordance sign
+# test (see src/v11/human_concordance.py docstring). These categories therefore
+# affect presentation/ordering of a supplementary context table, not any scored
+# statistic or manuscript number.
+#
+# This replaces the hand-typed marker sets and the `startswith(prefix)` heuristic
+# that previously lived as Python literals (OSD656_DIRECT_AXIS_MARKERS,
+# OSD656_RECOVERY_CONTEXT_MARKERS, OSD656_RECOVERY_PREFIXES).
+
+meta:
+  panel: "OSD-656 Inspiration4 urine Multiplex/NULISAseq inflammation panel"
+  use: "optional recovery/inflammation context only; never scored in Reach D"
+
+categories:
+
+  # Distal-nephron / RAAS markers. Pulled from the project's already-sourced gene
+  # sets rather than re-typed, plus a small cited RAAS/water-balance addition.
+  direct_distal_raas_marker:
+    description: "Distal-nephron transport + RAAS/water-balance markers that index the mouse-predicted axis directly."
+    from_gene_sets:
+      - file: config/mechanism_gene_sets.yaml
+        set: dct_ncc_wnk_transport          # WNK1/WNK4/STK39/OXSR1/SLC12A3/KLHL3/...
+    extra_markers:
+      # RAAS / water-balance genes not in the DCT transport set. Canonical
+      # renin-angiotensin + collecting-duct water-channel members.
+      # source: HGNC + UniProt canonical RAAS / aquaporin nomenclature.
+      - symbol: AQP2     # aquaporin-2 (collecting-duct water channel)
+      - symbol: AGT      # angiotensinogen
+      - symbol: REN      # renin
+      - symbol: ATP6AP2  # (pro)renin receptor; reported as RENR on the panel
+      - symbol: WNK3     # WNK3 (RAAS-responsive distal kinase; not in DCT core set)
+
+  # Inflammation / matrix-remodeling recovery context. Distal/RAAS markers take
+  # precedence (a marker matching both lands in direct_distal_raas_marker).
+  recovery_inflammation_matrix_context:
+    description: "Chemokine, interleukin, matrix-proteolysis, and injury markers used as post-flight recovery/inflammation context."
+    from_gene_sets:
+      - file: config/mechanism_gene_sets.yaml
+        set: macrophage_inflammation        # CCL2/CCR2/IL1B/TNF/...
+      - file: config/mechanism_gene_sets.yaml
+        set: mmp_adam_proteolysis           # MMP2/3/7/9/12/13/14, TIMP1/2/3, ADAM*
+    extra_markers:
+      # Explicit, individually citable members observed on the I4 urine panel that
+      # are not in the gene sets above. source: HGNC gene-group nomenclature
+      # (CC/CXC chemokine ligands, interleukins) + kidney-injury marker literature.
+      - symbol: CCL3
+      - symbol: CCL4
+      - symbol: CCL5
+      - symbol: CCL7
+      - symbol: CCL8
+      - symbol: CCL13
+      - symbol: CCL14
+      - symbol: CCL15
+      - symbol: CCL16
+      - symbol: CCL17
+      - symbol: CCL19
+      - symbol: CCL20
+      - symbol: CCL22
+      - symbol: CCL23
+      - symbol: CCL24
+      - symbol: CCL25
+      - symbol: CCL28
+      - symbol: CX3CL1
+      - symbol: CXCL1
+      - symbol: CXCL2
+      - symbol: CXCL5
+      - symbol: CXCL6
+      - symbol: CXCL8
+      - symbol: CXCL9
+      - symbol: CXCL10
+      - symbol: CXCL11
+      - symbol: CXCL12
+      - symbol: IL1A
+      - symbol: IL6
+      - symbol: IL10
+      - symbol: IL18
+      - symbol: TGFA
+      - symbol: TGFB1
+      - symbol: VEGFA
+      - symbol: AGER     # advanced glycation end-product receptor (injury/inflammation)
+      - symbol: ANXA1    # annexin A1 (resolution of inflammation)
+      - symbol: CHI3L1   # chitinase-3-like-1 (YKL-40; kidney injury/fibrosis)
+      - symbol: LCN2     # NGAL (canonical kidney injury marker)
+      - symbol: SPP1     # osteopontin (kidney injury/fibrosis)
+      - symbol: VCAM1    # vascular adhesion (inflammation)
+
+# Optional nomenclature fallback. This is an EXPLICIT, TOGGLEABLE heuristic, NOT a
+# curated gene set: it labels any panel marker whose symbol begins with a chemokine
+# (CCL/CXCL), interleukin (IL), or matrix-proteinase (MMP/TIMP) prefix as recovery
+# context, to capture panel members not individually enumerated above.
+# source: HGNC gene-group symbol nomenclature conventions.
+# Set enabled=false to score categories from explicit membership only.
+family_prefix_fallback:
+  enabled: true
+  rationale: "HGNC symbol-root nomenclature for chemokine ligand / interleukin / matrix-metalloproteinase families; labeling-only, never scored."
+  prefixes:
+    - CCL
+    - CXCL
+    - IL
+    - MMP
+    - TIMP
+  category: recovery_inflammation_matrix_context
+
+default_category: panel_marker
