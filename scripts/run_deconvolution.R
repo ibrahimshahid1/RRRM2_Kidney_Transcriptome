@@ -149,11 +149,6 @@ obs <- data.frame(fread(obs_path, header = TRUE), row.names = 1, check.names = F
 var <- data.frame(fread(var_path, header = TRUE), row.names = 1, check.names = FALSE)
 
 # Handle potential transpose issues with mtx (Scanpy writes shape n_obs x n_vars, readMM reads as such)
-# But SCE expects genes x cells (n_vars x n_obs). Scanpy usually writes cells x genes?
-# Creating scipy.io.mmwrite(..., raw_adata.X) usually writes standard MM.
-# If raw_adata.X is (cells, genes), then readMM returns (rows=cells, cols=genes).
-# SCE needs (rows=genes, cols=cells). So we likely need to Transpose.
-# Let's check dimensions carefully.
 message("MTX dims: ", paste(dim(raw_mat), collapse = " x "))
 message("Obs rows: ", nrow(obs))
 message("Var rows: ", nrow(var))
@@ -285,7 +280,7 @@ colData(sce)$segment_use <- droplevels(colData(sce)$segment_use)
 message("\n--- Segment Distribution (before DCT split) ---")
 print(table(colData(sce)$segment_use, useNA = "ifany"))
 
-# ── DCT Sub-clustering: Split DCT into DCT_early (Slc12a3+) and DCT_late (Pvalb+) ──
+# DCT Sub-clustering: Split DCT into DCT_early (Slc12a3+) and DCT_late (Pvalb+)
 message("\n--- DCT Sub-clustering ---")
 dct_mask <- colData(sce)$segment_use == "DCT"
 n_dct <- sum(dct_mask)
@@ -607,8 +602,6 @@ colData(sce2)$clusterType <- as.character(colData(sce2)$clusterType)
 colData(sce2)$donor_id <- as.character(colData(sce2)$donor_id)
 
 # CRITICAL: donor_id diagnostics
-# MuSiC uses cross-donor variance for cell-size (theta) estimation.
-# If donor_id is NA, constant, or unique per cell, resolution fails.
 message("\n", paste(rep("=", 60), collapse = ""))
 message("DONOR_ID DIAGNOSTICS (MuSiC requires valid multi-donor data)")
 message(paste(rep("=", 60), collapse = ""))
@@ -653,8 +646,6 @@ if (n_donors == 1) {
 }
 
 # Option to force single donor for testing
-# Uncomment the line below to bypass donor issues:
-# colData(sce2)$donor_id <- "D1"
 
 message(paste(rep("=", 60), collapse = ""))
 
@@ -669,14 +660,10 @@ message("Proximal segments: ", paste(clusters.type$Proximal, collapse = ", "))
 message("Distal segments: ", paste(clusters.type$Distal, collapse = ", "))
 
 # In-silico pseudo-bulk test for MuSiC
-# Requires: sce2 with counts, colData(sce2)$segment_use and $clusterType and $donor_id
-# Also requires: clusters.type and group.markers as in your script
 
 set.seed(1)
 
-# ---------
 # Helpers
-# ---------
 normalize_rows_to_one <- function(M, eps = 1e-12) {
   rs <- rowSums(M)
   rs[rs < eps] <- 1
@@ -694,9 +681,7 @@ rdirichlet_base <- function(n, alpha) {
   X
 }
 
-# ---------
 # IMPROVED: Pseudobulk with exact proportions and all fixes
-# ---------
 make_pseudobulk_exact <- function(
   sce_obj,
   segment_col = "segment_use",
@@ -767,9 +752,6 @@ make_pseudobulk_exact <- function(
     idx_this_donor <- idx_by_donor_seg[[d]]
 
     # FIX 3: Independent DCT variation via two-level design
-    # Sample tubule proportions with independent ranges
-
-    # Step 1: Sample coarse group totals
     tubule_total <- runif(1, tubule_total_range[1], tubule_total_range[2])
     glom_total <- runif(1, glom_total_range[1], glom_total_range[2])
     immune_total <- runif(1, immune_frac_range[1], immune_frac_range[2])
@@ -910,9 +892,7 @@ make_pseudobulk_exact <- function(
   )
 }
 
-# ---------
 # Build pseudo-bulk mixtures
-# ---------
 make_pseudobulk <- function(
   sce_obj,
   segment_col = "segment_use",
@@ -945,9 +925,7 @@ make_pseudobulk <- function(
     dimnames = list(genes, rownames(P_draw))
   )
 
-  # Two ground-truth matrices:
-  # P_cell: fraction of sampled cells from each segment
-  # P_rna:  fraction of total UMIs contributed by each segment
+  # Two ground-truth matrices: P_cell: fraction of sampled cells from each segment
   P_cell <- matrix(0,
     nrow = n_mixtures, ncol = length(seg_levels),
     dimnames = list(rownames(P_draw), seg_levels)
@@ -1013,9 +991,7 @@ make_pseudobulk <- function(
   list(pb_mat = pb_mat, P_cell = P_cell, P_rna = P_rna)
 }
 
-# ---------
 # Experiment B: Per-donor pseudo-bulk (sample from single donor per mixture)
-# ---------
 make_pseudobulk_per_donor <- function(
   sce_obj,
   segment_col = "segment_use",
@@ -1128,9 +1104,7 @@ make_pseudobulk_per_donor <- function(
   list(pb_mat = pb_mat, P_cell = P_cell, P_rna = P_rna, donor_used = donor_used)
 }
 
-# ---------
 # Run pseudo-bulk test (with normalize_flag parameter)
-# ---------
 run_music_on_pseudobulk <- function(pb_mat, sce_obj, group.markers, clusters.type, normalize_flag = FALSE) {
   # Ensure numeric matrix genes x samples
   storage.mode(pb_mat) <- "numeric"
@@ -1347,11 +1321,9 @@ if (mean(eval_T$stats$spearman_rho, na.rm = TRUE) > mean(eval_F$stats$spearman_r
 P_hat <- res_pb$Est.prop.weighted.cluster
 
 # align to pseudo-bulk sample names
-# MuSiC returns rows = bulk samples; our pb_mat cols are samples
-# So rownames(P_hat) should match colnames(pb_mat)
 stopifnot(all(rownames(P_hat) %in% colnames(pb$pb_mat)))
 
-# ---- Evaluate against P_cell (cell fraction) ----
+# Evaluate against P_cell (cell fraction)
 message("\n--- Evaluation vs P_cell (cell fraction ground truth) ---")
 eval_cell <- evaluate_pseudobulk(pb$P_cell[rownames(P_hat), , drop = FALSE], P_hat)
 print(eval_cell$stats[order(-eval_cell$stats$spearman_rho), ])
@@ -1484,12 +1456,6 @@ for (seg in names(segment_markers)) {
 }
 
 # FIX APPLIED 2026-01-11: CPM Normalization for Validation
-# Problem: prop_seg is library-size independent (fractions sum to 1), but raw
-#          bulk counts scale with sequencing depth. This caused spurious low/negative
-#          correlations in validation (e.g., DCT showed ρ=0.03 with raw, ρ=0.33 with CPM).
-# Solution: Normalize bulk to CPM before computing marker scores.
-
-# CPM normalize bulk matrix for validation
 lib_sizes <- colSums(bulk_mat2)
 bulk_cpm <- sweep(bulk_mat2, 2, lib_sizes, "/") * 1e6
 message(
@@ -1706,8 +1672,6 @@ for (grp in names(clusters.type)) {
 
 
 # 6) Use segment-direct proportions (already at segment level)
-# Since we ran MuSiC on segments directly, prop_seg is already at segment granularity
-# No need to aggregate cell types - the output is already segment-level
 
 segment_prop <- as.data.frame(prop_seg)
 

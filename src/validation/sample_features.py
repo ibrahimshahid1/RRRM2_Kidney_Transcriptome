@@ -1,14 +1,4 @@
-"""
-Sample-Level Feature Extraction for RRRM-2
-
-Extract mouse-level features from LIONESS networks for supervised learning.
-
-Per methodology Section 5:
-    - Mean/median edge weight within pre-registered pathway subnetworks
-    - Node strength (sum of incident weights) for candidate genes
-    - Shifter-centered connectivity scores
-    - Low-dimensional summaries (top PCs of edge weights)
-"""
+"""Sample-Level Feature Extraction for RRRM-2"""
 
 from __future__ import annotations
 

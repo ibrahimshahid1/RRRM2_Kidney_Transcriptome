@@ -1,10 +1,4 @@
-"""Cross-OSDR contrast-vector alignment utilities.
-
-This module implements the contrast-level pooling rule from
-agents_instruction.md: external studies are reduced to within-study flight
-vectors first, then compared by cosine/projection statistics. It contains no
-raw cross-study expression pooling.
-"""
+"""Cross-OSDR contrast-vector alignment utilities."""
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict

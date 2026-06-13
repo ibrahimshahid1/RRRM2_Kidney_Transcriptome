@@ -45,10 +45,6 @@ def consensus(files: list[str], k: int, out: str):
     m["missing"]    = len(files) - m["n_present"]
 
     # score: lower is better
-    # - median drives stability
-    # - max punishes “good usually, bad once”
-    # - iqr punishes inconsistency
-    # - missing penalizes absent genes
     m["score"] = (
         m["median_pct"]
         + 0.50 * m["max_pct"]

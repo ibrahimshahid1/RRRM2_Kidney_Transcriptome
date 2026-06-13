@@ -1,17 +1,4 @@
-"""
-RRRM-2 Statistics Module
-
-Phase 5: Rewiring Metrics + Silent Shifters
-Phase 6: Uncertainty/Null Models (Permutation + Bootstrap)
-
-This module contains:
-- silent_shifters: Silent shifter identification (high rewiring, low DE)
-- interaction_metrics: Interaction persistence analysis
-- permutation_bootstrap: Permutation/bootstrap uncertainty estimation
-- full_regression: Full edge regression (all 80 samples)
-
-Note: R script (differential_expression.R) is called via Rscript.
-"""
+"""RRRM-2 Statistics Module"""
 
 from pathlib import Path
 

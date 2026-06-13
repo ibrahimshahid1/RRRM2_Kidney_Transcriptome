@@ -1,79 +1,80 @@
 # RRRM2 Kidney Transcriptome
 
-Rigor-remediated network rewiring analysis for RRRM-2 mouse kidney transcriptomics.
+Cross-cohort and cross-omic analysis of mouse kidney responses to spaceflight, centered on RRRM-2/OSD-771 and the matched OSD-462 RNA, protein, and phosphoprotein dataset.
 
-The repository now draws a hard line between candidates, calibrated inference, validation, and context mapping. Post-hoc focused permutation is removed; Procrustes anchors are configured and force-included; silent shifters require DE; Phase 8b is fold-safe; external replication and multi-study pooling are separate.
+## Current Status
 
-## Key Claims
+The maintained analysis and manuscript are v11. The project has moved beyond the original DCT network-rewiring proposal and now focuses on what the public bulk datasets support directly:
 
-Defensible after remediation:
+- A recurrent matrix/endothelial-high and DCT transport-low RNA response across mouse kidney spaceflight cohorts.
+- RNA-to-protein decoupling in OSD-462, with the strongest distal-nephron signal appearing at the regulatory phosphosite layer.
+- Suppression of NCC/SPAK/WNK regulatory phosphorylation while total NCC abundance remains approximately flat.
+- Enrichment of flight-suppressed phosphosites among DCT1-high parent genes from the GSE228367 reference, strongest in the top-decile prior subset and persistent after conservative parent-protein and bulk-compartment adjustment.
+- Layer-specific propagation and observability audits showing that the main RNA/protein/phosphosite mismatch is not explained by simple protein-detectability bias.
 
-- A biology-first remodeling panel spanning lipid/PPAR, cholesterol, ECM/fibrosis, tubular transport, TGF-beta/Wnt, oxidative stress, and translation programs across downloaded OSD cohorts.
-- LAR-Young-like directional replication through OSD-102, if criteria pass.
-- Sex-robustness checks through OSD-513 as secondary analysis.
-- Context mapping through OSD-163 and OSD-253, reported as recurrence/detection rather than strict replication.
-- ISS-T Young full-domain edge-sum hits as candidates only.
+These are whole-kidney observational results. The repository does not claim DCT1 cell of origin, causal mediation, fibrosis, or a newly discovered NCC dephosphorylation phenotype.
 
-Still provisional:
+## Repository Map
 
-- Broad per-gene discoveries.
-- ISS-T or old-arm external validation.
-- Classifier validation.
-- Global cohort expansion.
+- `src/v11/`: current DCT-subtype-prior, phosphoproteomic, recurrence, robustness, and layer-specificity analyses.
+- `scripts/v11/`: executable v11 runners, including RNA-to-protein propagation and observability audits.
+- `src/multiomics/`: OSD-462 harmonization, cell-type panels, regulator activity, and phenotype comparisons.
+- `src/networks/` and `src/statistics/`: supporting and historical network, recurrence, permutation, and regression analyses.
+- `config/`: curated gene sets, priors, metadata design, and analysis parameters.
+- `tests/`: unit, regression, and fixture-locked headline-number checks.
+- `docs/v11_execution_results.md`: core v11 execution report and interpretation boundaries.
+- `docs/v11_layer_specificity_execution_summary_2026-06-07.md`: latest propagation and observability extensions.
+- `latex_paper/manuscript_v11.tex`: maintained manuscript source.
 
-## Important Modules
+Earlier manuscript versions are historical. New changes to those iterations are ignored; v11 is the maintained manuscript artifact.
 
-- `src/networks/shared_topology.py`: top-k 80 shared skeleton, DCT plus anchor force-inclusion.
-- `src/networks/procrustes.py`: configured-anchor Procrustes alignment.
-- `src/statistics/permutation_bootstrap.py`: edge-sum node-rewiring permutation/bootstrap, candidate-only BH, hierarchical FDR.
-- `src/statistics/full_regression.py`: signed empirical gene aggregation.
-- `src/statistics/silent_shifters.py`: DE-aware silent shifters and calibration.
-- `src/statistics/full_pipeline_permutation.py`: appendix-tier cosine-distance full-pipeline permutation manifest/driver.
-- `src/validation/enhanced_cv.py`: fold-safe Phase 8b with pooling modes and feature sets.
-- `src/validation/external_replication.py`: independent OSD protocol guard for confirmatory and context-mapping cohorts.
-- `src/validation/osd_external_validation.py`: builds protocol-bound OSD validation/context feature tables from downloaded VST matrices.
-- `src/validation/multi_study_pool.py`: OSD-102 plus OSD-771 LAR-Young pooling guard with ComBat-seq/PCA requirements.
-- `src/preprocessing/deconvolution_sensitivity.R`: MuSiC reference sensitivity.
-- `docs/biology_first_framing.md`: current manuscript framing around lipid/ECM/tubular remodeling across cohorts.
+## Setup
 
-## Quick Checks
+The environment definition targets Python 3.10 and includes the required R/Bioconductor packages:
 
 ```bash
-venv/bin/python -m pytest tests
-venv/bin/python -m py_compile src/statistics/permutation_bootstrap.py src/statistics/full_regression.py
+conda env create -f environment.yml
+conda activate rrrm2_kidney
 ```
 
-Run the main remediated pipeline and append external validation:
+The analysis expects downloaded OSDR and external reference files under `data/external/`. Large source data and generated run directories are intentionally excluded from Git.
+
+## Run The Current Analysis
+
+Run the v11 stack through the main entry point:
 
 ```bash
-venv/bin/python -m src.run_all_phases --hierarchical-fdr --external-validation
+python -m src.run_all_phases --v11-only --run-id RUN_ID
 ```
 
-Run only downloaded supported OSD validation/context mapping:
+Useful options include `--v11-site-scope`, `--v11-skip-spatial`, `--v11-skip-visium`, `--v11-skip-xenium`, and `--v11-skip-figures`.
+
+Run the layer-specificity extensions directly:
 
 ```bash
-venv/bin/python -m src.run_all_phases --external-validation-only
+python scripts/v11/05_rna_protein_propagation.py
+python scripts/v11/06_observability_audit.py
 ```
 
-Run an explicit four-cohort external pass after downloading all folders:
+## Verification
+
+Run the full test suite:
 
 ```bash
-venv/bin/python -m src.run_all_phases --external-validation-only --external-studies OSD-102,OSD-513,OSD-163,OSD-253
+python -m pytest -q
 ```
 
-External validation now defaults to preranked GSEA over all mapped genes. The legacy pathway-mean statistic remains available for sensitivity checks:
+The v11 headline and layer-specificity values are locked in:
+
+- `tests/fixtures/v11_headline_numbers.tsv`
+- `tests/fixtures/v11_layer_specificity_numbers.tsv`
+
+## Manuscript
+
+Build the current manuscript from `latex_paper/`:
 
 ```bash
-venv/bin/python -m src.run_all_phases --external-validation-only --external-pathway-method mean_t
+latexmk -pdf manuscript_v11.tex
 ```
 
-## External Data
-
-External replication should store data under:
-
-- `data/external/osdr/OSD-102/`
-- `data/external/osdr/OSD-513/`
-- `data/external/osdr/OSD-163/`
-- `data/external/osdr/OSD-253/`
-
-OSD-102/513 are directional validation cohorts. OSD-163/253 are context-mapping cohorts for lipid/ECM/tubular remodeling. Do not use excluded studies for validation claims. OSDR references: [NASA OSDR](https://www.nasa.gov/osdr/) and [OSDR Developer API](https://www.nasa.gov/reference/osdr-developer-api/).
+The manuscript-facing claim language and allowed interpretation boundaries are summarized in `docs/v11_reviewer_ready_revision_packet.md`.

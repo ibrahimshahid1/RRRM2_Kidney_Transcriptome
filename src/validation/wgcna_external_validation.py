@@ -1,15 +1,4 @@
-"""
-WGCNA module-projection external validation.
-
-Projects RRRM-2 WGCNA module gene sets into external OSD cohorts and tests
-FLT vs GC module score shifts via permutation. Does NOT rebuild WGCNA in
-external cohorts (they're too small).
-
-For each external cohort × module:
-  1. Compute module score = mean z-scored expression of module genes present
-  2. Welch t-test (FLT vs GC) + label-permutation p-value
-  3. BH correction across modules within each study
-"""
+"""WGCNA module-projection external validation."""
 from __future__ import annotations
 
 import argparse

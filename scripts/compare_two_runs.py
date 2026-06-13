@@ -1,23 +1,5 @@
 #!/usr/bin/env python3
-"""
-Comprehensive comparison of two pipeline runs:
-  run_20260312_203319_2500g  (Mar 12 — "NEW")
-  run_20260226_132416_2500g  (Feb 26 — "OLD")
-
-Sections covered:
-  0. Run metadata & configuration
-  1. Phase 0 – Deconvolution (cell-type proportions, pseudobulk recovery)
-  2. Phase 1 – Residualization / gene counts
-  3. Phase 2 – Network skeleton (edge & gene counts)
-  4. Phase 3 – Node2Vec embeddings & seed stability
-  5. Phase 3 – Procrustes rewiring (aggregated scores, top-50 genes)
-  6. Phase 5 – Derived interaction / persistence metrics
-  7. Phase 5 – Silent shifters (strict)
-  8. Phase 6 – Edge regression (gene-level flight & interaction)
-  9. Phase 6 – Permutation / bootstrap uncertainty
- 10. Phase 7 – Gene-set enrichment / biological grounding
- 11. Figure-level summary tables
-"""
+"""Compare the February and March 2026 pipeline runs."""
 
 from __future__ import annotations
 
@@ -30,7 +12,7 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 
-# ── paths ────────────────────────────────────────────────────────────────────
+# paths
 BASE = Path("/Users/ibrahimshahid/Documents/Github/RRRM2_Kidney_Transcriptome")
 RUN_NEW = BASE / "data/results/run_20260312_203319_2500g"
 RUN_OLD = BASE / "data/results/run_20260226_132416_2500g"
@@ -49,9 +31,6 @@ def safe_read(path: Path, **kw) -> pd.DataFrame | None:
     return None
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  0.  RUN METADATA
-# ═══════════════════════════════════════════════════════════════════════════════
 header("0. RUN METADATA & CONFIGURATION")
 
 for label, run in [("NEW (Mar 12)", RUN_NEW), ("OLD (Feb 26)", RUN_OLD)]:
@@ -66,9 +45,6 @@ for label, run in [("NEW (Mar 12)", RUN_NEW), ("OLD (Feb 26)", RUN_OLD)]:
         print(f"    phases     : {meta['phases']}")
         print(f"    skip_r     : {meta['skip_r']}")
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  1.  PHASE 0 — DECONVOLUTION
-# ═══════════════════════════════════════════════════════════════════════════════
 header("1. PHASE 0 — DECONVOLUTION (cell-type proportions)")
 
 deconv_files = [
@@ -138,9 +114,6 @@ for which in ["P_rna", "P_cell"]:
         print(f"\n  Pseudobulk recovery ({which}) — NEW run:")
         print(df.to_string(index=False, max_rows=20))
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  2.  PHASE 1 — RESIDUALIZATION / GENE COUNTS
-# ═══════════════════════════════════════════════════════════════════════════════
 header("2. PHASE 1 — RESIDUALIZATION / GENE & SAMPLE COUNTS")
 
 for label, run in [("NEW", RUN_NEW), ("OLD", RUN_OLD)]:
@@ -174,9 +147,6 @@ for label, run in [("NEW", RUN_NEW), ("OLD", RUN_OLD)]:
         markers = dct.read_text().strip().split("\n")
         print(f"  DCT marker panel [{label}]: {len(markers)} genes")
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  3.  PHASE 2 — NETWORK SKELETON
-# ═══════════════════════════════════════════════════════════════════════════════
 header("3. PHASE 2 — NETWORK SKELETON (edges & genes)")
 
 for label, run in [("NEW", RUN_NEW), ("OLD", RUN_OLD)]:
@@ -245,9 +215,6 @@ for c in contrasts:
             print(f"    max |Δ logFC| = {logfc_diff.max():.6f}")
             print(f"    mean|Δ logFC| = {logfc_diff.mean():.6f}")
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  4.  PHASE 3 — NODE2VEC EMBEDDING STABILITY
-# ═══════════════════════════════════════════════════════════════════════════════
 header("4. PHASE 3 — NODE2VEC EMBEDDING SEED STABILITY")
 
 for label, run in [("NEW", RUN_NEW), ("OLD", RUN_OLD)]:
@@ -279,9 +246,6 @@ for pred in preds:
                 row.append(f"{label}={vals.median():.4f}")
     print(f"    {pred:30s} {'  '.join(row)}")
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  5.  PHASE 3 — PROCRUSTES REWIRING
-# ═══════════════════════════════════════════════════════════════════════════════
 header("5. PHASE 3 — PROCRUSTES REWIRING SCORES")
 
 for label, run in [("NEW", RUN_NEW), ("OLD", RUN_OLD)]:
@@ -359,9 +323,6 @@ for label, run in [("NEW", RUN_NEW), ("OLD", RUN_OLD)]:
         print(f"\n  [{label}] rewiring_summary.tsv (figures/):")
         print(df.to_string(index=False))
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  6.  PHASE 5 — DERIVED INTERACTION / PERSISTENCE
-# ═══════════════════════════════════════════════════════════════════════════════
 header("6. PHASE 5 — DERIVED INTERACTION & PERSISTENCE METRICS")
 
 derived_files = [
@@ -400,9 +361,6 @@ for fname in derived_files:
                     d = (num_n[c] - num_o[c]).abs()
                     print(f"    Δ {c}: Pearson r={r:.6f}  max|Δ|={d.max():.6f}  mean|Δ|={d.mean():.6f}")
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  7.  PHASE 5 — SILENT SHIFTERS (STRICT)
-# ═══════════════════════════════════════════════════════════════════════════════
 header("7. PHASE 5 — SILENT SHIFTERS (strict)")
 
 ss_contrasts = [
@@ -449,9 +407,6 @@ for label, run in [("NEW", RUN_NEW), ("OLD", RUN_OLD)]:
         print(f"\n  [{label}] silent_shifter_summary (figures/):")
         print(df.to_string(index=False))
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  8.  PHASE 6 — GENE-LEVEL EDGE REGRESSION
-# ═══════════════════════════════════════════════════════════════════════════════
 header("8. PHASE 6 — GENE-LEVEL EDGE REGRESSION")
 
 phase6_files = [
@@ -528,9 +483,6 @@ for label, run in [("NEW", RUN_NEW), ("OLD", RUN_OLD)]:
             print(f"\n  [{label}] figures/phase6_regression/{figf}:")
             print(df.to_string(index=False, max_rows=30))
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  9.  PHASE 6 — PERMUTATION / BOOTSTRAP UNCERTAINTY
-# ═══════════════════════════════════════════════════════════════════════════════
 header("9. PHASE 6 — PERMUTATION & BOOTSTRAP UNCERTAINTY")
 
 for rc in ss_contrasts:
@@ -564,9 +516,6 @@ for label, run in [("NEW", RUN_NEW), ("OLD", RUN_OLD)]:
         print(f"\n  [{label}] uncertainty_summary.tsv:")
         print(df.to_string(index=False))
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 10.  PHASE 7 — GENE-SET ENRICHMENT
-# ═══════════════════════════════════════════════════════════════════════════════
 header("10. PHASE 7 — GENE-SET ENRICHMENT / BIOLOGICAL GROUNDING")
 
 for rc in ss_contrasts:
@@ -624,9 +573,6 @@ for rc in ss_contrasts:
     else:
         print(f"    {rc}: no significant sets in either run")
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 11.  FIGURES-LEVEL DECONVOLUTION SUMMARIES
-# ═══════════════════════════════════════════════════════════════════════════════
 header("11. FIGURES — DECONVOLUTION SUMMARIES")
 
 for sumf in ["music_cluster_proportions_summary.tsv",
@@ -640,9 +586,6 @@ for sumf in ["music_cluster_proportions_summary.tsv",
             print(f"    [{label}]:")
             print(df.to_string(index=False))
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 12.  OVERALL STRUCTURAL DIFF — files unique to each run
-# ═══════════════════════════════════════════════════════════════════════════════
 header("12. STRUCTURAL DIFFERENCES — files unique to each run")
 
 def rel_files(run: Path) -> set[str]:
@@ -669,7 +612,6 @@ print(f"  Files ONLY in OLD:  {len(only_old)}")
 for f in only_old:
     print(f"    - {f}")
 
-# ═══════════════════════════════════════════════════════════════════════════════
 print(f"\n{'=' * 88}")
 print("  COMPARISON COMPLETE")
 print(f"{'=' * 88}\n")

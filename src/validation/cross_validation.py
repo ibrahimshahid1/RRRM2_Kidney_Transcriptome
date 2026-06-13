@@ -37,9 +37,7 @@ DEFAULT_TOPK = 80
 DEFAULT_RF_MAX_DEPTH = 5
 
 
-# ---------------------------------------------------------------------------
 # Fold-wise skeleton + LIONESS (leakage-safe)
-# ---------------------------------------------------------------------------
 
 def build_skeleton_on_fold(
     rtech_train: np.ndarray,
@@ -160,9 +158,7 @@ def transform_fold_edge_weights(
     raise ValueError("CV supports raw, raw_ranknorm, or raw_robust LIONESS transforms")
 
 
-# ---------------------------------------------------------------------------
 # Main CV loop
-# ---------------------------------------------------------------------------
 
 def main():
     ap = argparse.ArgumentParser(
@@ -196,7 +192,7 @@ def main():
     print("Phase 8: Leakage-Safe Cross-Validation")
     print("=" * 60)
 
-    # ── 1) Load expression + metadata ────────────────────────────
+    # 1) Load expression + metadata
     print("\nLoading data...")
     rtech = pd.read_csv(args.rtech, sep="\t", compression="gzip", index_col=0)
     meta = pd.read_csv(args.meta, sep="\t", compression="gzip")
@@ -218,7 +214,7 @@ def main():
     print(f"  Samples (FLT+GC): {len(meta)}")
     print(f"  FLT: {(meta['EnvGroup'] == 'FLT').sum()}, GC: {(meta['EnvGroup'] == 'GC').sum()}")
 
-    # ── 2) Gene selection (top variance) ─────────────────────────
+    # 2) Gene selection (top variance)
     gene_var = rtech.var(axis=1).sort_values(ascending=False)
     keep_genes = gene_var.head(args.max_genes).index.tolist()
 
@@ -235,7 +231,7 @@ def main():
     G = len(genes)
     print(f"  Genes: {G}")
 
-    # ── 3) Prepare labels and stratification ─────────────────────
+    # 3) Prepare labels and stratification
     y = (meta["EnvGroup"] == "FLT").astype(int).values  # 1=FLT, 0=GC
     strat_labels = meta["Age"].astype(str) + "_" + meta["Arm"].astype(str)
 
@@ -256,7 +252,7 @@ def main():
 
         y_train, y_test = y[train_idx], y[test_idx]
 
-        # ── 3a) Build skeleton on training data only ─────────
+        # 3a) Build skeleton on training data only
         meta_train = meta.iloc[train_idx]
         X_train = X_expr[:, train_idx]
 
@@ -266,15 +262,13 @@ def main():
         )
         print(f"  Skeleton: {len(edge_i)} edges")
 
-        # ── 3b) Compute LIONESS on training samples ──────────
+        # 3b) Compute LIONESS on training samples
         print("  Computing raw LIONESS contributions (training)...")
         train_mask = np.zeros(len(y), dtype=bool)
         train_mask[train_idx] = True
         lioness_train = lioness_on_fold(X_expr, train_mask, edge_i, edge_j)
 
-        # ── 3c) Compute LIONESS for test samples ─────────────
-        # For test: compute relative to training pool
-        # Each test sample is added to the pool individually
+        #  3c) Compute LIONESS for test samples
         print("  Computing raw LIONESS contributions (test)...")
         lioness_test = np.empty((len(test_idx), len(edge_i)), dtype=np.float32)
         for k, t_idx in enumerate(test_idx):
@@ -292,7 +286,7 @@ def main():
             lioness_train, lioness_test, transform=args.lioness_transform
         )
 
-        # ── 3d) Extract features ─────────────────────────────
+        # 3d) Extract features
         from src.validation.sample_features import (
             node_strength, edge_pca_features
         )
@@ -321,7 +315,7 @@ def main():
         feat_train = scaler.fit_transform(feat_train)
         feat_test = scaler.transform(feat_test)
 
-        # ── 3e) Classify ─────────────────────────────────────
+        # 3e) Classify
         classifiers = {
             "LogisticRegression": LogisticRegression(
                 max_iter=1000, C=1.0, random_state=42
@@ -360,7 +354,7 @@ def main():
                 "tp": int(cm[1, 1]),
             })
 
-    # ── 4) Save results ──────────────────────────────────────────
+    # 4) Save results
     results_df = pd.DataFrame(fold_results)
     results_path = outdir / "cv_results.tsv"
     results_df.to_csv(results_path, sep="\t", index=False)

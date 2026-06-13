@@ -1,21 +1,4 @@
-"""Cell-type marker-panel decomposition (memo Recommendation 4).
-
-Bulk kidney RNA cannot, by itself, distinguish a transcriptional *program*
-change inside DCT cells from a change in nephron-segment *composition* or from
-dilution by infiltrating/interstitial RNA. This module supplies curated kidney
-cell-type marker panels and the scoring/decision helpers used to bound that
-ambiguity without new single-cell data, following memo Section 8.2-8.3.
-
-Key distinction the panels are designed to make:
-
-* ``dct_identity`` -- DCT cell-type markers whose level tracks *how much DCT is
-  present* (Pvalb, Trpm6, Calb1, ...).
-* ``dct_transport`` -- the WNK-SPAK/OSR1-NCC functional transport program.
-
-If ``dct_transport`` falls while ``dct_identity`` is preserved, the most likely
-reading is transcriptional suppression of the transport program rather than
-loss of DCT cells (memo: "strong support for DCT program interpretation").
-"""
+"""Cell-type marker-panel decomposition (memo Recommendation 4)."""
 from __future__ import annotations
 
 import numpy as np
@@ -24,8 +7,6 @@ import pandas as pd
 EPS = 1e-12
 
 # Curated mouse kidney marker panels. Sources: Chen et al. 2021 (GSE150338),
-# Ransick et al. 2019 (kidney cell atlas), Park et al. 2018; standard segment
-# markers. Symbols are mgi-style to match decoupler/id_map symbol space.
 KIDNEY_PANELS: dict[str, list[str]] = {
     # --- distal convoluted tubule, split into identity vs transport program ---
     "dct_identity": ["Pvalb", "Trpm6", "Calb1", "Egf", "Tmem52b", "Klhl3"],

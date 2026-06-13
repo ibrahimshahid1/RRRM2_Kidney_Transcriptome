@@ -1,24 +1,5 @@
 #!/usr/bin/env python3
-"""v10 regulator-activity prioritization -- orchestrator.
-
-Layer A (kinase activity, KSEA) runs fully offline and is executed here.
-Layer B (TF/pathway activity) uses decoupler with PROGENy + DoRothEA/CollecTRI
-priors fetched from omnipath/zenodo; that fetch needs network access at run
-time. If the priors cannot be fetched, Layer B is skipped with a clear message
-and the run recipe is printed -- Layer A outputs are still produced.
-
-Usage
------
-    python3 scripts/regulator_activity/run_regulator_activity.py \
-        --outdir data/results/run_YYYYMMDD_regulator_activity
-
-Inputs (defaults point at the verified v9 / OSD-462 anchor outputs):
-    --phospho-sites   OSD-462 genome-wide phosphosite flight effects
-    --ks-net          kinase-substrate table (curated core ships in-repo;
-                      pass a PhosphoSitePlus-format table for the full panel)
-    --rna-effects     optional JSON mapping {cohort_label: path} of gene-level
-                      flight-effect tables for Layer B
-"""
+"""v10 regulator-activity prioritization -- orchestrator."""
 from __future__ import annotations
 
 import argparse
@@ -68,9 +49,7 @@ def resolve(p: str | Path) -> Path:
     return p if p.is_absolute() else REPO_ROOT / p
 
 
-# ---------------------------------------------------------------------------
 # Layer A -- KSEA kinase activity
-# ---------------------------------------------------------------------------
 
 def layer_a_kinase(phospho_path: Path, ksnet_path: Path, outdir: Path) -> dict:
     log("Layer A: KSEA kinase-activity inference on OSD-462 phosphoproteomics")
@@ -91,9 +70,7 @@ def layer_a_kinase(phospho_path: Path, ksnet_path: Path, outdir: Path) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
 # Layer B -- TF / pathway activity (decoupler, network-dependent priors)
-# ---------------------------------------------------------------------------
 
 def _load_rna_effects(spec: dict[str, str]) -> pd.DataFrame:
     """Build a contrasts x genes matrix from per-cohort gene-effect tables.

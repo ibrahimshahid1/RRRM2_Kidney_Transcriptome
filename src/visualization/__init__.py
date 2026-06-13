@@ -1,12 +1,4 @@
-"""
-RRRM-2 Visualization Module
-
-Publication-ready plots and network diagnostics.
-
-This module contains:
-- publication_plots: Generate publication-ready plots for all phases
-- network_diagnostics: Network skeleton visualization and diagnostics
-"""
+"""RRRM-2 Visualization Module"""
 
 from pathlib import Path
 

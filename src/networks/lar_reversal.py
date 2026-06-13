@@ -1,16 +1,4 @@
-"""LAR reversal and mechanism-switch analysis utilities.
-
-This module tests three competing interpretations of the RRRM-2 LAR arm:
-
-* attenuation: LAR flight is near zero relative to ISS-T flight,
-* reversal: LAR flight moves opposite to the ISS-T flight direction,
-* mechanism switch: LAR does not simply negate ISS-T, but loads onto other
-  biological axes such as clock/DCT, S1P, immune, or preservation-stress context.
-
-The functions here are deliberately sample-level and contrast-level.  Gene and
-network outputs are used as exploratory annotation, not confirmatory topology
-claims.
-"""
+"""LAR reversal and mechanism-switch analysis utilities."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -27,8 +15,6 @@ from src.networks.mechanism_axis import safe_z
 EPS = 1e-12
 
 # Independent state-space coordinates used for cosine/projection geometry.
-# matrix_minus_dct is a scalar readout, not an independent coordinate, because
-# it is exactly matrix_component - dct_transport_component.
 STATE_VECTOR_FEATURES = (
     "matrix_component",
     "dct_transport_component",

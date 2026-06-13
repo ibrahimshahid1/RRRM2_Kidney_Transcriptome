@@ -1,7 +1,4 @@
 # scripts/export_phase1_to_python.R
-# Export Phase 1 residualized expression data to Python-friendly formats
-
-# Parse --outdir argument
 args <- commandArgs(trailingOnly = TRUE)
 outdir <- "data/processed/phase1_residuals"   # default (legacy)
 for (.a in args) {

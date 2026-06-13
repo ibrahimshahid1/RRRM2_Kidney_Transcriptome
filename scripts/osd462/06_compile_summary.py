@@ -1,16 +1,5 @@
 #!/usr/bin/env python3
-"""Layer 6 - Consolidate anchor results into a single summary + run manifest.
-
-Reads every layer output and emits:
-  * ``results_summary.json`` - headline numbers + the pre-registered hypothesis
-    verdicts (H1-H4) and the decision-table row the data landed on.
-  * ``manifest.json``        - run-level manifest referencing each layer manifest
-    with input SHAs.
-
-Usage::
-
-    python scripts/osd462/06_compile_summary.py --run RUN_NAME
-"""
+"""Layer 6 - Consolidate anchor results into a single summary + run manifest."""
 from __future__ import annotations
 
 import argparse

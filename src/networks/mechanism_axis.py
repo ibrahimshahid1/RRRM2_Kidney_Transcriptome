@@ -1,10 +1,4 @@
-"""Mechanism-axis scoring and exploratory network-neighborhood prioritization.
-
-This module keeps the statistical pieces behind
-``scripts/run_mechanism_axis_prioritization.py`` small enough to test.  The
-analysis is intentionally pathway/module first; gene rankings produced here are
-secondary prioritizations, not confirmatory gene-level rewiring calls.
-"""
+"""Mechanism-axis scoring and exploratory network-neighborhood prioritization."""
 from __future__ import annotations
 
 from dataclasses import dataclass

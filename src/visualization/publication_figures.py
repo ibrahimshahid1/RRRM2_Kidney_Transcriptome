@@ -1,24 +1,5 @@
 #!/usr/bin/env python3
-"""
-publication_figures.py — Generate all key publication-ready figures.
-
-Figures produced (all saved under <results_dir>/figures/publication/):
-  1. rewiring_vs_logfc.png        — 4-panel scatter: rewiring vs |log2FC|, annotated
-  2. edge_sum_perm_rank.png       — Per-contrast edge-sum rank plots with candidates labeled
-  3. pathway_dotplot.png          — OR dot plot across all contrasts × pathways
-  4. pathway_barplot.png          — Horizontal bar chart of top pathway hits
-  5. age_comparison.png           — ISS-T Young vs ISS-T Old rewiring scatter
-  6. arm_comparison.png           — ISS-T vs LAR recovery (persistence) plot
-  7. pipeline_schematic.png       — Text-based pipeline overview
-  8. retinol_subnetwork.png       — Retinol gene rewiring across contrasts
-  9. figures/v11/*.png/.pdf       — V11 DCT1/phosphoproteome/mediation figures, when present
- 10. result_tables.tsv            — Table 1 (sig genes) + Table 2 (sig pathways)
-
-Usage (standalone):
-    python -m src.visualization.publication_figures --results_dir data/results/run_XYZ
-
-Called automatically by Phase 9 of the pipeline.
-"""
+"""publication_figures.py - Generate all key publication-ready figures."""
 from __future__ import annotations
 
 import argparse
@@ -39,7 +20,7 @@ from scipy import stats
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# ── Style ──────────────────────────────────────────────────────────────────
+# Style
 PALETTE = {
     "ISS_T_YNG": "#E63946",
     "ISS_T_OLD": "#457B9D",
@@ -83,7 +64,7 @@ plt.rcParams.update({
 sns.set_style("whitegrid")
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────
+# Helpers
 
 def _ensure(p: Path) -> Path:
     p.mkdir(parents=True, exist_ok=True)
@@ -197,7 +178,7 @@ def _load_enrichment(results_dir: Path, contrast_key: str,
     return df
 
 
-# ── Figure 1: Rewiring vs |log2FC| ────────────────────────────────────────
+# Figure 1: Rewiring vs |log2FC|
 
 def fig_rewiring_vs_logfc(results_dir: Path, repo_root: Path, out_dir: Path) -> None:
     """4-panel scatter: rewiring vs |log2FC|, key genes annotated."""
@@ -272,7 +253,7 @@ def fig_rewiring_vs_logfc(results_dir: Path, repo_root: Path, out_dir: Path) -> 
     _save(fig, out_dir / "rewiring_vs_logfc.png")
 
 
-# ── Figure 2: Edge-Sum Permutation Rank Plots ────────────────────────────
+# Figure 2: Edge-Sum Permutation Rank Plots
 
 def fig_focused_perm_rank(results_dir: Path, repo_root: Path, out_dir: Path) -> None:
     """Per-contrast: rank vs edge-sum rewiring, significant candidates labeled."""
@@ -356,7 +337,7 @@ def fig_focused_perm_rank(results_dir: Path, repo_root: Path, out_dir: Path) -> 
     _save(fig, out_dir / "edge_sum_perm_rank.png")
 
 
-# ── Figure 3: Pathway Enrichment Dot Plot ────────────────────────────────
+# Figure 3: Pathway Enrichment Dot Plot
 
 def _build_enrichment_table(results_dir: Path) -> pd.DataFrame:
     """Merge significant enrichment across all contrasts."""
@@ -490,7 +471,7 @@ def fig_pathway_barplot(results_dir: Path, out_dir: Path) -> None:
     _save(fig, out_dir / "pathway_barplot.png")
 
 
-# ── Figure 4: Age Comparison ─────────────────────────────────────────────
+# Figure 4: Age Comparison
 
 def fig_age_comparison(results_dir: Path, repo_root: Path, out_dir: Path) -> None:
     """Scatter: ISS-T Young rewiring vs ISS-T Old rewiring, divergent genes labeled."""
@@ -564,7 +545,7 @@ def fig_age_comparison(results_dir: Path, repo_root: Path, out_dir: Path) -> Non
     _save(fig, out_dir / "age_comparison.png")
 
 
-# ── Figure 5: Arm Comparison (ISS-T vs LAR Recovery) ────────────────────
+# Figure 5: Arm Comparison (ISS-T vs LAR Recovery)
 
 def fig_arm_comparison(results_dir: Path, repo_root: Path, out_dir: Path) -> None:
     """ISS-T vs LAR persistence: which rewiring events resolve after return?"""
@@ -635,7 +616,7 @@ def fig_arm_comparison(results_dir: Path, repo_root: Path, out_dir: Path) -> Non
     _save(fig, out_dir / "arm_comparison.png")
 
 
-# ── Figure 6: Pipeline Schematic ─────────────────────────────────────────
+# Figure 6: Pipeline Schematic
 
 def fig_pipeline_schematic(out_dir: Path) -> None:
     """Clean text-flow pipeline diagram."""
@@ -712,7 +693,7 @@ def fig_pipeline_schematic(out_dir: Path) -> None:
     _save(fig, out_dir / "pipeline_schematic.png")
 
 
-# ── Figure 7: Retinol Subnetwork ─────────────────────────────────────────
+# Figure 7: Retinol Subnetwork
 
 def fig_retinol_subnetwork(results_dir: Path, repo_root: Path, out_dir: Path) -> None:
     """Heatmap + barplot of retinol pathway gene rewiring across all contrasts."""
@@ -831,7 +812,7 @@ def fig_retinol_subnetwork(results_dir: Path, repo_root: Path, out_dir: Path) ->
     _save(fig, out_dir / "retinol_subnetwork.png")
 
 
-# ── Table Generation ──────────────────────────────────────────────────────
+# Table Generation
 
 def _build_result_tables(results_dir: Path, repo_root: Path, out_dir: Path) -> None:
     """Write Table 1 (sig genes) and Table 2 (sig pathways) as TSVs."""
@@ -891,7 +872,7 @@ def _build_result_tables(results_dir: Path, repo_root: Path, out_dir: Path) -> N
         print(f"  [saved] table2_significant_pathways.tsv ({len(enr2)} rows)")
 
 
-# ── Main ──────────────────────────────────────────────────────────────────
+# Main
 
 def generate_all_figures(results_dir: Path, repo_root: Path) -> None:
     """Generate all publication figures for a given run."""

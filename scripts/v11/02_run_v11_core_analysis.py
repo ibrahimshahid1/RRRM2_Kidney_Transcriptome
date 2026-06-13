@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Execute the core v11 DCT1/phosphoproteome/mediation analyses.
-
-This script intentionally keeps the external references as priors/scaffolds:
-GSE228367 is a DCT subtype RNA reference, PXD001729 is a cultured DCT-lineage
-phosphoproteomic reference, and OSD-462 remains the only spaceflight
-phosphoproteomic anchor.
-"""
+"""Execute the core v11 DCT1/phosphoproteome/mediation analyses."""
 
 from __future__ import annotations
 

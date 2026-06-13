@@ -1,12 +1,5 @@
 #!/usr/bin/env python
-"""
-plot_output.py - Generate publication-ready plots and tables for each pipeline phase.
-
-Organizes outputs into a clean folder structure mirroring the export script's phase organization.
-
-Usage:
-    python scripts/plot_output.py --out_root plots --tag paper_figures
-"""
+"""plot_output.py - Generate publication-ready plots and tables for each pipeline phase."""
 from __future__ import annotations
 
 import argparse

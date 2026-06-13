@@ -1,16 +1,5 @@
 #!/usr/bin/env python3
-"""Consolidated six-recommendation integration figure.
-
-Ties together the memo's Recommendation analyses into one cross-omic
-decoupling / evidence-ladder panel:
-
-  A  RNA pathway-vector recurrence (RRRM-2 ISS-T vs OSD-462)        [Rec 3 / 1]
-  B  Protein-abundance concordance null (matrix & DCT)              [Rec 3]
-  C  Phospho layer: NCC regulatory vs non-regulatory + total NCC    [Rec 3]
-  D  Regulator activity: KSEA WNK/SPAK + recurrent pathways/TFs     [Rec 2]
-  E  Cell-type decomposition: DCT down, interstitial up (cohorts)   [Rec 4]
-  F  Evidence ladder + honest grades (Rec 1-6)                      [Rec 5/6]
-"""
+"""Consolidated six-recommendation integration figure."""
 from __future__ import annotations
 
 import sys

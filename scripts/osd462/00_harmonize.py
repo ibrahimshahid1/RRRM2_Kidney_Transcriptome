@@ -1,16 +1,5 @@
 #!/usr/bin/env python3
-"""Layer 0 - Harmonization.
-
-Builds the master ``osd462_flight_effects.tsv`` joining, per gene:
-  * RRRM-2 ISS-T RNA flight effect (reference; from lar_reversal_gene_scatter)
-  * OSD-462 RNA flight effect (Space Flight - Ground Control; OSDR DE table)
-  * OSD-462 protein flight effect (FL - GC, plex-corrected; TMT workbook)
-  * peptide count, plex coverage, protein abundance, matched-null strata bins
-
-Usage::
-
-    python scripts/osd462/00_harmonize.py [--run RUN_NAME]
-"""
+"""Layer 0 - Harmonization."""
 from __future__ import annotations
 
 import argparse
@@ -37,7 +26,7 @@ def main() -> None:
     print(f"[layer0] run = {args.run}")
     print(f"[layer0] output dir = {out_dir}")
 
-    # 1. OSD-462 proteomics flight effect -> gene level ----------------------
+    # 1. OSD-462 proteomics flight effect -> gene level
     print("[layer0] parsing proteomics workbook ...")
     tab = parse_tmt_sheet(
         PROTEOMICS_XLSX, "protein_quant_2721", gene_col="Gene Symbol",
@@ -51,7 +40,7 @@ def main() -> None:
     print(f"[layer0] proteins quantified: {tab.n_rows}; "
           f"gene-level both-plex: {len(gene_prot)}; any-plex: {len(gene_prot_1plex)}")
 
-    # 2. OSD-462 RNA flight effect (SF - GC) ---------------------------------
+    # 2. OSD-462 RNA flight effect (SF - GC)
     print("[layer0] loading OSD-462 RNA differential-expression table ...")
     rna = pd.read_csv(RNA_DE, usecols=["ENSEMBL", "SYMBOL", RNA_FLIGHT_COL, RNA_FLIGHT_ADJP],
                       dtype={"ENSEMBL": str, "SYMBOL": str})
@@ -60,7 +49,7 @@ def main() -> None:
     rna["ENSEMBL"] = rna["ENSEMBL"].str.strip()
     rna = rna.dropna(subset=["ENSEMBL"]).drop_duplicates("ENSEMBL")
 
-    # 3. RRRM-2 ISS-T reference RNA effect -----------------------------------
+    # 3. RRRM-2 ISS-T reference RNA effect
     print("[layer0] loading RRRM-2 ISS-T reference gene effect ...")
     ref = pd.read_csv(RRRM2_GENE_SCATTER, sep="\t",
                       usecols=["gene", "mgi_symbol", "iss_t_effect"])
@@ -68,7 +57,7 @@ def main() -> None:
     ref["ENSEMBL"] = ref["ENSEMBL"].astype(str).str.strip()
     ref = ref.drop_duplicates("ENSEMBL")
 
-    # 4. ID bridge: protein symbol -> ENSMUSG --------------------------------
+    # 4. ID bridge: protein symbol -> ENSMUSG
     bridge = build_symbol_to_ensembl()
     n_coll = bridge.pop("_n_collisions", 0)
     sym = gene_prot["gene_symbol"].astype(str)
@@ -98,7 +87,7 @@ def main() -> None:
     else:
         gene_prot = gene_prot.rename(columns={"flight_effect": "protein_flight_effect"})
 
-    # 5. Master join ----------------------------------------------------------
+    # 5. Master join
     master = (rna.merge(ref[["ENSEMBL", "rrrm2_iss_t_rna_effect"]], on="ENSEMBL", how="outer")
                  .merge(gene_prot, on="ENSEMBL", how="outer"))
     # prefer the proteomics symbol, else RNA SYMBOL

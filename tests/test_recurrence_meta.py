@@ -1,11 +1,4 @@
-"""Unit tests for Repair B -- the cross-cohort recurrence meta-analysis.
-
-The contract: per-cohort effects are sign-faithful Welch contrasts on the VST
-scale; the DerSimonian-Laird pool recovers a planted shared effect with I^2 ~ 0
-when cohorts agree and high I^2 when they disagree; BH-FDR separates a truly
-shared signal from noise; and gene-set re-scoring + leave-one-cohort-out are
-sign-faithful and stable.
-"""
+"""Unit tests for Repair B -- the cross-cohort recurrence meta-analysis."""
 import numpy as np
 import pandas as pd
 
@@ -18,9 +11,7 @@ from src.v11.recurrence_meta import (
 )
 
 
-# --------------------------------------------------------------------------- #
-# design resolution
-# --------------------------------------------------------------------------- #
+# #
 
 def test_resolve_design_splits_flight_ground_and_excludes_viv_baseline_rerun():
     cols = [
@@ -38,9 +29,7 @@ def test_resolve_design_splits_flight_ground_and_excludes_viv_baseline_rerun():
     assert "RR7_KDN_GCrerun_25days_Blue_Rep1_GR01" not in d   # rerun batch never ground
 
 
-# --------------------------------------------------------------------------- #
-# per-cohort effect + SE
-# --------------------------------------------------------------------------- #
+# #
 
 def _planted_vst(effects, n=6, noise=0.3, seed=0):
     """genes x samples VST with a planted flight-minus-ground shift per gene."""
@@ -75,9 +64,7 @@ def test_per_cohort_effect_refuses_too_few_replicates():
         pass
 
 
-# --------------------------------------------------------------------------- #
-# random-effects meta
-# --------------------------------------------------------------------------- #
+# #
 
 def _cohort_effect_table(effect, se, genes):
     return pd.DataFrame(
@@ -134,9 +121,7 @@ def test_meta_requires_minimum_cohorts():
     assert meta.empty                                        # one cohort -> nothing pooled
 
 
-# --------------------------------------------------------------------------- #
-# gene-set scoring + leave-one-out
-# --------------------------------------------------------------------------- #
+# #
 
 def _toy_meta(ens_effects):
     rows = []

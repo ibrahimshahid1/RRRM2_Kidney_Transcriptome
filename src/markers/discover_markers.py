@@ -1,32 +1,5 @@
 #!/usr/bin/env python3
-"""
-Phase 1.5b: Generalized Segment Marker Discovery
-==================================================
-
-Discovers marker genes for ALL nephron segments in the CLR file, using the
-same regression-based approach as discover_dct.py but parameterized by
-target segment.
-
-For each segment S in the CLR file:
-  1. Fit OLS: Y_ig = α + β_S · CLR(S)_i + γ' · CLR(other)_i + θ_cell(i) + ε_ig
-  2. Select genes where β_S > 0, BH q < 0.05 (or fallback to marginal r)
-  3. Bootstrap stability within experimental cells
-  4. Anti-confounding: gene tracks S more than any other segment
-
-Outputs per segment:
-  <outdir>/<segment>_marker_scores.tsv   — full regression results
-  <outdir>/<segment>_marker_panel.txt    — final marker gene list
-
-Usage:
-    python -m src.markers.discover_markers \\
-        --vst data/processed/vst_normalized/GLDS-674_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv \\
-        --meta data/processed/phase1_residuals/meta_phase1.tsv.gz \\
-        --clr data/processed/deconvolution/latest/music_segment_direct_proportions_CLR.csv \\
-        --outdir data/processed/segment_markers
-
-    # Single segment:
-    python -m src.markers.discover_markers --segments DCT ...
-"""
+"""Phase 1.5b: Generalized Segment Marker Discovery"""
 from __future__ import annotations
 
 import argparse
@@ -45,7 +18,7 @@ def bh_fdr(p: np.ndarray) -> np.ndarray:
     return _bh_fdr(p)
 
 
-# ── Core regression (same as discover_dct.py, parameterized) ─────────────
+# Core regression (same as discover_dct.py, parameterized)
 
 def build_design_matrix(
     meta: pd.DataFrame,
@@ -206,7 +179,7 @@ def bootstrap_marginal(
     return pass_counts / n_boot
 
 
-# ── Single-segment discovery ─────────────────────────────────────────────
+# Single-segment discovery
 
 def discover_segment_markers(
     vst: pd.DataFrame,
@@ -354,7 +327,7 @@ def discover_segment_markers(
     return results, panel_genes
 
 
-# ── Main: run for all segments ───────────────────────────────────────────
+# Main: run for all segments
 
 def main():
     ap = argparse.ArgumentParser(

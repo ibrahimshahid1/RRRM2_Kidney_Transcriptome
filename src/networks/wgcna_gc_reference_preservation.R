@@ -1,6 +1,5 @@
 #!/usr/bin/env Rscript
-# GC-only reference WGCNA → FLT preservation test
-# Item 5: Verify preservation with proper GC-reference modules
+# Test FLT preservation against GC-reference WGCNA modules.
 
 suppressPackageStartupMessages(library(WGCNA))
 disableWGCNAThreads()

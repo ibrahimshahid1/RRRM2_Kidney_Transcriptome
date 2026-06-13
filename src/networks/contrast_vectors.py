@@ -1,24 +1,4 @@
-"""Contrast-vector decomposition core (Cross-OSDR Network-Contrast Framework).
-
-Implements the geometry of §1 of agents_instruction.md:
-    A^a_GC  = N(Old, a, GC)  - N(Young, a, GC)
-    A^a_FLT = N(Old, a, FLT) - N(Young, a, FLT)
-    beta_a  = (A_FLT . A_GC) / (A_GC . A_GC)              # projection coefficient
-    cos_a   = (A_FLT . A_GC) / (||A_FLT|| ||A_GC||)
-    R_a     = A_FLT - beta_a * A_GC                       # redirected component
-    rho_a   = ||R_a|| / ||A_FLT||                         # redirectedness
-
-Optional precision (variance) weighting per Guardrail C (§2.3):
-    beta_w = (A_FLT^T W A_GC) / (A_GC^T W A_GC)
-    cos_w  = (A_FLT^T W A_GC) / sqrt(A_FLT^T W A_FLT * A_GC^T W A_GC)
-
-Bootstrap (§2.4) and permutation (§4.4) helpers operate on
-stratified row-indices over the sample table so callers control how subjects
-are nested in cells.
-
-This module is dataset-agnostic. Adapters that build N(condition) from
-expression/network artifacts live in bootstrap_decomposition.py.
-"""
+"""Contrast-vector decomposition core (Cross-OSDR Network-Contrast Framework)."""
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
@@ -30,9 +10,6 @@ import pandas as pd
 EPS = 1e-12
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Core geometry
-# ─────────────────────────────────────────────────────────────────────────────
 
 @dataclass
 class Decomposition:
@@ -148,9 +125,6 @@ def cosine(u: np.ndarray, v: np.ndarray, weights: np.ndarray | None = None) -> f
     return _dot(u, v, weights) / (nu * nv)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Interpretation categories (§4.4)
-# ─────────────────────────────────────────────────────────────────────────────
 
 def classify_beta(beta: float, rho: float | None = None,
                   amplify_min: float = 1.0,
@@ -231,9 +205,6 @@ def interpretation_label(summary: Mapping[str, object]) -> str:
     return "mixed (" + ", ".join(parts) + ")"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Stratified bootstrap and label permutation
-# ─────────────────────────────────────────────────────────────────────────────
 
 def stratified_bootstrap_indices(
     strata: Sequence,
@@ -273,9 +244,6 @@ def stratified_permutation_indices(
     return out
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Vector builders + bootstrap orchestration
-# ─────────────────────────────────────────────────────────────────────────────
 
 def build_aging_vectors(
     feature_matrix: np.ndarray,

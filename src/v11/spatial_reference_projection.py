@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
-"""External kidney injury/repair spatial reference projection for v11.
-
-Primary spatial source:
-  * GSE269622 Visium, whole-transcriptome Space Ranger archives.
-
-Secondary spatial source:
-  * GSE269719 processed Xenium AnnData, used only for annotation/neighborhood
-    inventory because the panel is targeted and not a genome-wide projection
-    source.
-
-This script does not localize the RR-10 spaceflight lesion. It asks which IRI
-timepoints or marker-enriched Visium spatial niches most resemble the bulk
-spaceflight RNA remodeling vector.
-"""
+"""External kidney injury/repair spatial reference projection for v11."""
 
 from __future__ import annotations
 

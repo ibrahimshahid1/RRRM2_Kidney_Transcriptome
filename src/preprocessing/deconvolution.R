@@ -134,8 +134,6 @@ stopifnot(anyDuplicated(rownames(meta)) == 0)
 message("Successfully aligned ", ncol(bulk_mat), " samples.")
 
 # 2) Load single-cell reference from H5AD
-# 2) Load single-cell reference from Raw MTX
-# Use hybrid reference (TMS + Chen) for improved DCT subtype resolution
 USE_HYBRID_REF <- TRUE
 if (USE_HYBRID_REF) {
   message("Loading HYBRID single-cell reference (TMS + Chen)...")
@@ -156,11 +154,6 @@ obs <- data.frame(fread(obs_path, header = TRUE), row.names = 1, check.names = F
 var <- data.frame(fread(var_path, header = TRUE), row.names = 1, check.names = FALSE)
 
 # Handle potential transpose issues with mtx (Scanpy writes shape n_obs x n_vars, readMM reads as such)
-# But SCE expects genes x cells (n_vars x n_obs). Scanpy usually writes cells x genes?
-# Creating scipy.io.mmwrite(..., raw_adata.X) usually writes standard MM.
-# If raw_adata.X is (cells, genes), then readMM returns (rows=cells, cols=genes).
-# SCE needs (rows=genes, cols=cells). So we likely need to Transpose.
-# Let's check dimensions carefully.
 message("MTX dims: ", paste(dim(raw_mat), collapse = " x "))
 message("Obs rows: ", nrow(obs))
 message("Var rows: ", nrow(var))
@@ -306,12 +299,7 @@ colData(sce)$segment_use <- droplevels(colData(sce)$segment_use)
 message("\n--- Segment Distribution (before DCT split) ---")
 print(table(colData(sce)$segment_use, useNA = "ifany"))
 
-# ── DCT Sub-typing ──
-# With hybrid reference (Chen + TMS), DCT subtypes are pre-annotated:
-#   DCT1 (Slc12a3+/Pvalb+, thiazide-sensitive NCC)
-#   DCT2 (Slc12a3+/Pvalb−, calcium transport)
-#   CNT  (connecting tubule)
-# No sub-clustering needed when using hybrid reference.
+#  DCT Sub-typing
 if (USE_HYBRID_REF) {
   has_dct1 <- sum(colData(sce)$segment_use == "DCT1") > 0
   has_dct2 <- sum(colData(sce)$segment_use == "DCT2") > 0
@@ -669,8 +657,6 @@ colData(sce2)$clusterType <- as.character(colData(sce2)$clusterType)
 colData(sce2)$donor_id <- as.character(colData(sce2)$donor_id)
 
 # CRITICAL: donor_id diagnostics
-# MuSiC uses cross-donor variance for cell-size (theta) estimation.
-# If donor_id is NA, constant, or unique per cell, resolution fails.
 message("\n", paste(rep("=", 60), collapse = ""))
 message("DONOR_ID DIAGNOSTICS (MuSiC requires valid multi-donor data)")
 message(paste(rep("=", 60), collapse = ""))
@@ -715,8 +701,6 @@ if (n_donors == 1) {
 }
 
 # Option to force single donor for testing
-# Uncomment the line below to bypass donor issues:
-# colData(sce2)$donor_id <- "D1"
 
 message(paste(rep("=", 60), collapse = ""))
 
@@ -731,14 +715,10 @@ message("Proximal segments: ", paste(clusters.type$Proximal, collapse = ", "))
 message("Distal segments: ", paste(clusters.type$Distal, collapse = ", "))
 
 # In-silico pseudo-bulk test for MuSiC
-# Requires: sce2 with counts, colData(sce2)$segment_use and $clusterType and $donor_id
-# Also requires: clusters.type and group.markers as in your script
 
 set.seed(1)
 
-# ---------
 # Helpers
-# ---------
 normalize_rows_to_one <- function(M, eps = 1e-12) {
   rs <- rowSums(M)
   rs[rs < eps] <- 1
@@ -756,9 +736,7 @@ rdirichlet_base <- function(n, alpha) {
   X
 }
 
-# ---------
 # IMPROVED: Pseudobulk with exact proportions and all fixes
-# ---------
 make_pseudobulk_exact <- function(
   sce_obj,
   segment_col = "segment_use",
@@ -830,9 +808,6 @@ make_pseudobulk_exact <- function(
     idx_this_donor <- idx_by_donor_seg[[d]]
 
     # FIX 3: Independent DCT variation via two-level design
-    # Sample tubule proportions with independent ranges
-
-    # Step 1: Sample coarse group totals
     tubule_total <- runif(1, tubule_total_range[1], tubule_total_range[2])
     glom_total <- runif(1, glom_total_range[1], glom_total_range[2])
     immune_total <- runif(1, immune_frac_range[1], immune_frac_range[2])
@@ -977,9 +952,7 @@ make_pseudobulk_exact <- function(
   )
 }
 
-# ---------
 # Build pseudo-bulk mixtures
-# ---------
 make_pseudobulk <- function(
   sce_obj,
   segment_col = "segment_use",
@@ -1012,9 +985,7 @@ make_pseudobulk <- function(
     dimnames = list(genes, rownames(P_draw))
   )
 
-  # Two ground-truth matrices:
-  # P_cell: fraction of sampled cells from each segment
-  # P_rna:  fraction of total UMIs contributed by each segment
+  # Two ground-truth matrices: P_cell: fraction of sampled cells from each segment
   P_cell <- matrix(0,
     nrow = n_mixtures, ncol = length(seg_levels),
     dimnames = list(rownames(P_draw), seg_levels)
@@ -1080,9 +1051,7 @@ make_pseudobulk <- function(
   list(pb_mat = pb_mat, P_cell = P_cell, P_rna = P_rna)
 }
 
-# ---------
 # Experiment B: Per-donor pseudo-bulk (sample from single donor per mixture)
-# ---------
 make_pseudobulk_per_donor <- function(
   sce_obj,
   segment_col = "segment_use",
@@ -1195,9 +1164,7 @@ make_pseudobulk_per_donor <- function(
   list(pb_mat = pb_mat, P_cell = P_cell, P_rna = P_rna, donor_used = donor_used)
 }
 
-# ---------
 # Run pseudo-bulk test (with normalize_flag parameter)
-# ---------
 run_music_on_pseudobulk <- function(pb_mat, sce_obj, group.markers, clusters.type, normalize_flag = FALSE) {
   # Ensure numeric matrix genes x samples
   storage.mode(pb_mat) <- "numeric"
@@ -1415,11 +1382,9 @@ if (mean(eval_T$stats$spearman_rho, na.rm = TRUE) > mean(eval_F$stats$spearman_r
 P_hat <- res_pb$Est.prop.weighted.cluster
 
 # align to pseudo-bulk sample names
-# MuSiC returns rows = bulk samples; our pb_mat cols are samples
-# So rownames(P_hat) should match colnames(pb_mat)
 stopifnot(all(rownames(P_hat) %in% colnames(pb$pb_mat)))
 
-# ---- Evaluate against P_cell (cell fraction) ----
+# Evaluate against P_cell (cell fraction)
 message("\n--- Evaluation vs P_cell (cell fraction ground truth) ---")
 eval_cell <- evaluate_pseudobulk(pb$P_cell[rownames(P_hat), , drop = FALSE], P_hat)
 print(eval_cell$stats[order(-eval_cell$stats$spearman_rho), ])
@@ -1465,20 +1430,12 @@ p_rec <- ggplot(df_plot, aes(x = true, y = est)) +
 ggsave(file.path(outdir, "pseudobulk_recovery_scatter_P_rna.png"), p_rec, width = 11, height = 7)
 message("Saved pseudo-bulk recovery plot: pseudobulk_recovery_scatter_P_rna.png")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TWO-STAGE DECONVOLUTION
-# Stage 1: TMS-only MuSiC for coarse types (PT, Podo, Endo, Mes, Immune, Fibro, CD)
-# Stage 2: Chen-only MuSiC for distal subtypes (TAL_LOH, DCT1, DCT2, CNT)
-# Then scale Stage 2 relative proportions by distal_total from Stage 1.
-# This avoids the block-diagonal donor problem where cross-donor variance
-# between TMS segments and Chen segments cannot be modeled.
-# ══════════════════════════════════════════════════════════════════════════════
 
 message("\n", paste(rep("=", 60), collapse = ""))
 message("TWO-STAGE DECONVOLUTION")
 message(paste(rep("=", 60), collapse = ""))
 
-# ── Build source-specific SCEs ──
+# Build source-specific SCEs
 has_source <- "source" %in% colnames(colData(sce2))
 if (!has_source) {
   message("WARNING: 'source' column not found in SCE colData.")
@@ -1494,25 +1451,19 @@ tms_mask <- src == "TMS"
 chen_mask <- src == "Chen"
 message("TMS cells: ", sum(tms_mask), "  Chen cells: ", sum(chen_mask))
 
-# ── TMS-only SCE: PT, Podocyte, Endothelial, Mesangial, Immune, Fibroblast, CD ──
+# TMS-only SCE: PT, Podocyte, Endothelial, Mesangial, Immune, Fibroblast, CD
 sce_tms <- sce2[, tms_mask]
 colData(sce_tms)$segment_use <- as.character(colData(sce_tms)$segment_use)
 colData(sce_tms)$donor_id    <- as.character(colData(sce_tms)$donor_id)
 tms_types <- unique(colData(sce_tms)$segment_use)
 message("TMS cell types: ", paste(sort(tms_types), collapse = ", "))
 
-# ── Chen-only SCE: TAL_LOH, DCT1, DCT2, CNT ──
+# Chen-only SCE: TAL_LOH, DCT1, DCT2, CNT
 sce_chen <- sce2[, chen_mask]
 colData(sce_chen)$segment_use <- as.character(colData(sce_chen)$segment_use)
 colData(sce_chen)$donor_id    <- as.character(colData(sce_chen)$donor_id)
 
-# MERGE DCT1 + DCT2 → DCT for Stage 2 deconvolution.
-# Rationale: DCT1 and DCT2 share ~60% of canonical markers (Slc12a3, Calb1,
-# Trpm6, Slc8a1, Trpv5, Fxyd2). The only DCT1-exclusive marker is Pvalb,
-# which is insufficient for MuSiC to resolve a 4-type NNLS reliably.
-# Stage 2 output: DCT1≈0, DCT2≈0.48 — a collapse artifact.
-# Merging gives MuSiC 3 well-separated types (TAL_LOH, DCT, CNT) instead of 4
-# near-collinear types.
+# MERGE DCT1 + DCT2 to DCT for Stage 2 deconvolution.
 seg_labels <- colData(sce_chen)$segment_use
 n_dct1 <- sum(seg_labels == "DCT1")
 n_dct2 <- sum(seg_labels == "DCT2")
@@ -1524,7 +1475,7 @@ message("Merged DCT1 (", n_dct1, ") + DCT2 (", n_dct2, ") → DCT (",
 chen_types <- unique(colData(sce_chen)$segment_use)
 message("Chen cell types: ", paste(sort(chen_types), collapse = ", "))
 
-# ── Stage 1: TMS-only flat MuSiC ──
+# Stage 1: TMS-only flat MuSiC
 message("\n--- Stage 1: TMS-only flat MuSiC ---")
 res_stage1 <- MuSiC::music_prop(
   bulk.mtx  = bulk_mat2,
@@ -1539,7 +1490,7 @@ message("Stage 1 cell types: ", paste(colnames(prop_stage1), collapse = ", "))
 message("Stage 1 mean proportions:")
 print(round(colMeans(prop_stage1), 4))
 
-# ── Stage 2: Chen-only flat MuSiC ──
+# Stage 2: Chen-only flat MuSiC
 message("\n--- Stage 2: Chen-only flat MuSiC ---")
 res_stage2 <- MuSiC::music_prop(
   bulk.mtx  = bulk_mat2,
@@ -1554,25 +1505,15 @@ message("Stage 2 cell types: ", paste(colnames(prop_stage2), collapse = ", "))
 message("Stage 2 relative proportions (within distal):")
 print(round(colMeans(prop_stage2), 4))
 
-# ── Scale & Combine ──
+# Scale & Combine
 message("\n--- Scale & Combine ---")
 
 # PROBLEM: Stage 1 (TMS-only) has no distal tubule types (TAL, DCT1/2, CNT),
-# so MuSiC absorbs all distal signal into PT and CD. The residual
-# (1 - sum(Stage1)) is ~0 for most samples, zeroing out all distal types.
-#
-# FIX: Use a data-informed floor for distal_total. In mouse kidney, the distal
-# nephron (TAL + DCT1 + DCT2 + CNT) represents ~20-40% of tubular epithelium.
-# We set a floor so that Stage 2 relative proportions are always scaled by a
-# meaningful amount, then re-normalize the final proportions.
 
 distal_residual <- 1 - rowSums(prop_stage1)
 n_overallocated <- sum(distal_residual < 0.01)
 
 # Data-informed distal floor: use the median of Stage 2's own "confidence"
-# Stage 2 gives relative proportions. If they're spread across 4 types,
-# the reference thinks the bulk genuinely has distal signal. We combine this
-# with a minimum floor of 10% (known kidney anatomy).
 DISTAL_FLOOR <- 0.10
 
 if (n_overallocated > nrow(prop_stage1) * 0.5) {
@@ -1694,12 +1635,6 @@ for (seg in names(segment_markers)) {
 }
 
 # FIX APPLIED 2026-01-11: CPM Normalization for Validation
-# Problem: prop_seg is library-size independent (fractions sum to 1), but raw
-#          bulk counts scale with sequencing depth. This caused spurious low/negative
-#          correlations in validation (e.g., DCT showed ρ=0.03 with raw, ρ=0.33 with CPM).
-# Solution: Normalize bulk to CPM before computing marker scores.
-
-# CPM normalize bulk matrix for validation
 lib_sizes <- colSums(bulk_mat2)
 bulk_cpm <- sweep(bulk_mat2, 2, lib_sizes, "/") * 1e6
 message(
@@ -1795,8 +1730,6 @@ write.csv(validation_results, file.path(outdir, "validation_segment_correlations
 message("\nWrote validation results to: ", file.path(outdir, "validation_segment_correlations.csv"))
 
 # DCT-specific marker check (DCT1/DCT2/CNT/CD subtypes)
-# Expanded canonical marker lists (15–25 per segment) to ensure ≥10 survive
-# symbol→Ensembl mapping, making rho estimates reliable.
 message("\n--- DCT Subtype Marker Validation (Expanded) ---")
 
 # After DCT1+DCT2 merge, validate the combined DCT proportion
@@ -1910,9 +1843,6 @@ immune_near_zero <- mean(immune_prop < 0.01)
 message(sprintf("Samples with Immune < 1%%: %.1f%%", immune_near_zero * 100))
 
 # 2. Compute immune marker scores from bulk
-# Expanded immune markers: pan-immune (Ptprc/Lyz2/Tyrobp/Ctss/Fcer1g),
-# macrophage (Cd68/Adgre1/Csf1r), T-cell (Cd3d/Cd3e), B-cell (Ms4a1),
-# monocyte (Lst1/Itgam), MHC-II (H2-Aa)
 immune_markers <- c("Ptprc", "Lyz2", "Tyrobp", "Ctss", "Fcer1g", "Cd68", "Cd3d",
                     "Cd3e", "Ms4a1", "Lst1", "Itgam", "Adgre1", "Csf1r", "H2-Aa")
 immune_genes <- resolve_markers_to_matrix(immune_markers, rownames(bulk_cpm))
@@ -2004,8 +1934,6 @@ for (grp in names(clusters.type)) {
 
 
 # 6) Use segment-direct proportions (already at segment level)
-# Since we ran MuSiC on segments directly, prop_seg is already at segment granularity
-# No need to aggregate cell types - the output is already segment-level
 
 segment_prop <- as.data.frame(prop_seg)
 

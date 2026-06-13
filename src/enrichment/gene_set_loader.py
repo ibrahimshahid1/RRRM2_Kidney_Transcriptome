@@ -30,7 +30,7 @@ DEFAULT_CURATED_YAML = REPO_ROOT / "config" / "gene_sets.yaml"
 DEFAULT_ID_MAP = REPO_ROOT / "data" / "processed" / "resources" / "id_map.json"
 DEFAULT_SEGMENT_MARKERS = REPO_ROOT / "data" / "processed" / "segment_markers"
 
-# ── Default Enrichr libraries (mouse-specific first) ──────────────────────
+# Default Enrichr libraries (mouse-specific first)
 DEFAULT_LIBRARIES: list[str] = [
     "KEGG_2019_Mouse",
     "WikiPathways_2024_Mouse",
@@ -39,7 +39,7 @@ DEFAULT_LIBRARIES: list[str] = [
 ]
 
 
-# ── Ensembl-backed symbol resolution ─────────────────────────────────────
+# Ensembl-backed symbol resolution
 
 def load_id_map(path: Path | None = None) -> dict[str, str]:
     """Load the Ensembl→Symbol JSON map and build a case-insensitive
@@ -83,7 +83,7 @@ def resolve_symbol(sym: str, lookup: dict[str, str]) -> str:
     return sym
 
 
-# ── Curated sets from YAML ───────────────────────────────────────────────
+# Curated sets from YAML
 
 def load_curated_from_yaml(
     yaml_path: Path | None = None,
@@ -159,7 +159,7 @@ def load_curated_from_yaml(
     return sets
 
 
-# ── Data-driven segment marker panels ────────────────────────────────────
+# Data-driven segment marker panels
 
 def load_segment_marker_panels(
     marker_dir: Path | None = None,
@@ -206,7 +206,7 @@ def load_segment_marker_panels(
     return sets
 
 
-# ── Enrichr fetcher ───────────────────────────────────────────────────────
+# Enrichr fetcher
 
 def fetch_enrichr_library(name: str, cache_dir: Path) -> dict[str, list[str]]:
     """Fetch an Enrichr gene-set library; cache as JSON for offline reuse."""
@@ -233,7 +233,7 @@ def fetch_enrichr_library(name: str, cache_dir: Path) -> dict[str, list[str]]:
         return {}
 
 
-# ── GMT file loader ───────────────────────────────────────────────────────
+# GMT file loader
 
 def load_gmt(path: Path) -> dict[str, list[str]]:
     """Parse a standard .gmt file (MSigDB / GSEA format)."""
@@ -250,7 +250,7 @@ def load_gmt(path: Path) -> dict[str, list[str]]:
     return gene_sets
 
 
-# ── Main entry point ──────────────────────────────────────────────────────
+# Main entry point
 
 def load_gene_sets(
     libraries: list[str] | None = None,
@@ -300,7 +300,7 @@ def load_gene_sets(
     gene_sets: dict[str, list[str]] = {}
     set_to_library: dict[str, str] = {}
 
-    # ── 1) Enrichr libraries ──────────────────────────────────────────
+    # 1) Enrichr libraries
     for lib_name in libraries:
         print(f"Gene set library: {lib_name}")
         raw = fetch_enrichr_library(lib_name, cache_dir)
@@ -322,7 +322,7 @@ def load_gene_sets(
 
         print(f"  Kept {n_kept} / {len(normed)} sets (size {min_size}–{max_size})")
 
-    # ── 2) .gmt files ────────────────────────────────────────────────
+    # 2) .gmt files
     if gmt_files:
         for gmt_path in gmt_files:
             p = Path(gmt_path)
@@ -341,7 +341,7 @@ def load_gene_sets(
                     n_kept += 1
             print(f"Gene set library: {lib_name} — {n_kept} / {len(raw)} sets from .gmt")
 
-    # ── 3) Curated sets from YAML ────────────────────────────────────
+    # 3) Curated sets from YAML
     if include_curated:
         curated = load_curated_from_yaml(curated_yaml, id_map_path)
         n_cur = 0
@@ -353,7 +353,7 @@ def load_gene_sets(
                 n_cur += 1
         print(f"Gene set library: curated — {n_cur} sets from YAML")
 
-    # ── 4) Data-driven segment marker panels ─────────────────────────
+    # 4) Data-driven segment marker panels
     if include_segment_markers:
         panels = load_segment_marker_panels(segment_marker_dir)
         n_seg = 0
@@ -370,7 +370,7 @@ def load_gene_sets(
     return gene_sets, set_to_library
 
 
-# ── CLI: list available Enrichr libraries ─────────────────────────────────
+# CLI: list available Enrichr libraries
 if __name__ == "__main__":
     import argparse
 

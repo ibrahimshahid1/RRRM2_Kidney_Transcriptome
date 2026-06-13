@@ -1,32 +1,5 @@
 #!/usr/bin/env Rscript
 # Multi-study residualization + harmonization (Phase 1 of the Cross-OSDR framework).
-#
-# Per agents_instruction.md §5 Phase 1, this script:
-#   1. Residualizes each MV study (OSD-771, OSD-513, OSD-253) INDEPENDENTLY
-#      against estimated kidney cell composition + per-study technical covariates.
-#      Raw expression is NEVER pooled across studies (§3 absolute pooling rule).
-#   2. Restricts each study to the common protein-coding gene universe and
-#      writes per-study residual matrices for downstream contrast-vector code.
-#   3. Emits a per-study manifest that records sample counts, covariates, and
-#      the formula used.
-#
-# Usage:
-#   Rscript src/preprocessing/multi_study_harmonization.R \
-#       --counts=data/processed/<study>/raw_counts.tsv.gz \
-#       --meta=data/processed/<study>/metadata.tsv \
-#       --clr=data/processed/<study>/music_composition_CLR.csv \
-#       --gene_universe=data/processed/multi_study_gene_universe.tsv \
-#       --study=OSD-513 \
-#       --outdir=data/processed/OSD-513
-#
-# Downstream consumers:
-#   - scripts/run_contrast_vector_framework.py  (Phase 3 stability gate + Phase 4 decomposition)
-#   - src/networks/cross_osdr_projection.py     (Phase 6 alignment)
-#
-# This file is intentionally lightweight; the heavy preprocessing per study is
-# already done elsewhere (e.g. nf-core/rnaseq, DESeq2 VST). The job here is to
-# (a) regress out per-study cell composition + technical covariates and
-# (b) restrict to the common gene universe.
 
 suppressPackageStartupMessages({
     library(optparse)

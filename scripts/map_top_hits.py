@@ -15,9 +15,7 @@ with open(os.path.join(BASE, "data/processed/resources/id_map.json")) as f:
 
 print(f"Loaded {len(m)} gene mappings\n")
 
-# ============================================================
 # TASK 1: Map top regression hits
-# ============================================================
 groups = {
     "FLIGHT MAIN EFFECT": [
         "ENSMUSG00000025735","ENSMUSG00000087881","ENSMUSG00002076852",
@@ -64,9 +62,7 @@ for label, ids in groups.items():
         print(f"  {i:2d}. {g} -> {sym}")
     print()
 
-# ============================================================
 # TASK 2: Find DCT/NCC-WNK genes in the map
-# ============================================================
 dct_symbols = [
     "Wnk1","Wnk4","Stk39","Oxsr1","Slc12a3","Kcnj10","Kcnj16",
     "Scnn1a","Scnn1b","Scnn1g","Nedd4l","Sgk1","Klhl3","Cul3",
@@ -92,9 +88,7 @@ for sym in extra_dct:
     dct_ensembl[sym] = eid
     print(f"  {sym:12s} -> {eid}")
 
-# ============================================================
 # TASK 3: Check DCT genes in regression results
-# ============================================================
 reg_files = [
     "gene_flight_effect.tsv",
     "gene_age_flight_interaction.tsv",
@@ -120,9 +114,7 @@ for fname in reg_files:
     if not found:
         print("  (none found)")
 
-# ============================================================
 # TASK 4: Check DCT genes in rewiring results
-# ============================================================
 rew_files = [
     "ISS_T_OLD_FLT_minus_GND_rewiring_agg.tsv",
     "ISS_T_YNG_FLT_minus_GND_rewiring_agg.tsv",
@@ -149,9 +141,7 @@ for fname in rew_files:
     if not found:
         print("  (none found)")
 
-# ============================================================
 # TASK 5: Check permutation pvals for DCT genes
-# ============================================================
 perm_files = [
     "ISS_T_OLD_FLT_minus_GND_perm_pvals.tsv",
     "ISS_T_YNG_FLT_minus_GND_perm_pvals.tsv",
@@ -174,9 +164,7 @@ for fname in perm_files:
     if not found:
         print("  (none found)")
 
-# ============================================================
 # TASK 6: Summary of enrichment gene set overlap
-# ============================================================
 print("\n=== DCT_NCC_WNK_axis GENE SET IN ENRICHMENT ===")
 print("Note: In ALL enrichment files, DCT_NCC_WNK_axis shows:")
 print("  - overlap = 0 genes (in gene_flight_effect, age_flight, 3-way regression enrichment)")

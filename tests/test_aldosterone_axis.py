@@ -1,10 +1,4 @@
-"""Unit tests for Reach F -- the aldosterone / mineralocorticoid-axis test.
-
-The contract: the directional panel score is sign-faithful (a coherently
-suppressed aldosterone program yields a negative axis effect with a small
-permutation p), the meta layer reuses signed pooling and a sign-test honestly,
-and the permutation null is competitive (random panels are not significant).
-"""
+"""Unit tests for Reach F -- the aldosterone / mineralocorticoid-axis test."""
 import numpy as np
 import pandas as pd
 

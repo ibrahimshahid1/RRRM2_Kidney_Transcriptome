@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-"""Publication-ready v11 figures.
-
-The v11 figure labels use manuscript-facing terminology:
-  * DCT-prior panels show enrichment among distal-nephron subtype-prior parent
-    genes in whole-kidney OSD-462 phosphoproteomics.
-  * Composition-aware panels separate robust top-decile enrichment from weak
-    continuous DCT1-gradient models.
-  * Spatial panels are external IRI reference contextualization.
-"""
+"""Publication-ready v11 figures."""
 
 from __future__ import annotations
 

@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
-"""TMT channel-centering QC for the v11 phosphosite enrichment analysis.
-
-This module answers two audit questions around the OSD-462 TMT phosphosite
-layer:
-
-1. Does the raw phosphosite channel pattern show lower flight-channel medians?
-2. Does the DCT-subtype-prior enrichment persist when phosphosite effects are
-   recomputed without the within-plex channel-centering step?
-
-The primary analysis uses channel-centered phosphosite effects written by
-``scripts/osd462/02_phospho_axis.py``.  The uncentered recomputation here is a
-sensitivity check, not a replacement estimator.
-"""
+"""TMT channel-centering QC for the v11 phosphosite enrichment analysis."""
 
 from __future__ import annotations
 

@@ -1,9 +1,4 @@
-"""Bootstrap orchestration helpers for contrast-vector decomposition.
-
-This module is the statistics-facing wrapper around
-``src.networks.contrast_vectors``. It keeps file/summary conventions in one
-place so Phase 3-7 runners emit consistent artifacts.
-"""
+"""Bootstrap orchestration helpers for contrast-vector decomposition."""
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Run the Cross-OSDR Network-Contrast Framework.
-
-This script is intentionally separate from the legacy phase runner and is
-invoked from ``src/run_all_phases.py`` only when the new opt-in flag is used.
-It implements the RRRM-2 stability gate and within-cohort decomposition path,
-with explicit external-axis and decision artifacts.
-"""
+"""Run the Cross-OSDR Network-Contrast Framework."""
 from __future__ import annotations
 
 import argparse

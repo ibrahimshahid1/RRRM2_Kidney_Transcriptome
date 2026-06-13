@@ -1,16 +1,4 @@
 # Sanity Marker Panel Script
-# Purpose: Validate marker expression across nephron segments to ensure correct
-#          cell type labeling in the reference SCE before deconvolution.
-#
-# This script:
-#   1) Maps marker panel genes into the gene ID space used by sce2
-#   2) Computes mean logCPM and % cells expressing for each marker by segment_use
-#   3) Identifies where each marker peaks to detect potential mislabeling
-#   4) Optionally refines segment labels (DCT1, DCT2/CNT, CD_PC, CD_IC) using
-#      module-score winner assignment for improved deconvolution
-#
-# Prerequisites: Run this AFTER run_deconvolution.R has created `sce2` so that
-#                `sce2` is in your global environment with segment_use assigned.
 
 suppressPackageStartupMessages({
     library(SingleCellExperiment)
@@ -145,25 +133,7 @@ if (length(cdpc_rows) > 0) {
     print(peak_seg[cdpc_rows])
 }
 
-# How to interpret the output (the "skeptical" read):
-#
-# - If Aqp2 / Avpr2 / Scnn1g peak in "Other", you likely have true collecting
-#   duct principal cells hiding in "Other".
-# - If Atp6v1b1 / Foxi1 / Slc4a1 peak in "Other", you likely have intercalated
-#   cells hiding in "Other".
-# - If your current "CD" peaks for Calb1/Trpv5/Slc8a1/Klk1, that's CNT/DCT2,
-#   NOT true collecting duct.
-# - If Slc12a1/Umod don't peak in your TAL_LOH, your TAL label may be off
-#   (or TAL is underrepresented).
-
-
-# PART B: Rename/split distal segments (practical way)
-# Option 1: Simple "module-score winner" relabel inside (DCT, CD, Other)
-#
-# This is the fastest approach, and it's surprisingly effective.
-# After running this, use `segment_refined` instead of `segment_use` in MuSiC.
-
-# Set to TRUE to enable the relabeling (run Part A first to inspect markers)
+# How to interpret the output (the "skeptical" read): If Aqp2 / Avpr2 / Scnn1g peak in "Other", you likely have true collecting
 RUN_RELABELING <- FALSE
 
 if (RUN_RELABELING) {
@@ -218,15 +188,7 @@ if (RUN_RELABELING) {
     print(table(before = colData(sce2)$segment_use[cells]))
     print(table(after = colData(sce2)$segment_refined[cells]))
 
-    # What this accomplishes:
-    #   - If true collecting duct is hiding in "Other", it becomes CD_PC / CD_IC.
-    #   - Your current "CD" that's really CNT becomes DCT2CNT.
-    #   - Your "DCT" that's really DCT1 stays DCT1.
-    #   - You can keep TAL separate or ignore it.
-    #
-    # IMPORTANT: Tell MuSiC to use `segment_refined` instead of `segment_use`
-    #   Wherever your deconvolution script currently uses `segment_use`,
-    #   switch the cluster column to `segment_refined`.
+    # What this accomplishes: If true collecting duct is hiding in "Other", it becomes CD_PC / CD_IC.
 
     message("\nDone! Use colData(sce2)$segment_refined for MuSiC deconvolution.")
     message("Remember to update clusters.type to include: DCT1, DCT2CNT, CD_PC, CD_IC")

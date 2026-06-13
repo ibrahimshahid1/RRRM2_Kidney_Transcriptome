@@ -1,20 +1,4 @@
-"""Regulator-activity prioritization (v10 trimmed plan).
-
-Two activity-inference layers added on top of the verified v9/OSD-462 analysis:
-
-* Layer A -- kinase-substrate enrichment (KSEA) on OSD-462 phosphoproteomics.
-  Implemented as the classic Casado et al. (2013) z-score statistic, fully
-  self-contained (no external database required for the curated core panel;
-  a PhosphoSitePlus-format table can be supplied for the full panel).
-* Layer B -- transcription-factor / pathway activity inference on RNA, using
-  ``decoupler`` (ULM) with PROGENy and DoRothEA/CollecTRI priors. The decoupler
-  resources are fetched from omnipath/zenodo and therefore require network
-  access at run time; the computation itself is offline.
-
-Both layers are *prioritization*, not causal mechanism discovery. The wording in
-all outputs is deliberately constrained: "candidate upstream organizer",
-"activity anchor", "negative boundary" -- never "mechanism" or "causal".
-"""
+"""Regulator-activity prioritization (v10 trimmed plan)."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -29,9 +13,7 @@ from src.common import bh_fdr
 EPS = 1e-12
 
 
-# ---------------------------------------------------------------------------
 # Layer A -- KSEA (self-contained, no external dependency)
-# ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class KseaResult:
@@ -149,9 +131,7 @@ def ksea_positive_control_passes(ksea_table: pd.DataFrame, *, control_kinases: S
     return bool((sub["z_score"] < 0).all() and (sub["p_value"] < 0.05).all())
 
 
-# ---------------------------------------------------------------------------
 # Layer B -- TF / pathway activity inference (decoupler ULM)
-# ---------------------------------------------------------------------------
 
 def run_ulm_activity(
     gene_effects: pd.DataFrame,
@@ -216,9 +196,7 @@ def recurrence_class(activity_by_cohort: Mapping[str, float], *, threshold: floa
     return "mixed_direction"
 
 
-# ---------------------------------------------------------------------------
 # Integration -- evidence grading
-# ---------------------------------------------------------------------------
 
 EVIDENCE_GRADES = (
     "activity_anchor",            # phospho-supported, positive control

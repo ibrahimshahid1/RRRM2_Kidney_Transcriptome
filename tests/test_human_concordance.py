@@ -77,8 +77,6 @@ def test_figure_evidence_scores_aqp2_but_not_circular_agt_or_renr():
     assert fig.loc["AQP2", "concordant"] is True
     assert fig.loc["AQP2", "scored"] == True
     # AGT's predicted direction is read off the same Fig. S4A panel that supplies its
-    # observation, so it cannot be discordant by construction -> it stays directionally
-    # concordant but is no longer counted in the sign test.
     assert fig.loc["AGT", "concordant"] is True
     assert fig.loc["AGT", "scored"] == False
     assert fig.loc["AGT", "excluded_reason"] == "circular_figure_prediction"
@@ -120,8 +118,6 @@ def test_verdict_uses_independent_axes_not_individual_analytes():
     axis = build_axis_concordance(table_summary, figure_evidence_table())
     verdict = concordance_verdict(axis)
     # Sodium, 24 h volume, magnesium, and figure-level AQP2 are scored; AGT is now
-    # report-only (circular) and potassium is context, so four scored analytes
-    # collapse to three independent physiological axes.
     assert verdict["n_analytes_scored"] == 4
     assert verdict["n_analytes_concordant"] == 4
     assert verdict["n_axes_scored"] == 3

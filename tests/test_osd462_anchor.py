@@ -1,9 +1,4 @@
-"""Unit tests for the OSD-462 multi-omics anchor module.
-
-These tests use small synthetic TMT tables so they do not depend on the large
-workbooks; they validate the flight-effect arithmetic, plex correction,
-gene collapse, the matched-null sampler, and the pathway-cosine geometry.
-"""
+"""Unit tests for the OSD-462 multi-omics anchor module."""
 import numpy as np
 import pandas as pd
 

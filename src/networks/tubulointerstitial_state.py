@@ -1,10 +1,4 @@
-"""Tubulointerstitial state-space analysis utilities.
-
-This layer translates mechanism scores into a biological state-space:
-matrix remodeling on the x-axis and native DCT/NCC-WNK transport on the
-y-axis.  The DCT component is never sign-flipped; the scalar remodeling
-summary is defined separately as matrix_minus_dct.
-"""
+"""Tubulointerstitial state-space analysis utilities."""
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
-"""Layer 4 - Same-modality RNA recurrence gate.
-
-Before trusting any cross-modality (protein/phospho) result, confirm that the
-OSD-462 *RNA* flight effect recurs the RRRM-2 ISS-T matrix-high / DCT-low
-direction.  We build a pathway-effect vector for each cohort (mean flight
-effect per mechanism gene set) and compute their cosine alignment, with a
-sample-resampling bootstrap CI and a leave-one-pathway-out robustness check -
-mirroring the OSD-513 cross-OSDR recurrence test.
-
-This is a gate: if OSD-462 RNA does not recur the signal, a protein-concordance
-result would be hard to interpret.
-
-Usage::
-
-    python scripts/osd462/04_rna_recurrence.py --run RUN_NAME
-"""
+"""Layer 4 - Same-modality RNA recurrence gate."""
 from __future__ import annotations
 
 import argparse

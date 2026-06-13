@@ -1,22 +1,5 @@
 #!/usr/bin/env python3
-"""Layer 1 - Protein-level concordance with abundance/peptide-matched null.
-
-For each targeted gene set, estimate three statistics on its protein-quantified
-members and test each against an abundance x peptide-count-matched random
-gene-set null (10,000 draws):
-
-  1. signed mean protein flight effect (signed by the RRRM-2 RNA direction)
-  2. Spearman concordance between RRRM-2 ISS-T RNA effect and OSD-462 protein effect
-  3. RNA<->protein sign-agreement rate
-
-``tubular_transport_broad`` is carried as a specificity control (broad transport
-should be less concordant than the focused DCT/NCC/WNK axis).  The genome-wide
-RNA<->protein correlation is reported as background context.
-
-Usage::
-
-    python scripts/osd462/01_protein_concordance.py --run RUN_NAME
-"""
+"""Layer 1 - Protein-level concordance with abundance/peptide-matched null."""
 from __future__ import annotations
 
 import argparse

@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Generate manuscript v4 figures from mechanism-axis outputs.
-
-The visual style intentionally mirrors the original pipeline publication figures:
-whitegrid background, high-contrast FLT/GC colors, individual mouse points,
-median bars, compact multi-panel layouts, and PDF/PNG output.
-"""
+"""Generate manuscript v4 figures from mechanism-axis outputs."""
 from __future__ import annotations
 
 from pathlib import Path

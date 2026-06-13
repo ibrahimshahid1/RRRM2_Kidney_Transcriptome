@@ -1,16 +1,5 @@
 #!/usr/bin/env python3
-"""Reach E -- hypothesis-generating LINCS/CMap appendix screen.
-
-This is not a treatment-discovery analysis.  It builds a conservative human
-L1000-compatible query from the Repair B cross-cohort mouse RNA meta-analysis
-and, when the required LINCS metadata are present, computes an approximate local
-connectivity score against the Level-5 matrix.
-
-Critical guardrail: local signature scores are not interpretable without
-``sig_info`` because the signature id alone does not tell us the perturbagen,
-cell line, dose, or time.  If ``sig_info`` is missing, this module writes only
-``query_genes.tsv`` plus a verdict marking the local screen as blocked.
-"""
+"""Reach E -- hypothesis-generating LINCS/CMap appendix screen."""
 
 from __future__ import annotations
 

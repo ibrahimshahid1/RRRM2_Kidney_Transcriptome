@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize cross-cohort recurrence of decoupler Layer-B regulator activity.
-
-Reads the PROGENy pathway and CollecTRI TF activity tables produced by
-``run_regulator_activity.py`` and asks the memo's Recommendation-2 question: is
-there a *non-obvious* upstream regulator that recurs across independent flight
-cohorts, beyond generic injury/inflammation/stress?
-
-Recurrence is evaluated over the *terminal-flight* cohorts only (ISS-T Young,
-OSD-462, OSD-513, OSD-253). The RRRM-2 LAR (live-animal-return) arm is reported
-separately as a recovery/reversal contrast, not as a recurrence cohort.
-
-Outputs (into the regulator run dir):
-* ``progeny_recurrence.tsv`` / ``collectri_recurrence.tsv`` -- per-source
-  recurrence summary, ranked.
-* ``regulator_recurrence_verdict.json`` -- the honest Rec-2 verdict.
-"""
+"""Summarize cross-cohort recurrence of decoupler Layer-B regulator activity."""
 from __future__ import annotations
 
 import json
@@ -36,8 +21,6 @@ RECOVERY = "RRRM2_LAR_young"
 STRONG = 2.0  # |ULM z| threshold for a "strong" per-cohort call
 
 # Curated set of regulators that are *expected* from generic kidney
-# injury/inflammation/fibrosis/stress/proliferation -- recurrence here is
-# literature-consistent, not a discovery. (lowercased match)
 GENERIC = {
     # pathways
     "nfkb", "tnfa", "jak-stat", "tgfb", "hypoxia", "p53", "mapk", "egfr",

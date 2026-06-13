@@ -1,8 +1,4 @@
-"""Common gene-universe utilities for the Cross-OSDR framework.
-
-The implementation only intersects already processed within-study matrices.
-It does not pool raw expression across studies.
-"""
+"""Common gene-universe utilities for the Cross-OSDR framework."""
 from __future__ import annotations
 
 import argparse

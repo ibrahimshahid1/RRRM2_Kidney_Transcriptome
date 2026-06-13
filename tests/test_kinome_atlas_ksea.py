@@ -1,14 +1,4 @@
-"""Unit tests for Repair A -- kinome-wide atlas KSEA.
-
-The contract: motif scoring is consensus-faithful (a kinase scores its own
-consensus motif above a foreign one); percentile assignment + ``build_kinome_net``
-hand the existing ``ksea`` a clean (kinase, gene, site) net; and a kinase whose
-substrate sites are planted in the *down* set comes back with negative KSEA z and
-is flagged by the parent-gene-aware over-representation Fisher -- without ever
-being hand-curated into the net. SPAK (atlas label ``STLK3``) and OSR1 are the
-real positive control; here we plant a synthetic basophilic kinase to prove the
-machinery recovers a suppressed kinase unbiasedly.
-"""
+"""Unit tests for Repair A -- kinome-wide atlas KSEA."""
 import numpy as np
 import pandas as pd
 import pytest
@@ -30,9 +20,7 @@ from src.v11.kinome_atlas_ksea import (
 from src.multiomics.regulator_activity import ksea
 
 
-# --------------------------------------------------------------------------- #
-# fixtures: a two-kinase synthetic atlas + planted sites
-# --------------------------------------------------------------------------- #
+# #
 
 _RESIDUES = ["R", "D", "E", "A", "S", "T", "G"]
 _POS_IX = {p: i for i, p in enumerate(ATLAS_POSITIONS)}
@@ -80,9 +68,7 @@ def _toy_sites(seed: int = 0) -> pd.DataFrame:
     )
 
 
-# --------------------------------------------------------------------------- #
-# motif scoring
-# --------------------------------------------------------------------------- #
+# #
 
 def test_score_sites_is_consensus_faithful():
     atlas = _toy_atlas()
@@ -100,9 +86,7 @@ def test_central_residue_filters_non_st():
     assert _central_residue(None) is None
 
 
-# --------------------------------------------------------------------------- #
-# assignment + net
-# --------------------------------------------------------------------------- #
+# #
 
 def test_build_kinome_net_assigns_top_percentile_sites():
     atlas = _toy_atlas()
@@ -119,9 +103,7 @@ def test_build_kinome_net_assigns_top_percentile_sites():
     assert all(g.startswith("BASOg") for g in baso)     # only the planted basophilic sites
 
 
-# --------------------------------------------------------------------------- #
-# KSEA on the derived net
-# --------------------------------------------------------------------------- #
+# #
 
 def test_ksea_recovers_suppressed_kinase_negative_and_ranks_it_first():
     atlas = _toy_atlas()
@@ -143,9 +125,7 @@ def test_ksea_recovers_suppressed_kinase_negative_and_ranks_it_first():
     assert row.loc["BASO", "rank"] == 1.0
 
 
-# --------------------------------------------------------------------------- #
-# over-representation cross-check
-# --------------------------------------------------------------------------- #
+# #
 
 def test_over_representation_flags_the_down_kinase():
     atlas = _toy_atlas()
@@ -163,9 +143,7 @@ def test_over_representation_flags_the_down_kinase():
     assert baso["p_value"].iloc[0] < 0.05
 
 
-# --------------------------------------------------------------------------- #
-# real-atlas smoke test (skips if the 1.6 MB workbook isn't staged)
-# --------------------------------------------------------------------------- #
+# #
 
 def test_real_atlas_parses_and_contains_control_kinases():
     pytest.importorskip("openpyxl")

@@ -1,23 +1,5 @@
 #!/usr/bin/env Rscript
 # src/networks/wgcna_analysis.R
-# ─────────────────────────────────────────────────────────────────────────
-# WGCNA Module Discovery, Module-Trait Association, and Module Preservation
-#
-# Replaces the LIONESS/node2vec/Procrustes stack with:
-#   Analysis A: Module discovery on FLT+GC samples (n≈40)
-#   Analysis B: Module eigengene ~ Flight * Age * Arm association
-#   Analysis C: Module preservation (GC ref → FLT test)
-#   Analysis D: Pathway enrichment per module
-#
-# Usage:
-#   Rscript src/networks/wgcna_analysis.R \
-#     --rtech data/results/run_XYZ/phase1_residuals/Rtech.tsv.gz \
-#     --meta  data/results/run_XYZ/phase1_residuals/meta_phase1.tsv.gz \
-#     --id_map data/processed/resources/id_map.tsv \
-#     --gene_sets config/gene_sets.yaml \
-#     --outdir data/results/run_XYZ/wgcna \
-#     --max_genes 5000 --n_pres_perms 200
-# ─────────────────────────────────────────────────────────────────────────
 
 suppressPackageStartupMessages({
   library(WGCNA)
@@ -29,7 +11,7 @@ disableWGCNAThreads()
 
 options(stringsAsFactors = FALSE)
 
-# ── CLI args ──────────────────────────────────────────────────────────────
+# CLI args
 
 option_list <- list(
   make_option("--rtech", type = "character",
@@ -66,7 +48,7 @@ cat("============================================================\n")
 cat("WGCNA Module Analysis for RRRM-2\n")
 cat("============================================================\n\n")
 
-# ── Load data ─────────────────────────────────────────────────────────────
+# Load data
 
 cat("Loading expression:", args$rtech, "\n")
 rtech <- read.csv(gzfile(args$rtech), sep = "\t", row.names = 1, check.names = FALSE)
@@ -102,7 +84,7 @@ rtech <- rtech[, common]
 meta <- meta[common, ]
 cat("  Aligned:", length(common), "samples\n")
 
-# ── Filter to FLT + GC only ──────────────────────────────────────────────
+# Filter to FLT + GC only
 
 keep <- meta$EnvGroup %in% c("FLT", "GC")
 cat("\nFiltering to FLT + GC only:", sum(keep), "samples\n")
@@ -112,7 +94,7 @@ cat("  FLT:", sum(meta_fg$EnvGroup == "FLT"), ", GC:", sum(meta_fg$EnvGroup == "
 cat("  Age: ", paste(table(meta_fg$Age), collapse = "/"), "\n")
 cat("  Arm: ", paste(table(meta_fg$Arm), collapse = "/"), "\n")
 
-# ── Gene selection: top N by variance ─────────────────────────────────────
+# Gene selection: top N by variance
 
 gene_var <- apply(rtech_fg, 1, var, na.rm = TRUE)
 gene_var <- sort(gene_var, decreasing = TRUE)
@@ -135,7 +117,7 @@ if (!gsg$allOK) {
 }
 cat("  Final matrix:", nrow(datExpr), "samples ×", ncol(datExpr), "genes\n")
 
-# ── Sample clustering QC ─────────────────────────────────────────────────
+# Sample clustering QC
 
 pdf(file.path(outdir, "sample_dendrogram.pdf"), width = 12, height = 6)
 sampleTree <- hclust(dist(datExpr), method = "average")
@@ -144,9 +126,6 @@ plot(sampleTree, main = "Sample clustering (FLT + GC)", xlab = "", sub = "",
      cex = 0.6)
 dev.off()
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Analysis A: Soft Threshold Selection + Module Discovery
-# ═══════════════════════════════════════════════════════════════════════════
 
 cat("\n", paste(rep("=", 60), collapse = ""), "\n")
 cat("Analysis A: Module Discovery\n")
@@ -259,9 +238,6 @@ plotDendroAndColors(net$dendrograms[[1]], moduleColors[net$blockGenes[[1]]],
 dev.off()
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Analysis B: Module-Trait Association
-# ═══════════════════════════════════════════════════════════════════════════
 
 cat("\n", paste(rep("=", 60), collapse = ""), "\n")
 cat("Analysis B: Module-Trait Association\n")
@@ -334,9 +310,6 @@ labeledHeatmap(Matrix = modTraitCor,
 dev.off()
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Analysis C: Module Preservation (GC ref → FLT test)
-# ═══════════════════════════════════════════════════════════════════════════
 
 cat("\n", paste(rep("=", 60), collapse = ""), "\n")
 cat("Analysis C: Module Preservation (GC → FLT)\n")
@@ -355,9 +328,6 @@ multiColor <- list(GC = moduleColors)
 
 cat("  Running modulePreservation (", args$n_pres_perms, " permutations)...\n")
 # NOTE: Using cor (Pearson) for preservation instead of bicor.
-# bicor + corOptions triggers a known WGCNA bug in modulePreservation
-# where maxPOutliers is passed as a positional arg causing dimension errors.
-# Modules are still built with bicor; only preservation testing uses Pearson.
 pres <- modulePreservation(
   multiExpr, multiColor,
   referenceNetworks = 1,
@@ -427,9 +397,6 @@ if (nrow(plot_df) > 0) {
 dev.off()
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Analysis D: Module Pathway Enrichment
-# ═══════════════════════════════════════════════════════════════════════════
 
 cat("\n", paste(rep("=", 60), collapse = ""), "\n")
 cat("Analysis D: Module Pathway Enrichment\n")
@@ -515,9 +482,6 @@ if (!is.null(gs_config) && nchar(args$id_map) > 0 && file.exists(args$id_map)) {
 }
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Save summary metadata
-# ═══════════════════════════════════════════════════════════════════════════
 
 summary_info <- list(
   timestamp = Sys.time(),

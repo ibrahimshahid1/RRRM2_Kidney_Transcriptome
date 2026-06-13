@@ -175,7 +175,7 @@ def main():
     high = set(rw.loc[rw["rewiring_mean"] >= thr, "gene"].astype(str))
     print(f"High rewiring threshold (q={args.top_quantile}): {thr:.4f} ({len(high)} genes)")
 
-    # ── Load gene sets from database / curated ──────────────────────────
+    # Load gene sets from database / curated
     libraries = None  # use defaults
     if args.curated_only:
         libraries = []  # skip Enrichr

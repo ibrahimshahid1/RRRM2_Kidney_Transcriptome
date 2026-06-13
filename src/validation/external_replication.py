@@ -271,8 +271,6 @@ def compare_directional_replication(
     merged["external_pass_q"] = merged["q_value"] <= merged["q_threshold"]
     merged["context_detected"] = merged["external_pass_q"]
     # `same_direction` is object-dtype because non-directional rows hold pd.NA.
-    # In pandas >= 2.2, .fillna on object dtype triggers a FutureWarning about
-    # silent downcasting. Build the boolean column from raw values to avoid it.
     sd_raw = merged["same_direction"].to_numpy()
     same_direction_bool = np.array(
         [bool(v) if v is not pd.NA and not (isinstance(v, float) and np.isnan(v)) else False

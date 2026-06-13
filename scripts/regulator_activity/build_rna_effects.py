@@ -1,22 +1,5 @@
 #!/usr/bin/env python3
-"""Build per-cohort gene-level flight-effect tables for regulator Layer B.
-
-decoupler PROGENy / CollecTRI priors are keyed by *gene symbol*, so each cohort
-table is emitted as ``gene`` (mgi symbol) + ``stat`` (a signed flight-effect
-statistic, Space Flight - Ground Control). The per-cohort effect definition is:
-
-* RRRM-2 ISS-T / LAR (Young): Wald-style z = log2FC / lfcSE from the project
-  limma gene-level DE tables (``data/processed/gene_level_DE``).
-* OSD-462 RNA: the OSDR-provided moderated ``Stat_(Space Flight)v(Ground
-  Control)`` (symbol bridge from the same DE table).
-* OSD-513 / OSD-253: Welch t per gene (Space Flight vs Ground Control) computed
-  directly from the GeneLab VST matrix (no DE table downloaded). OSD-253 pools
-  strains/durations into a single cohort-level SF-vs-GC contrast and is treated
-  as a context cohort.
-
-All effects are *within cohort*; decoupler Layer B is run per cohort and only
-the cross-cohort recurrence of activity sign is interpreted (never raw pooling).
-"""
+"""Build per-cohort gene-level flight-effect tables for regulator Layer B."""
 from __future__ import annotations
 
 import json

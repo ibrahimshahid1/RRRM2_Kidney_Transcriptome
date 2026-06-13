@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
-"""
-Metadata Alignment Script for GLDS-674 / OSD-771
-Aligns metadata to count matrices (STAR, RSEM, VST) and creates aligned datasets.
-
-This script:
-1. Reads count files (STAR unnormalized, RSEM unnormalized, VST normalized)
-2. Reads ISA metadata
-3. Aligns metadata to samples across all count matrices
-4. Optionally parses design factors from sample names
-5. Saves aligned outputs to data/processed/aligned_outputs/
-
-Usage:
-    python scripts/align_metadata_to_counts.py
-"""
+"""Metadata Alignment Script for GLDS-674 / OSD-771"""
 
 from __future__ import annotations
 

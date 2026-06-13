@@ -1,9 +1,4 @@
-"""Shared paths and helpers for the OSD-462 multi-omics anchor layer scripts.
-
-All layer scripts (``00_harmonize`` ... ``04_rna_recurrence``) import from here
-so that input locations, the ID bridge, gene-set loading, and manifest writing
-are defined once.
-"""
+"""Shared paths and helpers for the OSD-462 multi-omics anchor layer scripts."""
 from __future__ import annotations
 
 import hashlib
@@ -22,11 +17,11 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.common import id_map_lookup  # noqa: E402
 
-# ── Reference RRRM-2 run (fixed input; not re-derived) ───────────────────────
+# Reference RRRM-2 run (fixed input; not re-derived)
 RRRM2_RUN = "run_20260519_000547_2500g"
 RRRM2_BASE = REPO_ROOT / "data" / "results" / RRRM2_RUN / "contrast_vectors" / "mechanism_axis"
 
-# ── Input paths ──────────────────────────────────────────────────────────────
+# Input paths
 OSD462_DIR = REPO_ROOT / "data" / "external" / "osdr" / "OSD-462"
 PROTEOMICS_XLSX = OSD462_DIR / "GLDS-462_proteomics_2021-12-31_tc884-885_Protein_WorkUp.xlsx"
 PHOSPHO_XLSX = OSD462_DIR / "GLDS-462_phosphproteomics_2021-12-31_tc882-883_Pho_WorkUp_JM.xlsx"

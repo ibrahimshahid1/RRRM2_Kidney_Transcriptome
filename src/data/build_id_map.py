@@ -1,27 +1,5 @@
 #!/usr/bin/env python3
-"""
-Build Ensembl → Symbol ID Mapping
-==================================
-
-Queries the Ensembl REST API to map mouse Ensembl gene IDs to MGI symbols.
-Generates cached TSVs for use by Phase 7 biological grounding.
-
-Outputs:
-  id_map.tsv          — universe genes only (safe for enrichment denominator)
-  id_map_extras.tsv   — extra pathway symbols (annotation/reporting only)
-  id_map.json         — combined dict for quick lookups
-
-Uses two strategies:
-  1) POST /lookup/id (batch, fast) — maps Ensembl → display_name
-  2) GET /xrefs/symbol/mus_musculus/<symbol> (extra pathway symbols)
-     followed by POST /lookup/id to get canonical display_name
-
-Usage:
-    python scripts/build_id_map.py \\
-        --genes data/processed/networks/run_xxx/phase2_genes.txt \\
-        --outdir data/processed/resources \\
-        --extra_symbols Wnk1,Slc12a3,Kcnj10
-"""
+"""Build Ensembl to Symbol ID Mapping"""
 from __future__ import annotations
 
 import argparse
@@ -147,7 +125,7 @@ def main():
     print("Build Ensembl → Symbol ID Mapping")
     print("=" * 60)
 
-    # ── Load gene IDs, strip Ensembl versions ────────────────────────────
+    # Load gene IDs, strip Ensembl versions
     gene_ids = [
         line.strip().split(".")[0] for line in
         Path(args.genes).read_text().strip().split("\n")
@@ -160,7 +138,7 @@ def main():
     print(f"\nLoaded {len(gene_ids)} Ensembl gene IDs from {args.genes}")
     print(f"  SHA1 (first 12): {gene_list_hash}")
 
-    # ── Query Ensembl REST release for reproducibility ───────────────────
+    # Query Ensembl REST release for reproducibility
     rest_release = "unknown"
     try:
         r = requests.get(f"{ENSEMBL_REST}/info/data/",
@@ -173,7 +151,7 @@ def main():
     except Exception:
         pass
 
-    # ── Step 1: Batch lookup universe IDs ─────────────────────────────────
+    # Step 1: Batch lookup universe IDs
     print("\nStep 1: Batch POST /lookup/id (universe) ...")
     lookup = ensembl_batch_lookup(gene_ids)
 
@@ -203,7 +181,7 @@ def main():
     n_mapped = (df_universe["mgi_symbol"] != "").sum()
     print(f"\n  Mapped: {n_mapped}/{len(gene_ids)} universe genes have symbols")
 
-    # ── Step 2: Extra symbols for reporting (NOT in universe) ────────────
+    # Step 2: Extra symbols for reporting (NOT in universe)
     # Collect extra symbols from --extra_symbols flag AND --curated_yaml
     extra_syms: list[str] = []
     if args.extra_symbols:
@@ -274,14 +252,14 @@ def main():
             df_extras = pd.DataFrame(xref_rows)
             print(f"  Added {len(df_extras)} extra mappings (for reporting only)")
 
-    # ── Dedup universe: prefer non-empty symbol, drop true duplicates ────
+    # Dedup universe: prefer non-empty symbol, drop true duplicates
     df_universe = df_universe.sort_values(
         ["ensembl_gene_id", "mgi_symbol"],
         key=lambda s: s.apply(lambda x: (0 if x else 1) if isinstance(x, str) else x)
     )
     df_universe = df_universe.drop_duplicates(subset="ensembl_gene_id", keep="first")
 
-    # ── Provenance header ────────────────────────────────────────────────
+    # Provenance header
     header = [
         f"Generated {datetime.now().isoformat()}",
         f"Source: {ENSEMBL_REST}",
@@ -291,18 +269,18 @@ def main():
         f"Gene list SHA1: {gene_list_hash}",
     ]
 
-    # ── Save universe map ────────────────────────────────────────────────
+    # Save universe map
     map_path = outdir / "id_map.tsv"
     write_tsv_with_header(df_universe, map_path, header)
     print(f"\nWrote: {map_path} ({len(df_universe)} universe entries)")
 
-    # ── Save extras separately ───────────────────────────────────────────
+    # Save extras separately
     if len(df_extras) > 0:
         extras_path = outdir / "id_map_extras.tsv"
         write_tsv_with_header(df_extras, extras_path, header)
         print(f"Wrote: {extras_path} ({len(df_extras)} extra entries)")
 
-    # ── JSON for programmatic use (universe only) ────────────────────────
+    # JSON for programmatic use (universe only)
     json_path = outdir / "id_map.json"
     mapping = {row["ensembl_gene_id"]: row["mgi_symbol"]
                for _, row in df_universe.iterrows() if row["mgi_symbol"]}

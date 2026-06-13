@@ -1,11 +1,4 @@
-"""
-RRRM-2 Enrichment Module
-
-Phase 7: Biological Grounding
-
-This module contains:
-- biological_grounding: Gene set enrichment + pathway analysis
-"""
+"""RRRM-2 Enrichment Module"""
 
 from pathlib import Path
 

@@ -90,7 +90,3 @@ print(f"\nTop significant rewiring edges (q < 0.05) for ECM genes (Arm x Flight 
 print(res_df.head(20).to_string(index=False))
 
 # What does a positive/negative interaction beta mean?
-# flight=1(FLT), 0(GC); arm=1(ISS-T), 0(LAR).
-# arm_flight interaction = (ISS-T FLT - ISS-T GC) - (LAR FLT - LAR GC)
-# Positive: The increase in connectivity due to flight is GREATER on ISS-T than LAR.
-# Negative: The increase in connectivity due to flight is WEAKER (or decreases) on ISS-T compared to LAR.

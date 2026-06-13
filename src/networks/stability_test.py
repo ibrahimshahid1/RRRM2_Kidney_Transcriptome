@@ -1,15 +1,4 @@
-"""Guardrail A — bootstrap stability of the control aging vector A^a_GC.
-
-Per agents_instruction.md §2.1, the within-RRRM-2 projection layer is only
-allowed when the GC aging direction is itself stable. This module quantifies
-that stability and emits the pass/fail decision artifacts that downstream
-phases gate on.
-
-Key API:
-    estimate_agc_stability(...)        -> StabilityReport
-    apply_stability_gate(...)          -> StabilityDecision
-    write_stability_artifacts(...)     -> persists report + decision JSON
-"""
+"""Guardrail A - bootstrap stability of the control aging vector A^a_GC."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

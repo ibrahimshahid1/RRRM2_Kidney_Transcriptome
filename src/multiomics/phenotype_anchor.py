@@ -1,20 +1,4 @@
-"""Phenotype-anchoring layer: animal-matched RNA-state vs NCC-activity.
-
-OSD-462 / RR-10 ran kidney RNA-seq and phosphoproteomics on the *same animals*
-(channel ``FL-01`` <-> RNA sample ``FLT_F1`` etc.). This module builds a
-per-animal NCC/SPAK regulatory-phosphorylation activity score and a per-animal
-DCT/NCC-low RNA state score, matches them by animal, and compares them at three
-levels of stringency:
-
-1. group level (Space Flight vs Ground Control) -- the primary, robust claim;
-2. all-sample correlation -- descriptive, inflated by the group means;
-3. condition-adjusted correlation -- the real test of an animal-level link,
-   on within-condition-centered residuals; underpowered at n~10/condition.
-
-Controls: a non-regulatory NCC phosphosite score (should not track the RNA
-state) and an RNA score with the Slc12a3 transcript removed (the link must not
-be one gene covarying with its own phospho).
-"""
+"""Phenotype-anchoring layer: animal-matched RNA-state vs NCC-activity."""
 from __future__ import annotations
 
 import re

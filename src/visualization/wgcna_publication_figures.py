@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
-"""
-WGCNA Publication Figures
-=========================
-Generates manuscript-ready figures for the WGCNA analysis when invoked via
---network-method wgcna in the pipeline.
-
-Figures:
-  1. Module-trait heatmap (Flight/Age/Arm correlations)
-  2. Grey60 eigengene dot plot (by EnvGroup × Arm × Age)
-  3. Module preservation bar chart
-  4. Hub gene kME lollipop chart for grey60
-  5. External validation cross-study comparison
-  6. Simple-effect contrast forest plot
-"""
+"""WGCNA Publication Figures"""
 from __future__ import annotations
 import argparse, os, warnings
 from pathlib import Path
@@ -28,7 +15,7 @@ from scipy import stats as sp_stats
 
 warnings.filterwarnings("ignore")
 
-# ── Color palette ─────────────────────────────────────────────────────────
+# Color palette
 C_FLT = "#E63946"
 C_GC  = "#457B9D"
 C_ISS = "#264653"

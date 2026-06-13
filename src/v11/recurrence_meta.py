@@ -1,31 +1,4 @@
-"""Repair B -- cross-cohort recurrence meta-analysis.
-
-Turns the descriptive cosine recurrence (0.87 / 0.64 / -0.51 across three
-cohorts) into a precision-weighted random-effects meta-analysis with per-gene
-FDR and heterogeneity, across *five* on-disk mouse-kidney spaceflight cohorts
-(OSD-102, OSD-163, OSD-253, OSD-462, OSD-513; two strains).
-
-The contract the manuscript leans on is *sign-faithful, precision-weighted
-pooling*: a gene coherently suppressed across cohorts must yield a negative
-pooled effect with a small meta-p and (when the cohorts agree) a low I^2; the
-per-cohort effects feeding the pool are honest flight-vs-ground contrasts on the
-VST scale, computed in Python (Welch t; no R). The DCT/NCC-WNK transport program
-and the ECM/matrix program are then re-scored with the *pooled* statistic in
-place of cosine, and leave-one-cohort-out reports stability.
-
-Design provenance
------------------
-Per-cohort flight/ground membership is read from the GeneLab VST column names:
-``_FLT_`` -> flight, ``_GC_`` -> ground. Vivarium (``VIV``), basal (``BSL``) and
-the OSD-253 ground re-run batch (``GCrerun``) are excluded so every cohort
-contributes a clean hardware-ground-control contrast. OSD-462 uses the totRNA
-library (rRNA-depleted total RNA), matching the rRNA-removed library type of the
-other four cohorts.
-
-Existing ``contrast_vectors/cross_osdr_recurrence/`` artifacts are PROGENy
-*pathway*-level bootstraps, not per-gene effect+SE, so they cannot substitute for
-the per-gene meta inputs; per-cohort effects are computed from VST here.
-"""
+"""Repair B -- cross-cohort recurrence meta-analysis."""
 from __future__ import annotations
 
 import argparse
@@ -42,9 +15,7 @@ from src.common import id_map_lookup
 from src.v11.core_analysis import bh
 from src.networks.cross_osdr_projection import signed_stouffer_z
 
-# --------------------------------------------------------------------------- #
-# Configuration / on-disk locations
-# --------------------------------------------------------------------------- #
+# #
 
 ID_MAP_PATH = Path("data/processed/resources/id_map.tsv")
 MECHANISM_GENE_SETS = Path("config/mechanism_gene_sets.yaml")
@@ -63,9 +34,7 @@ COHORT_VST: dict[str, str] = {
     "OSD-513": "data/external/osdr/OSD-513/GLDS-513_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv",
 }
 
-#: OSD-163 is the BAL-TAL strain; the rest are C57-derived. Recorded for the
-#: heterogeneity narrative (a strain difference *adds* robustness if the signal
-#: survives it).
+# : OSD-163 is the BAL-TAL strain; the rest are C57-derived. Recorded for the
 COHORT_STRAIN: dict[str, str] = {
     "OSD-102": "C57-6J",
     "OSD-163": "BAL-TAL",
@@ -78,9 +47,7 @@ MIN_REPLICATES = 2   # per arm, to admit a cohort's effect for a gene
 MIN_COHORTS = 2      # genes must appear in >= this many cohorts to pool
 
 
-# --------------------------------------------------------------------------- #
-# Design resolution
-# --------------------------------------------------------------------------- #
+# #
 
 def resolve_design(columns: Sequence[str]) -> dict[str, str]:
     """Map VST sample columns to ``flight`` / ``ground`` from GeneLab names.
@@ -101,9 +68,7 @@ def resolve_design(columns: Sequence[str]) -> dict[str, str]:
     return design
 
 
-# --------------------------------------------------------------------------- #
-# (1) per-cohort effect + SE  (pure)
-# --------------------------------------------------------------------------- #
+# #
 
 def per_cohort_effect(
     vst: pd.DataFrame,
@@ -172,9 +137,7 @@ def per_cohort_effect(
     return out
 
 
-# --------------------------------------------------------------------------- #
-# (2) random-effects meta-analysis  (pure)
-# --------------------------------------------------------------------------- #
+# #
 
 def _dersimonian_laird(y: np.ndarray, v: np.ndarray) -> dict[str, float]:
     """DerSimonian-Laird random-effects pool for one gene.
@@ -252,9 +215,7 @@ def meta_random_effects(
     return out
 
 
-# --------------------------------------------------------------------------- #
-# Gene-set scoring with the pooled statistic
-# --------------------------------------------------------------------------- #
+# #
 
 def _load_gene_set(key: str) -> list[str]:
     cfg = yaml.safe_load(MECHANISM_GENE_SETS.read_text())
@@ -306,9 +267,7 @@ def score_gene_set(
     }
 
 
-# --------------------------------------------------------------------------- #
-# (3) leave-one-cohort-out  (pure)
-# --------------------------------------------------------------------------- #
+# #
 
 def leave_one_cohort_out(
     effects: Mapping[str, pd.DataFrame],
@@ -340,9 +299,7 @@ def leave_one_cohort_out(
     return pd.DataFrame(rows)
 
 
-# --------------------------------------------------------------------------- #
-# Orchestrator
-# --------------------------------------------------------------------------- #
+# #
 
 def _load_cohort_effects(
     ens_to_symbol: Mapping[str, str],
@@ -388,7 +345,7 @@ def run_recurrence_meta(root: str | Path, *, moderate: bool = False) -> dict[str
     }
     loo = leave_one_cohort_out(effects, gene_sets, symbol_to_ens)
 
-    # ---- write artifacts -------------------------------------------------- #
+    # write artifacts -------------------------------------------------- #
     summary_path = out_dir / "recurrence_meta_summary.tsv"
     loo_path = out_dir / "recurrence_meta_leave_one_out.tsv"
     set_scores_path = out_dir / "recurrence_meta_gene_set_scores.tsv"
@@ -422,7 +379,7 @@ def run_recurrence_meta(root: str | Path, *, moderate: bool = False) -> dict[str
         "transport_set": transport,
         "matrix_set": matrix,
         "transport_loo_sign_stable": transport_loo_sign_stable,
-        # ---- headline-index provenance keys ----
+        # headline-index provenance keys
         "recurrence_meta_transport_effect": transport["set_effect"],
         "recurrence_meta_transport_fdr": transport["median_fdr"],
         "recurrence_meta_transport_i2": transport["median_I2"],

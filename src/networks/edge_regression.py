@@ -120,8 +120,6 @@ def main():
         print(f"  {col}: {list(meta[col].unique())}")
 
     # Covariates (numeric vs categorical). Residualized expression is already
-    # adjusted for batch/deconvolution/SVs; adding those terms again would
-    # double-adjust the network weights.
     covs = [c.strip() for c in args.add_covariates.split(",") if c.strip()]
     validate_covariate_policy(args.expression_source, covs)
     covs = [c for c in covs if c in meta.columns]
@@ -217,13 +215,10 @@ def main():
     print("  lmFit + eBayes complete")
 
     # Define contrasts
-    
-    # Helper to build coefficient names matching interaction(Age, Arm, EnvGroup) pattern
-    # R's interaction() produces "Level1.Level2.Level3", then make.names() sanitizes
     def term(age, arm, env):
         # interaction() pattern: Age.Arm.EnvGroup (dots as separators)
         raw_term = f"{age}.{arm}.{env}"
-        # make.names() turns "-" into "." 
+        # make.names() turns "-" into "."
         safe_term = raw_term.replace("-", ".")
         # Full coefficient name has "cell" prefix
         raw_coef = f"cell{raw_term}"

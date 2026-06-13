@@ -1,10 +1,4 @@
-"""Unit tests for the v10 regulator-activity layer.
-
-These tests exercise the offline machinery (KSEA statistic, recurrence
-classification, evidence grading). The decoupler TF/pathway inference is not
-unit-tested here because it requires network-fetched priors; its wrapper is
-covered by an interface smoke check only.
-"""
+"""Unit tests for the v10 regulator-activity layer."""
 import numpy as np
 import pandas as pd
 

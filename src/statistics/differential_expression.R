@@ -1,14 +1,4 @@
 # scripts/run_gene_level_DE.R
-#
-# Generate gene-level differential expression tables for FLT vs GC contrasts
-# within each Age×Arm stratum. These outputs can be used with
-# phase5_build_silent_shifters_strict.py --gene_de
-#
-# Outputs: data/processed/gene_level_DE/
-#   - ISS_T_YNG_FLT_vs_GC_gene_DE.tsv
-#   - ISS_T_OLD_FLT_vs_GC_gene_DE.tsv
-#   - LAR_YNG_FLT_vs_GC_gene_DE.tsv
-#   - LAR_OLD_FLT_vs_GC_gene_DE.tsv
 
 suppressPackageStartupMessages({
     library(DESeq2)

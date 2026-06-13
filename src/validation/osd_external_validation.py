@@ -1,11 +1,4 @@
-"""
-Protocol-bound external cohort validation and context mapping.
-
-This module builds compact external feature tables from the downloaded GeneLab
-processed VST matrices and immediately evaluates them through
-src.validation.external_replication. It is intentionally separate from
-multi-study pooling: each OSD cohort is analyzed independently.
-"""
+"""Protocol-bound external cohort validation and context mapping."""
 
 from __future__ import annotations
 

@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Run LAR reversal and mechanism-switch analysis.
-
-This secondary layer asks whether LAR flight effects are best described as
-attenuation, true reversal of the ISS-T remodeling direction, or a mechanism
-switch into other clock/DCT, S1P, immune, or preservation-context programs.
-"""
+"""Run LAR reversal and mechanism-switch analysis."""
 from __future__ import annotations
 
 import argparse

@@ -1,19 +1,5 @@
 #!/usr/bin/env python3
-"""
-RRRM-2 Full Pipeline Runner
-===========================
-Runs all phases of the RRRM-2 network rewiring analysis pipeline.
-
-Usage:
-    python scripts/run_all_phases.py                    # Run all phases
-    python scripts/run_all_phases.py --phases 2 3       # Run specific phases
-    python scripts/run_all_phases.py --skip-r           # Skip R-dependent steps
-    python scripts/run_all_phases.py --dry-run          # Show commands without running
-
-Requires:
-    - Python environment with dependencies from requirements.txt
-    - R with DESeq2, limma, sva, MuSiC (for Phase 0-1 and edge regression)
-"""
+"""RRRM-2 Full Pipeline Runner"""
 
 from __future__ import annotations
 import argparse
@@ -33,7 +19,7 @@ RESULTS_DIR = None
 NETWORKS_DIR = None
 
 
-# ── Artifact resolution ──────────────────────────────────────────────────────
+# Artifact resolution
 
 def _find_latest_run_dir() -> Path | None:
     """Return the most recent run_* directory under data/results/ that exists."""
@@ -1331,10 +1317,7 @@ Examples:
         log(f"Contrast-vector resolutions: {args.contrast_vector_resolutions}")
     print()
     
-    # ── WGCNA routing ─────────────────────────────────────────────────
-    # When --network-method wgcna, replace LIONESS phases (2,3,5,6,7)
-    # with a single WGCNA phase.  Phases 0, 1, 1.5, 8, 8.5, 10, 9 are
-    # unchanged (preprocessing, validation, diagnostics, figures).
+    #  WGCNA routing
     if args.network_method == "wgcna":
         lioness_phases = {2, 3, 5, 6, 7}
         # Phases 8 and 8.5 are also LIONESS-specific (require phase2_dir network

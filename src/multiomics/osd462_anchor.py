@@ -1,31 +1,4 @@
-"""OSD-462 / RR-10 multi-omics anchor.
-
-Dataset-agnostic estimation and inference helpers used by the
-``scripts/osd462/*`` layer scripts to test whether the RRRM-2 RNA-level
-matrix-high / DCT-low remodeling signal recurs at the protein and
-phosphoprotein level in the independent OSD-462 spaceflight kidney cohort.
-
-Design notes
-------------
-* Cross-study, cross-strain, cross-modality: no sample-level pooling.  The
-  unit of comparison is the *direction of the flight effect* (Space Flight
-  minus Ground Control), exactly the contrast-vector logic already used for
-  OSD-513 in ``src/networks/cross_osdr_projection.py``.
-* TMT 2-plex batch structure ("Samp1-5", "Samp6-10").  Plex is handled as a
-  batch factor everywhere: flight effects are estimated *within* each plex and
-  then averaged, which removes any per-plex (and, after channel centering,
-  per-channel) loading constant.
-* Primary inference is an abundance/peptide-matched random-gene-set null,
-  which is robust to the generically weak RNA<->protein correlation and to
-  gene-set size.
-
-The TMT workbook layout (both proteomics and phosphoproteomics) is::
-
-    row 1 : group banners ("... scaled ..." marks the scaled blocks)
-    row 2 : per-column sample labels  (BL-01, FL-03, GC-05, ...)
-    row 3 : machine column headers     (Samp1-5~rq_129n_sn scaled, ...)
-    row 4+: one protein / phosphosite per row
-"""
+"""OSD-462 / RR-10 multi-omics anchor."""
 from __future__ import annotations
 
 import warnings
@@ -36,9 +9,6 @@ from typing import Callable, Sequence
 import numpy as np
 import pandas as pd
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Constants
-# ─────────────────────────────────────────────────────────────────────────────
 
 PLEX1 = "Samp1-5"
 PLEX2 = "Samp6-10"
@@ -46,9 +16,6 @@ CONDITIONS = ("BL", "FL", "GC")
 EPS = 1e-12
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TMT workbook parsing
-# ─────────────────────────────────────────────────────────────────────────────
 
 @dataclass
 class TmtTable:
@@ -198,9 +165,6 @@ def _to_float(v) -> float:
         return np.nan
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Flight-effect estimation (within-plex FL - GC, plex-averaged)
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _log2_channel_matrix(
     table: TmtTable, plex: str, condition: str, center: pd.Series | None
@@ -412,9 +376,6 @@ def collapse_to_gene(
     return collapsed
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Gene-set statistics
-# ─────────────────────────────────────────────────────────────────────────────
 
 def spearman(a: np.ndarray, b: np.ndarray) -> float:
     """Spearman rho with NaN handling and tie-aware ranking."""
@@ -443,9 +404,6 @@ def sign_agreement(rna: np.ndarray, prot: np.ndarray) -> float:
     return float(np.mean(np.sign(rna[mask]) == np.sign(prot[mask])))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Abundance / peptide-matched random-gene-set null
-# ─────────────────────────────────────────────────────────────────────────────
 
 def assign_match_strata(
     pool: pd.DataFrame,
@@ -545,9 +503,6 @@ def matched_null_test(
                              int(finite.size), int(target_mask.sum()))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Pathway-vector cosine recurrence (Layer 4)
-# ─────────────────────────────────────────────────────────────────────────────
 
 def pathway_effect_vector(
     gene_effect: pd.Series,

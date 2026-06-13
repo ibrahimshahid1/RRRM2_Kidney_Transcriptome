@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
-"""Layer 3 - Network-candidate translation check.
-
-The only test in the anchor that speaks to the LIONESS/node2vec network layer.
-Take the RRRM-2 top composite network candidates (gene_axis_priority.tsv) and
-ask whether they are enriched among OSD-462 protein- and phospho-changing genes
-relative to an abundance/detectability-matched random null.  Both outcomes are
-reported honestly:
-
-  * enriched     -> the network layer nominated genes with independent
-                    proteomic / phosphoproteomic support
-  * not enriched -> the network layer did not translate to protein biology
-
-Usage::
-
-    python scripts/osd462/03_network_translation.py --run RUN_NAME
-"""
+"""Layer 3 - Network-candidate translation check."""
 from __future__ import annotations
 
 import argparse
@@ -49,13 +34,13 @@ def main() -> None:
 
     master = pd.read_csv(out_dir / "osd462_flight_effects.tsv", sep="\t")
 
-    # ── Protein pool ─────────────────────────────────────────────────────────
+    # Protein pool
     prot = master.dropna(subset=["protein_flight_effect"]).copy()
     prot["abs_protein_effect"] = prot["protein_flight_effect"].abs()
     prot["match_stratum"] = assign_match_strata(prot).values
     prot_thresh = prot["abs_protein_effect"].quantile(0.90)
 
-    # ── Phospho gene-level pool ──────────────────────────────────────────────
+    # Phospho gene-level pool
     phos_sites = pd.read_csv(out_dir / "phospho_all_sites.tsv", sep="\t")
     bridge = build_symbol_to_ensembl()
     bridge.pop("_n_collisions", None)

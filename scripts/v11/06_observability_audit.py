@@ -1,31 +1,5 @@
 #!/usr/bin/env python3
-"""v11 Module 3 — proteome observability-bias audit.
-
-Pre-empts the first-line reviewer objection to the v11 RNA→protein
-discordance: "the mismatch is just proteome detectability."
-
-Pipeline:
-
-  1. Build per-gene observability features from
-     ``protein_effects_by_row.tsv`` (peptide-weighted ``n_channels_used``,
-     ``missing_fraction``).
-  2. Detectability gradient — fraction of RNA-detected genes also
-     protein-quantified, per RNA-effect-magnitude decile.
-  3. Observability-matched re-test — extend the matched-null stratum with
-     a missing-fraction bin; rerun the Module 2 per-pathway propagation
-     tests on the extended strata and report q-values alongside Module
-     2's.
-  4. High-coverage subset re-test — restrict to ``n_peptides >= 3`` and
-     ``missing_fraction <= 0.2``; rerun the per-pathway propagation
-     tests.
-  5. NCC/SPAK phosphosite observability check — confirm the
-     pre-specified regulatory sites are NOT in the low-observability
-     tail of the phosphoproteome.
-
-Usage::
-
-    python scripts/v11/06_observability_audit.py [--n-null 10000]
-"""
+"""v11 Module 3 - proteome observability-bias audit."""
 from __future__ import annotations
 
 import argparse
@@ -102,7 +76,7 @@ def main() -> int:
     manifests_dir = args.run_root / "manifests"
     manifests_dir.mkdir(parents=True, exist_ok=True)
 
-    # ---- 1. inputs ---------------------------------------------------------
+    # 1. inputs
     flight_path = args.anchor_dir / "osd462_flight_effects.tsv"
     by_row_path = args.anchor_dir / "protein_effects_by_row.tsv"
     phospho_path = args.anchor_dir / "phospho_all_sites.tsv"
@@ -113,13 +87,13 @@ def main() -> int:
     print(f"[observability] flight rows: {len(flight)}; by-row rows: {len(by_row)};"
           f" phospho sites: {len(phospho)}")
 
-    # ---- 2. per-gene observability features --------------------------------
+    # 2. per-gene observability features
     obs = collapse_observability_to_gene(by_row)
     obs.to_csv(out_dir / "v11_observability_per_gene.tsv", sep="\t", index=False)
     print(f"[observability] per-gene observability: n_genes={len(obs)};"
           f" median_missing_fraction={obs['missing_fraction'].median():.4f}")
 
-    # ---- 3. build Module 2's pool with observability merged in -------------
+    # 3. build Module 2's pool with observability merged in
     cfg = PropagationConfig(
         run_root=args.run_root, anchor_dir=args.anchor_dir,
         gene_sets_path=args.gene_sets, n_null=args.n_null, seed=args.seed,
@@ -145,7 +119,7 @@ def main() -> int:
           f" unique standard strata: {pool['match_stratum'].nunique()};"
           f" unique extended strata: {pool['match_stratum_observability'].nunique()}")
 
-    # ---- 4. detectability gradient -----------------------------------------
+    # 4. detectability gradient
     rna_table = flight[["ENSEMBL", "rrrm2_iss_t_rna_effect"]].dropna(
         subset=["rrrm2_iss_t_rna_effect"]
     ).copy()
@@ -155,7 +129,7 @@ def main() -> int:
     print("[observability] detectability gradient (RNA |effect| decile → fraction protein-quantified):")
     print(grad.to_string(index=False))
 
-    # ---- 5. observability-matched per-pathway re-test ----------------------
+    # 5. observability-matched per-pathway re-test
     standard = propagation_with_strata(
         pool, gene_sets, stratum_col="match_stratum",
         n_null=args.n_null, seed=args.seed,
@@ -208,7 +182,7 @@ def main() -> int:
         "signed_mean_q_standard", "signed_mean_q_observability",
     ]].round(4).to_string(index=False))
 
-    # ---- 6. high-coverage subset re-test -----------------------------------
+    # 6. high-coverage subset re-test
     subset = high_coverage_subset(pool,
                                   min_peptides=args.high_coverage_min_peptides,
                                   max_missing_fraction=args.high_coverage_max_missing)
@@ -232,14 +206,14 @@ def main() -> int:
         print("[observability] high-coverage subset too small; skipping re-test")
         hc_path = None
 
-    # ---- 7. NCC/SPAK phosphosite observability check -----------------------
+    # 7. NCC/SPAK phosphosite observability check
     site_audit = ncc_site_observability(phospho)
     site_path = out_dir / "v11_observability_ncc_site_audit.tsv"
     site_audit.to_csv(site_path, sep="\t", index=False)
     print(f"[observability] NCC site audit:")
     print(site_audit.round(3).to_string(index=False))
 
-    # ---- 8. manifest -------------------------------------------------------
+    # 8. manifest
     manifest = {
         "analysis": "v11 Module 3 — proteome observability-bias audit",
         "timestamp": datetime.now(timezone.utc).isoformat(),

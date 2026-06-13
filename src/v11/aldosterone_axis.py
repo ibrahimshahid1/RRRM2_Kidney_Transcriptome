@@ -1,42 +1,5 @@
 #!/usr/bin/env python3
-"""Reach F -- explicit aldosterone / mineralocorticoid-axis test.
-
-Motivation (manuscript glue). NCC is aldosterone-regulated and spaceflight's
-cephalad fluid shift perturbs the renin-angiotensin-aldosterone system, yet the
-manuscript never tests the aldosterone axis -- even though the regulator run
-flagged a steroid-receptor ("Androgen") PROGENy pathway as up (MR and androgen
-receptors share hormone-response elements). This module scores a curated
-mineralocorticoid panel across the same five cohorts used by the recurrence
-analysis, cross-checks it against the already-computed PROGENy activities, and
-asks whether the aldosterone-axis direction is *coherent* with the predicted
-distal-nephron (NCC/WNK-SPAK) suppression -- reported side by side with the
-transport-anchor score.
-
-Design notes.
-  * The MR panel (``data/external/gene_sets/mineralocorticoid_axis_core.tsv``)
-    is directional: ``up`` genes are aldosterone-induced (Sgk1, Tsc22d3, Per1,
-    Klf15, Fxyd2, Scnn1a/b/g, Slc12a3); ``context`` genes (Hsd11b2, Nr3c2,
-    Wnk1/4, Stk39, Oxsr1) gate or organize the axis and are reported but
-    excluded from the directional score.
-  * Scoring is decoupleR-free on purpose: the panel is small and curated, the
-    sandbox has no decoupler, and a direction-corrected mean with a gene-label
-    permutation null is fully reproducible. Cross-cohort pooling reuses the
-    project's ``signed_stouffer_z`` and ``recurrence_class``.
-  * Sign convention: a *positive* axis effect means the aldosterone-responsive
-    program moves up; the manuscript's distal-nephron suppression prediction is
-    a *negative* axis effect that tracks NCC/WNK-SPAK transport suppression.
-
-Discipline (failure mode is informative). Bulk RNA cannot separate systemic
-hormone exposure from intrinsic DCT response; a flat or incoherent result
-argues against an endocrine-driven story and narrows the mechanism. Nothing
-here is a mechanistic claim.
-
-Inputs (on disk): the five cohort gene-stat tables under the regulator run's
-``rna_effects/`` (gene, stat), the curated MR panel, and the existing
-``rna_progeny_pathway_activity.tsv``.
-Output: ``regulator_activity/aldosterone_axis_summary.tsv`` (+ verdict JSON).
-Provenance key for the headline index: ``aldo_axis_meta_effect``.
-"""
+"""Reach F -- explicit aldosterone / mineralocorticoid-axis test."""
 
 from __future__ import annotations
 
@@ -62,9 +25,7 @@ PERM_SEED = 20260601
 RECURRENCE_THRESHOLD = 0.5  # on the z-like gene-stat scale; sign-consistency reported separately
 
 
-# --------------------------------------------------------------------------- #
-# Pure scoring (unit-tested; no I/O).                                          #
-# --------------------------------------------------------------------------- #
+# #
 def panel_signs(panel: pd.DataFrame) -> pd.Series:
     """Map each panel gene to a directional sign: ``up`` -> +1, else 0 (context)."""
     direction = panel.set_index("gene_symbol")["expected_aldosterone_direction"].astype(str).str.lower()
@@ -167,9 +128,7 @@ def meta_axis(per_cohort: dict[str, float], threshold: float = RECURRENCE_THRESH
     }
 
 
-# --------------------------------------------------------------------------- #
-# Orchestration (I/O).                                                         #
-# --------------------------------------------------------------------------- #
+# #
 def _load_cohorts(regulator_run: Path) -> dict[str, pd.Series]:
     spec_path = regulator_run / "rna_effects" / "rna_effects_spec.json"
     spec = json.loads(spec_path.read_text())

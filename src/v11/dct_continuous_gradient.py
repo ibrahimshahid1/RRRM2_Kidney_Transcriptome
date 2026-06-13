@@ -1,42 +1,5 @@
 #!/usr/bin/env python3
-"""Repair C -- DCT1<->DCT2 *continuous* contrast for flight-suppressed phosphosites.
-
-Motivation (audit response). The v11 H2 enrichment test bins the DCT-subtype
-prior into top/bottom decile/quartile flags and asks whether flight-suppressed
-phosphosites are over-represented in the DCT1-high bin. A reviewer can fairly
-object that (a) hard binning discards most of the continuous DCT1<->DCT2
-coordinate and (b) a bin-level signal could be carried by a handful of
-NCC/SPAK/WNK anchor genes. This module answers both by regressing phospho
-response on the *continuous* ``dct1_enrichment_score`` coordinate at the
-parent-gene level, with:
-
-  * a direct linear contrast (OLS slope, covariate-adjusted),
-  * a natural-cubic-spline term to detect non-monotone structure the linear
-    contrast would miss,
-  * Spearman rho as a rank-based nonparametric backup, and
-  * a logistic gradient on the binary suppression indicator,
-
-each re-run with the NCC/SPAK/WNK anchor genes excluded and on
-single-position sites only. It reuses ``build_parent_gene_table`` from
-``core_analysis`` so the gene collapse, covariates, and coordinate definition
-are identical to the binned H2 analysis -- only the *test* changes.
-
-Discipline. ``dct1_enrichment_score`` is a GSE228367 DCT-subtype RNA prior, not
-spaceflight evidence; this is an exploratory subtype-prior gradient test, not a
-mechanistic claim. Input is the per-run artifact
-``dct_prior/osd462_phosphosite_dct1_prior.tsv`` written by
-``core_analysis.build_dct_prior_mapping``.
-
-Sign convention (predicted, supportive direction):
-  * phospho-effect outcomes (mean / most-negative): more DCT1 => more
-    *negative* (suppressed) effect => supportive slope/rho is NEGATIVE.
-  * suppression-indicator outcome: more DCT1 => higher P(suppressed) =>
-    supportive log-odds is POSITIVE.
-
-Output: ``h2_enrichment/h2_dct_continuous_gradient.tsv`` (+ a verdict JSON).
-Provenance keys emitted for the headline index: ``dct_gradient_slope``,
-``dct_gradient_p``, ``dct_gradient_spearman``.
-"""
+"""Repair C -- DCT1<->DCT2 *continuous* contrast for flight-suppressed phosphosites."""
 
 from __future__ import annotations
 
@@ -67,9 +30,7 @@ COORD_COL = "dct1_enrichment_score"
 MIN_PARENT_GENES = 30
 
 
-# --------------------------------------------------------------------------- #
-# Pure estimators (unit-tested; no I/O).                                       #
-# --------------------------------------------------------------------------- #
+# #
 def _aligned(coord, outcome, covariates=None):
     """Return a clean numeric design frame (y, coord, covars) with NA rows dropped."""
     y = pd.to_numeric(pd.Series(outcome).reset_index(drop=True), errors="coerce")
@@ -232,9 +193,7 @@ def fit_spline_gradient(
         return {"model_status": f"not_fit: {exc}", "n": int(len(d))}
 
 
-# --------------------------------------------------------------------------- #
-# Orchestration (I/O).                                                         #
-# --------------------------------------------------------------------------- #
+# #
 def _zscore(s: pd.Series) -> pd.Series:
     v = pd.to_numeric(s, errors="coerce")
     sd = v.std(ddof=0)

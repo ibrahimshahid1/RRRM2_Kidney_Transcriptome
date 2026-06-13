@@ -1,12 +1,6 @@
 #!/usr/bin/env Rscript
 
 # MuSiC reference-atlas sensitivity analysis.
-#
-# This script compares primary MuSiC cell-type proportions against an alternate
-# deconvolution/reference-free estimate (for example bMIND, CIBERSORTx-compatible
-# output, or a TMS pseudo-bulk holdout). It also optionally compares key
-# downstream Phase 3 top-decile rewiring and Phase 7 pathway summaries produced
-# after rerunning residualization with alternate proportions.
 
 parse_args <- function() {
   args <- commandArgs(trailingOnly = TRUE)

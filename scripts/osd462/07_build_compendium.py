@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-"""Layer 7 - Build the standalone LaTeX results compendium from anchor outputs.
-
-Reads every layer artifact and emits ``latex_paper/osd462_multiomics_compendium.tex``
-with all tables populated from data (so numbers cannot drift from the analysis).
-
-Usage::
-
-    python scripts/osd462/07_build_compendium.py --run RUN_NAME [--compile]
-"""
+"""Layer 7 - Build the standalone LaTeX results compendium from anchor outputs."""
 from __future__ import annotations
 
 import argparse
@@ -23,7 +15,7 @@ from _common import REPO_ROOT, anchor_dir, default_run
 TEX_PATH = REPO_ROOT / "latex_paper" / "osd462_multiomics_compendium.tex"
 
 
-# ── formatting helpers ───────────────────────────────────────────────────────
+# formatting helpers
 def esc(s) -> str:
     return str(s).replace("_", r"\_").replace("%", r"\%").replace("&", r"\&")
 
@@ -84,7 +76,7 @@ def main() -> None:
     l2 = sjson["layer2_phospho"]
     l3 = sjson["layer3_network"]
 
-    # ── Table: Layer 4 pathway effects ───────────────────────────────────────
+    # Table: Layer 4 pathway effects
     pv_sorted = pv.sort_values("rrrm2_iss_t_pathway_effect", ascending=False)
     t4_rows = [[esc(r["pathway"]), f(r["osd462_rna_pathway_effect"]),
                 f(r["rrrm2_iss_t_pathway_effect"]),
@@ -99,7 +91,7 @@ def main() -> None:
                  f"{sum(pv['sign_agree'])}/{len(pv)} sign-concordant.",
                  "tab:layer4")
 
-    # ── Table: Layer 1 protein concordance ───────────────────────────────────
+    # Table: Layer 1 protein concordance
     order = ["ecm_organization", "dct_ncc_wnk_transport", "tlr4_innate", "s1p_s1pr3",
              "tubular_transport_broad"]
     s = summ.set_index("gene_set")
@@ -132,7 +124,7 @@ def main() -> None:
                  f"$p={l1['ecm_signed_mean_p_two_sided']:.3f}$).",
                  "tab:layer1")
 
-    # ── Table: NCC + SPAK phosphosites ───────────────────────────────────────
+    # Table: NCC + SPAK phosphosites
     foc = phos[phos["gene_symbol"].isin(["Slc12a3", "Stk39", "Oxsr1"])].copy()
     foc = foc.sort_values(["gene_symbol", "phospho_effect"])
     tph_rows = []
@@ -157,7 +149,7 @@ def main() -> None:
                   "are strongly down; NCC C-terminal sites (96--124) and OSR1-339 are flat.",
                   "tab:phospho", small=True)
 
-    # ── Table: network translation ───────────────────────────────────────────
+    # Table: network translation
     tn_rows = [[f"top-{int(r['top_k'])}",
                 str(int(r["n_candidates_with_protein"])), f(r["protein_mean_abs_effect"]),
                 f(r["protein_null_median"]), fp(r["protein_enrichment_p"]),
@@ -189,7 +181,7 @@ def main() -> None:
                    "machinery (gene-level, both plexes). Peptide counts are summed across the "
                    "two TMT plexes.", "tab:detect")
 
-    # ── compose document ─────────────────────────────────────────────────────
+    # compose document
     matrix_anti = l1["ecm_signed_mean_p_two_sided"]
     doc = rf"""\documentclass[11pt]{{article}}
 \usepackage[a4paper,margin=1in]{{geometry}}

@@ -1,12 +1,4 @@
-"""
-RRRM-2 Validation Module
-
-Leakage-safe cross-validation and sample-level feature extraction.
-
-This module contains:
-- cross_validation: Leakage-safe CV framework
-- sample_features: Mouse-level feature extraction for LIONESS networks
-"""
+"""RRRM-2 Validation Module"""
 
 from pathlib import Path
 

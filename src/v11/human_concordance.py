@@ -1,25 +1,5 @@
 #!/usr/bin/env python3
-"""Reach D -- human urine/fluid-axis concordance.
-
-This module deliberately does *not* validate the mouse kidney omics signature in
-human kidney tissue.  The human evidence is urine / clinical chemistry from the
-NASA Twins Study, so the analysis is an analyte-level sign concordance check
-against the mouse-derived fluid, mineralocorticoid, and distal-nephron transport
-predictions.
-
-Inputs on disk:
-  * Twins Table S8: urinary electrolyte / biochemistry timepoints.
-  * Twins SM PDF Fig. S4A: AQP2 / AGT / RENR urine-protein figure evidence.
-  * Optional OSD-656 files: Inspiration4 urine inflammation/NULISAseq recovery
-    context, never the main Reach D source.
-
-Outputs:
-  * ``human_concordance/twins_axis_concordance.tsv``
-  * ``human_concordance/twins_axis_level_concordance.tsv`` (independent-axis sign test)
-  * ``human_concordance/twins_aqp2_figure_evidence.tsv``
-  * ``human_concordance/human_concordance_verdict.json``
-  * optional OSD-656 catalog/summary files if an OSD-656 directory is present.
-"""
+"""Reach D -- human urine/fluid-axis concordance."""
 
 from __future__ import annotations
 
@@ -52,14 +32,7 @@ TABLE_S8_TW_FIRST_COL = 1
 TABLE_S8_TW_LAST_COL = 15
 TABLE_S8_HR_SUMMARY_COL = 16
 
-# ── Externalized, version-controlled prediction / scoring spec ───────────────
-# The analyte predictions, scoring flags, and the digitized figure directions
-# live in config YAML (auditable, citable) instead of as Python literals here.
-#   * config/human_concordance_prereg.yaml  -- table predictions + Fig. S4A rows
-#   * config/human_urine_marker_panel.yaml  -- OSD-656 context categories
-# Observed directions for the table analytes are still COMPUTED from Table S8 at
-# runtime; only the figure-row observed directions are stored, because Fig. S4A
-# has no numeric deposit and was digitized from the SM PDF (see provenance).
+#  Externalized, version-controlled prediction / scoring spec
 CONFIG_DIR = REPO_ROOT / "config"
 PREREG_YAML = CONFIG_DIR / "human_concordance_prereg.yaml"
 MARKER_PANEL_YAML = CONFIG_DIR / "human_urine_marker_panel.yaml"

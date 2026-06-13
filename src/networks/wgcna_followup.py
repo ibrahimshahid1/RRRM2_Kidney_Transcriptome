@@ -19,7 +19,7 @@ import yaml
 import gseapy as gp
 
 warnings.filterwarnings("ignore")
-# ── Paths ─────────────────────────────────────────────────────────────────
+# Paths
 ROOT  = Path(__file__).resolve().parent.parent.parent
 _results_dir = os.environ.get("RRRM_RESULTS_DIR", "")
 
@@ -63,7 +63,7 @@ GSETS = ROOT / "config/gene_sets.yaml"
 OUTDIR = WDIR / "manuscript_followup"
 OUTDIR.mkdir(parents=True, exist_ok=True)
 
-# ── Load data ─────────────────────────────────────────────────────────────
+# Load data
 print("Loading data...")
 rtech = pd.read_csv(RTECH, sep="\t", compression="gzip", index_col=0)
 meta = pd.read_csv(META, sep="\t", compression="gzip")
@@ -114,9 +114,6 @@ print(f"  FLT+GC samples: {len(meta_fg)}, Genes: {len(rtech_fg)}")
 # Significant modules to analyze
 SIG_MODULES = ["grey60", "royalblue", "salmon", "pink", "green", "red"]
 
-# ══════════════════════════════════════════════════════════════════════════
-# 1. SIMPLE-EFFECT CONTRASTS
-# ══════════════════════════════════════════════════════════════════════════
 print("\n" + "="*60)
 print("1. Simple-Effect Contrasts (FLT vs GC per Age×Arm stratum)")
 print("="*60)
@@ -133,12 +130,7 @@ strata = {
     "LAR_OLD":   {"AgeOld": 1, "ArmLAR": 1},
 }
 
-# For ME ~ Flight * AgeOld * ArmLAR:
-# Flight effect at (AgeOld=a, ArmLAR=r) = 
-#   β_Flight + a*β_Flight:AgeOld + r*β_Flight:ArmLAR + a*r*β_Flight:AgeOld:ArmLAR
-# Contrast vector c = [0, 1, 0, 0, a, r, 0, a*r] (matching intercept, Flight, AgeOld, ArmLAR, F:A, F:R, A:R, F:A:R)
-
-
+# For ME ~ Flight * AgeOld * ArmLAR: Flight effect at (AgeOld=a, ArmLAR=r)
 
 X = np.column_stack([
     np.ones(len(meta_fg)),
@@ -195,9 +187,6 @@ print("-"*80)
 for _, r in cdf[cdf["q"] < 0.10].sort_values(["color", "stratum"]).iterrows():
     print(f"{r['module']:<6} {r['color']:<14} {r['stratum']:<12} {r['estimate']:>7.3f} {r['SE']:>6.3f} {r['t']:>7.2f} {r['p']:>9.4f} {r['q']:>9.4f}")
 
-# ══════════════════════════════════════════════════════════════════════════
-# 2. GREY60 HUB GENES + kME
-# ══════════════════════════════════════════════════════════════════════════
 print("\n" + "="*60)
 print("2. Grey60 Hub Genes (kME analysis)")
 print("="*60)
@@ -234,9 +223,6 @@ print("-"*75)
 for _, r in kme_df.head(20).iterrows():
     print(f"{r['rank']:>4} {r['symbol']:<15} {r['kME']:>7.3f} {r['gene']:<20} {r['pathway_annotation']}")
 
-# ══════════════════════════════════════════════════════════════════════════
-# 3. EIGENGENE PLOTS
-# ══════════════════════════════════════════════════════════════════════════
 print("\n" + "="*60)
 print("3. Eigengene Plots")
 print("="*60)
@@ -305,9 +291,6 @@ for mod_color in plot_modules:
     plt.close(fig)
     print(f"  Saved: eigengene_{mod_color}.pdf")
 
-# ══════════════════════════════════════════════════════════════════════════
-# 4. BROADER ENRICHMENT (GO/KEGG via gseapy)
-# ══════════════════════════════════════════════════════════════════════════
 print("\n" + "="*60)
 print("4. GO/KEGG Enrichment for Significant Modules")
 print("="*60)
@@ -362,9 +345,6 @@ if all_enrich:
 else:
     print("  No enrichment results obtained")
 
-# ══════════════════════════════════════════════════════════════════════════
-# 6. FINAL INTEGRATED TABLE
-# ══════════════════════════════════════════════════════════════════════════
 print("\n" + "="*60)
 print("6. Final Integrated Table")
 print("="*60)

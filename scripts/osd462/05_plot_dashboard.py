@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
-"""Layer 5 - Multi-omics anchor figures.
-
-Produces two figures from the anchor outputs:
-  1. ``fig_osd462_multiomics_dashboard`` (2x2): RNA->protein scatter; DCT-axis
-     protein-abundance bars; WNK-SPAK/OSR1-NCC phosphosite effects with CIs;
-     network-candidate translation enrichment vs matched null.
-  2. ``fig_osd462_rna_recurrence`` (1x2): pathway-vector concordance (RNA gate)
-     and the cross-layer DCT/NCC summary (RNA / protein abundance / phospho).
-
-Usage::
-
-    python scripts/osd462/05_plot_dashboard.py --run RUN_NAME
-"""
+"""Layer 5 - Multi-omics anchor figures."""
 from __future__ import annotations
 
 import argparse
@@ -78,7 +66,7 @@ def dashboard(out_dir):
     axB = fig.add_subplot(gs[0, 1])
     axC = fig.add_subplot(gs[1, :])
 
-    # ── Panel A: matched OSD-462 RNA -> OSD-462 protein scatter ───────────────
+    # Panel A: matched OSD-462 RNA -> OSD-462 protein scatter
     ax = axA
     core = master.dropna(subset=["osd462_rna_effect", "protein_flight_effect"])
     ax.scatter(core["osd462_rna_effect"], core["protein_flight_effect"],
@@ -101,7 +89,7 @@ def dashboard(out_dir):
     ax.legend(loc="lower right", framealpha=0.9, markerscale=1.0)
     ax.set_ylim(-0.45, 0.45)
 
-    # ── Panel B: DCT/NCC/WNK protein-abundance bars ──────────────────────────
+    # Panel B: DCT/NCC/WNK protein-abundance bars
     ax = axB
     dct_genes = ["Slc12a3", "Wnk1", "Wnk4", "Stk39", "Oxsr1", "Calb1",
                  "Nedd4l", "Cul3", "Kcnj10", "Kcnj16"]
@@ -117,7 +105,7 @@ def dashboard(out_dir):
     ax.text(0.97, 0.04, "abundance ≈ flat\n(NCC slightly up)", transform=ax.transAxes,
             ha="right", va="bottom", fontsize=7.5, color="0.3")
 
-    # ── Panel C: phosphosite effects with CI (regulatory vs non-regulatory) ───
+    # Panel C: phosphosite effects with CI (regulatory vs non-regulatory)
     ax = axC
     show = phos[phos["gene_symbol"].isin(["Slc12a3", "Stk39", "Oxsr1"])].copy()
     show["label"] = show["gene_symbol"] + " " + show["site_position"].astype(str)

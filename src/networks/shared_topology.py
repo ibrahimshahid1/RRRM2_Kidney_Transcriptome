@@ -148,7 +148,7 @@ def pick_genes(
     r = rtech.loc[keep]
     n_before = len(r)
 
-    # ── Biotype filter ───────────────────────────────────────────────────
+    # Biotype filter
     if biotype_map is not None and allowed_biotypes:
         bt = biotype_map.set_index("ensembl_gene_id")
         # Genes in allowed biotypes
@@ -165,7 +165,7 @@ def pick_genes(
     else:
         bt = None
 
-    # ── Noise-symbol filter (Gm\d+, Rik, etc.) ──────────────────────────
+    # Noise-symbol filter (Gm\d+, Rik, etc.)
     if exclude_noise_symbols and biotype_map is not None:
         if bt is None:
             bt = biotype_map.set_index("ensembl_gene_id")
@@ -185,7 +185,7 @@ def pick_genes(
             print(f"    Removed {n_noise} noise-symbol genes")
             print(f"    Remaining: {len(r)}")
 
-    # ── Force-include ────────────────────────────────────────────────────
+    # Force-include
     forced: set[str] = set()
     if force_include:
         present = set(r.index)
@@ -520,7 +520,7 @@ def main():
                     help="Top-k neighbors per gene (~G*k edges)")
     ap.add_argument("--force_include", default="",
                     help="Path to gene list file (one gene per line) to force-include")
-    # ── Biotype filter arguments ─────────────────────────────────────────
+    # Biotype filter arguments
     ap.add_argument("--id_map", default="data/processed/resources/id_map.tsv",
                     help="Path to id_map.tsv with biotype annotations "
                          "(from build_id_map.py)")

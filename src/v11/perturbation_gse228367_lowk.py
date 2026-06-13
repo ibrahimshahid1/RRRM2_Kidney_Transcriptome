@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
-"""GSE228367 low-potassium DCT perturbation alignment.
-
-This module asks whether the spaceflight kidney RNA vectors resemble, oppose,
-or are unrelated to a native DCT-enriched low-potassium response.  The GEO raw
-archive contains three normal-potassium (NK) and three potassium-depleted (KD)
-filtered 10x matrices.  We compute sample-level log-normalized pseudobulk means
-from those matrices, estimate KD - NK gene effects, and compare that effect
-vector with spaceflight RNA effect vectors.
-
-The low-K response is DCT-enriched pseudobulk, not a DCT1/DCT2 cell-isolated
-contrast.  DCT1/DCT2 specificity is therefore evaluated by restricting genes to
-the native DCT1-core and DCT2-core reference priors already built from
-GSE228367 control Seurat objects.
-"""
+"""GSE228367 low-potassium DCT perturbation alignment."""
 
 from __future__ import annotations
 

@@ -1,22 +1,5 @@
 #!/usr/bin/env python3
-"""Convenience auditor for the Phase 3 stability gate (Guardrail A).
-
-Per agents_instruction.md §6.1, this script lives alongside
-``run_contrast_vector_framework.py`` and is meant for engineers / collaborators
-to confirm that the stability artifacts exist and that the recorded decisions
-match the pre-registered thresholds before downstream phases run.
-
-It does *not* re-run the bootstrap. It only inspects the already-written
-``agc_stability_report.tsv`` and ``agc_stability_decision.json`` and reports:
-
-* whether the files exist for the requested run
-* whether the recorded gate values match the configured thresholds
-* per-(arm, resolution) pass/fail summary
-* whether the global ``fallback_to_external_axis_only`` flag is set
-* whether ``--bypass-stability`` would be required to proceed
-
-Exit code is non-zero if anything is missing or inconsistent.
-"""
+"""Convenience auditor for the Phase 3 stability gate (Guardrail A)."""
 from __future__ import annotations
 
 import argparse

@@ -1,16 +1,5 @@
 #!/usr/bin/env python3
-"""Composition-aware H2 robustness tests for OSD-462 phosphoproteomics.
-
-This script tests whether the v11 DCT1-prior phosphosite signal survives a
-conservative adjustment ladder using per-animal TMT phosphosite intensities.
-
-Claim discipline:
-  * This is not DCT-specific phosphoproteomics.
-  * Composition scores are bulk RNA marker-panel estimates and may sit on the
-    biological path from flight to phosphosite dilution.
-  * The output should be described as composition-aware robustness, not
-    deconvolution.
-"""
+"""Composition-aware H2 robustness tests for OSD-462 phosphoproteomics."""
 
 from __future__ import annotations
 

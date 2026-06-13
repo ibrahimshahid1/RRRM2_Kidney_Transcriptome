@@ -1,35 +1,5 @@
 #!/usr/bin/env python3
-"""
-Direct Differential Co-expression Diagnostic (Phase 10)
-========================================================
-
-Permutation-based aggregate diagnostic to determine whether LIONESS-derived
-rewiring rankings reflect group-level covariance changes or are primarily
-artifacts of the sample-specific network pipeline.
-
-For each Age×Arm stratum:
-  1. Compute per-edge Δz = atanh(r_FLT) − atanh(r_GC) on the shared skeleton.
-     Individual edge p-values are NOT trusted (n=5 gives SE≈1).
-  2. Aggregate to gene-level: S_g = mean(|Δz_e|) over incident edges.
-  3. Build a label-permutation null (K shuffles of FLT/GC within stratum)
-     recomputing the entire gene score each time.
-  4. Compare direct-correlation gene ranking to LIONESS/node2vec rewiring
-     ranking (Spearman ρ), with a permutation null for the ρ itself.
-  5. Run pathway enrichment on the direct ranking and compare with
-     LIONESS-derived pathway results.
-
-The skeleton was built using all samples (including FLT/GC), so this is
-labeled as a robustness diagnostic, not primary inference.
-
-Usage:
-    python -m src.statistics.direct_coexpression_test \\
-        --rtech  data/results/run_XYZ/phase1_residuals/Rtech.tsv.gz \\
-        --meta   data/results/run_XYZ/phase1_residuals/meta_phase1.tsv.gz \\
-        --phase2_dir data/results/run_XYZ/networks \\
-        --rewiring_dir data/results/run_XYZ/phase3_rewiring \\
-        --outdir data/results/run_XYZ/phase10_direct_coexpr \\
-        --n_perms 1000
-"""
+"""Direct Differential Co-expression Diagnostic (Phase 10)"""
 from __future__ import annotations
 
 import argparse
@@ -46,7 +16,7 @@ from src.common import REPO_ROOT, find_sample_col, normalize_labels, bh_fdr
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-# ── Strata ────────────────────────────────────────────────────────────────
+# Strata
 
 STRATA = {
     "ISS_T_YNG": {"Age": "YNG", "Arm": "ISS-T"},
@@ -63,7 +33,7 @@ CONTRAST_REWIRING = {
 }
 
 
-# ── Core computation ──────────────────────────────────────────────────────
+# Core computation
 
 def _pearson_edges(X: np.ndarray, ei: np.ndarray, ej: np.ndarray) -> np.ndarray:
     """Pearson r for each edge across samples.  X is (genes, samples)."""
@@ -124,7 +94,7 @@ def permutation_null(X: np.ndarray, all_idx: np.ndarray,
     return null_scores
 
 
-# ── Stratum runner ────────────────────────────────────────────────────────
+# Stratum runner
 
 def run_stratum(
     stratum_key: str,
@@ -162,13 +132,13 @@ def run_stratum(
     gc_idx  = np.where(gc_mask)[0]
     all_idx = np.concatenate([flt_idx, gc_idx])
 
-    # ── Observed ──────────────────────────────────────────────────────
+    # Observed
     delta_z_obs, scores_obs = compute_observed(X, flt_idx, gc_idx, ei, ej, n_genes)
 
     print(f"  Observed mean gene score (mean |Δz|): {scores_obs.mean():.4f}")
     print(f"  Observed max  gene score:             {scores_obs.max():.4f}")
 
-    # ── Permutation null ──────────────────────────────────────────────
+    # Permutation null
     print(f"  Running {n_perms} label permutations...")
     null_scores = permutation_null(X, all_idx, n_flt, ei, ej, n_genes, n_perms, rng)
 
@@ -189,7 +159,7 @@ def run_stratum(
     print(f"  Global test (mean gene score): obs={mean_obs:.4f}, "
           f"null mean={null_means.mean():.4f}, p={global_p:.4f}")
 
-    # ── LIONESS concordance ───────────────────────────────────────────
+    # LIONESS concordance
     concordance = {}
     contrast_name = CONTRAST_REWIRING.get(stratum_key)
     if rewiring_dir and contrast_name:
@@ -257,7 +227,7 @@ def run_stratum(
                 print(f"    Top-decile overlap: {overlap}/{n_top} "
                       f"(null mean: {null_overlap_mean:.1f})")
 
-    # ── Save outputs ──────────────────────────────────────────────────
+    # Save outputs
     sdir = outdir / stratum_key
     sdir.mkdir(parents=True, exist_ok=True)
 
@@ -317,7 +287,7 @@ def run_stratum(
     return result
 
 
-# ── Main ──────────────────────────────────────────────────────────────────
+# Main
 
 def main():
     ap = argparse.ArgumentParser(

@@ -1,10 +1,4 @@
-"""Guardrail E: project RRRM-2 flight vectors onto an external aging axis.
-
-The implementation is deliberately feature-agnostic: callers provide a flight
-effect vector and an independently estimated aging-axis vector indexed by the
-same feature IDs. The CLI provides the gene-level RRRM-2 path used by the
-contrast-vector orchestrator.
-"""
+"""Guardrail E: project RRRM-2 flight vectors onto an external aging axis."""
 from __future__ import annotations
 
 import argparse

@@ -1,27 +1,16 @@
-# ===============================================
-# RRRM-2 Kidney Transcriptome .gitignore
-# ===============================================
-
-# -----------------------------------------------
-# Large Data Directories (Generated Results)
-# -----------------------------------------------
-# Processed data (embeddings, networks, residuals)
+# Generated data and results
 data/processed/
 data/external/
 data/networks/
 data/results/
 
-# Raw data except README
+# Keep the raw-data README.
 data/raw/*
 !data/raw/README.md
 
-# Exports snapshots (large intermediate outputs)
 exports/
 
-# -----------------------------------------------
-# Large File Formats (regardless of location)
-# -----------------------------------------------
-# Scientific data formats
+# Scientific binary formats
 *.h5ad
 *.h5
 *.hdf5
@@ -34,26 +23,11 @@ exports/
 *.pickle
 *.emb
 
-# Large CSVs (generated results over 10MB)
-# Note: keeping smaller tables and metadata CSVs
-
-# -----------------------------------------------
-# Results - Exclude embeddings/models, keep figures/tables
-# -----------------------------------------------
+# Generated models and embeddings
 results/embeddings/
 results/models/
 
-# Keep results/figures/ and results/tables/ (small visualization outputs)
-# Do NOT add results/figures/ or results/tables/ here
-
-# -----------------------------------------------
-# KEEP: plots/ directory (paper figures ~12MB)
-# -----------------------------------------------
-# Do NOT exclude plots/ - these are important outputs
-
-# -----------------------------------------------
-# Python Environment
-# -----------------------------------------------
+# Python environments and build products
 venv/
 .venv/
 env/
@@ -81,38 +55,33 @@ wheels/
 .installed.cfg
 *.egg
 
-# -----------------------------------------------
-# Jupyter Notebook
-# -----------------------------------------------
+# Jupyter checkpoints
 .ipynb_checkpoints/
 */.ipynb_checkpoints/*
 
-# -----------------------------------------------
-# IDEs and Editors
-# -----------------------------------------------
+# Editors and operating-system files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# -----------------------------------------------
-# Operating System
-# -----------------------------------------------
 .DS_Store
 Thumbs.db
 
-# -----------------------------------------------
-# Logs and Temporary Files
-# -----------------------------------------------
+# Logs, temporary files, and local prose archives
 *.log
 logs/
 *.tmp
 temp/
 tmp/
-transcriptomic_texts
-latex_paper
+transcriptomic_texts/
+COMMENT_ARCHIVE.md
 
-# Debug logs in root (from deconvolution runs)
+# LaTeX history; v11 is the maintained manuscript.
+latex_paper/*
+!latex_paper/manuscript_v11.tex
+!latex_paper/manuscript_v11.pdf
+
+# Deconvolution debug logs
 debug_*.txt
 deconv_log*.txt

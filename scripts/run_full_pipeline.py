@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""
-Master Pipeline Orchestration Script for RRRM-2 Kidney Network Analysis
-
-Runs the complete analysis pipeline from raw data to validated rewiring signatures.
-
-Usage:
-    python scripts/run_full_pipeline.py --config config/hyperparameters.yaml
-"""
+"""Master Pipeline Orchestration Script for RRRM-2 Kidney Network Analysis"""
 
 import argparse
 import sys

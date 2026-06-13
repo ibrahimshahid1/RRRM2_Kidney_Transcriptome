@@ -1,30 +1,5 @@
 #!/usr/bin/env python3
-"""
-Phase 1.5: Dataset-Derived DCT Marker Discovery
-=================================================
-
-Identifies genes whose expression tracks the deconvolved DCT fraction,
-after controlling for other nephron segments and experimental design.
-
-KEY DESIGN DECISION:
-  Uses VST-normalised expression (Y), NOT Rtech.
-  Rtech has CLR segment proportions already regressed out (DESeq2.R line 224),
-  so β_DCT ≈ 0 on Rtech. We need the pre-segment-residual expression.
-
-Model (per gene g, sample i):
-  Y_ig = α + β_DCT · CLR(DCT)_i + γ' · CLR(other)_i + θ_cell(i) + ε_ig
-
-  where cell(i) = Age × Arm × EnvGroup (16 one-hot dummies, 15 df)
-
-β_DCT > 0, q(BH) < 0.05, bootstrap_freq ≥ 0.70 → DCT marker gene
-
-Usage:
-    python scripts/discover_dct_markers.py \\
-        --vst data/processed/vst_normalized/GLDS-674_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv \\
-        --meta data/processed/phase1_residuals/meta_phase1.tsv.gz \\
-        --clr data/processed/deconvolution/music_segment_direct_proportions_CLR.csv \\
-        --outdir data/processed/dct_markers
-"""
+"""Phase 1.5: Dataset-Derived DCT Marker Discovery"""
 from __future__ import annotations
 
 import argparse
@@ -36,7 +11,7 @@ from scipy import stats as sp_stats
 from src.common import REPO_ROOT, find_sample_col, bh_fdr as _bh_fdr
 
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# helpers
 
 def bh_fdr(p: np.ndarray) -> np.ndarray:
     """BH-FDR with NaN/Inf guard (wraps src.common.bh_fdr)."""
@@ -314,7 +289,7 @@ def bootstrap_marginal_stability(Y: np.ndarray, dct_vec: np.ndarray,
     return pass_counts / n_boot
 
 
-# ── main ─────────────────────────────────────────────────────────────────────
+# main
 
 def main():
     ap = argparse.ArgumentParser(
@@ -378,7 +353,7 @@ def main():
     print("Phase 1.5: Dataset-Derived DCT Marker Discovery")
     print("=" * 60)
 
-    # ── 1. Load VST expression (genes × samples) ────────────────────────
+    # 1. Load VST expression (genes  samples)
     print(f"\n1) Loading VST expression: {args.vst}")
     vst = pd.read_csv(args.vst, index_col=0)
     # Strip Ensembl versions
@@ -388,21 +363,19 @@ def main():
         vst = vst.groupby(vst.index).mean()
     print(f"   {vst.shape[0]} genes × {vst.shape[1]} samples")
 
-    # ── 2. Load metadata ────────────────────────────────────────────────
+    # 2. Load metadata
     print(f"\n2) Loading metadata: {args.meta}")
     meta = pd.read_csv(args.meta, sep="\t")
     # Find sample column
     sample_col = find_sample_col(meta)
     meta = meta.set_index(sample_col, drop=False)
 
-    # ── 3. Load CLR proportions ─────────────────────────────────────────
+    # 3. Load CLR proportions
     print(f"\n3) Loading CLR proportions: {args.clr}")
     clr = pd.read_csv(args.clr, index_col=0)
     print(f"   Segments: {list(clr.columns)}")
 
     # If no single 'DCT' column, synthesize from DCT subtypes.
-    # The hybrid reference splits DCT into DCT1, DCT2, CNT — we need a
-    # combined DCT signal for marker discovery.
     if "DCT" not in clr.columns:
         # Look for DCT subtypes to combine
         dct_parts = [c for c in clr.columns if c.startswith("DCT")]
@@ -410,10 +383,7 @@ def main():
         if "CNT" in clr.columns:
             dct_parts.append("CNT")
         if dct_parts:
-            # CLR values are log-ratio transformed, so we need to:
-            # 1) back-transform to proportions, 2) sum, 3) re-CLR
-            # But since CLR = log(p/geom_mean), summing CLR is wrong.
-            # Instead, exponentiate, sum, then log.
+            # CLR values are log-ratio transformed, so we need to: 1) back-transform to proportions, 2) sum, 3) re-CLR
             import warnings
             dct_exp = np.exp(clr[dct_parts].values)  # undo log
             dct_combined_exp = dct_exp.sum(axis=1)    # sum proportional parts
@@ -433,7 +403,7 @@ def main():
                 f"Found: {list(clr.columns)}"
             )
 
-    # ── 4. Align samples ────────────────────────────────────────────────
+    # 4. Align samples
     print("\n4) Aligning samples across VST, metadata, CLR...")
     common = sorted(set(vst.columns) & set(meta.index) & set(clr.index))
     if len(common) < 10:
@@ -443,15 +413,13 @@ def main():
     clr = clr.loc[common]
     print(f"   Aligned: {len(common)} samples")
 
-    # ── 5. Filter genes (CPM ≥ 1 in ≥ 20% of samples) ──────────────────
-    # VST values are already normalised, but we should filter low-expression
-    # Use a variance floor: keep genes with var > 0
+    #  5. Filter genes (CPM  1 in  20% of samples)
     var = vst.var(axis=1)
     keep = var > 1e-8
     vst = vst.loc[keep]
     print(f"\n5) After low-variance filter: {vst.shape[0]} genes")
 
-    # ── 6. Build design matrix ──────────────────────────────────────────
+    # 6. Build design matrix
     cell_cols = [c.strip() for c in args.cell_cols.split(",")]
     tech_cols = [c.strip() for c in args.tech_cols.split(",") if c.strip()] if args.tech_cols else None
     print(f"\n6) Building design matrix...")
@@ -463,7 +431,7 @@ def main():
     if rank < X.shape[1]:
         print("   WARNING: Design matrix is rank-deficient. Results may be unreliable.")
 
-    # ── 7. Vectorised OLS for all genes ─────────────────────────────────
+    # 7. Vectorised OLS for all genes
     print(f"\n7) Running OLS for {vst.shape[0]} genes...")
     Y = vst.values.T  # (n_samples, n_genes)
     gene_names = vst.index.tolist()
@@ -489,16 +457,8 @@ def main():
     # Strict Sign Consistency: β_DCT > 0 AND Corr(expr, DCT) > 0
     results["sign_consistent"] = (results["beta_dct"] > 0) & (results["pearson_r_vst_dct"] > 0)
     
-    # ── Anti-confounding via DELTA approach ─────────────────────────────
-    # Problem: CLR(DCT), CLR(TAL_LOH), CLR(CD) are highly correlated because
-    # the two-stage Scale & Combine multiplies all distal subtypes by the same
-    # distal_total. Full residualization destroys >99% of DCT variance.
-    #
-    # Fix: Instead of residualizing DCT against TAL/CD (which kills variance),
-    # use a per-gene delta filter: gene passes if its correlation with DCT
-    # exceeds its max correlation with confounders. This catches genes that
-    # track DCT specifically rather than just "distal signal in general".
-    
+    #  Anti-confounding via DELTA approach
+
     possible_tal = ["TAL", "TAL_LOH", "LOH"]
     possible_cd = ["CD", "CD_PC", "CD_IC"]
     
@@ -530,16 +490,11 @@ def main():
         max_confound_r = np.max(np.abs(confound_stack), axis=1)  # (G,)
         
         # Anti-confounded = gene tracks DCT MORE than it tracks any confounder
-        # Use signed correlation: gene must correlate positively with DCT
-        # AND that positive correlation must exceed the max confounder correlation
         delta = marginal_r - max_confound_r
         results["delta_confound"] = delta
         results["anti_confounded"] = delta > args.diff_threshold
         
         # Also store a "DCT_resid" correlation for reference (using partial correlation)
-        # Partial r(Y, DCT | confounders) via formula:
-        # r_partial = (r_xy - r_xz * r_yz) / sqrt((1 - r_xz²)(1 - r_yz²))
-        # For multiple confounders, use the strongest one
         results["pearson_r_dct_resid"] = delta  # use delta as proxy for DCT-specific signal
         
         # Diagnostic: top 20 by delta
@@ -578,7 +533,7 @@ def main():
     sig_pos = (results["beta_dct"] > 0) & (results["q_BH"] < args.q_threshold)
     print(f"   Significant positive β_DCT (q<{args.q_threshold}): {sig_pos.sum()} genes")
 
-    # ── 8. DCT specificity filter ───────────────────────────────────────
+    # 8. DCT specificity filter
     print(f"\n8) Computing DCT specificity (|β_DCT| top-3 among segments)...")
     # Build map of segment column indices
     seg_col_map = {"DCT": dct_col}
@@ -591,7 +546,7 @@ def main():
     sig_specific = sig_pos & is_specific
     print(f"   Of {sig_pos.sum()} significant, {sig_specific.sum()} are DCT top-3")
 
-    # ── 9. Bootstrap stability ──────────────────────────────────────────
+    # 9. Bootstrap stability
     print(f"\n9) Bootstrap stability ({args.boot_n} stratified resamples)...")
 
     # Determine whether OLS has enough power to be useful
@@ -621,12 +576,10 @@ def main():
     stable = boot_freq >= args.boot_freq
     print(f"   Stable at ≥{args.boot_freq:.0%}: {stable.sum()} genes")
 
-    # ── 10. Final panel ─────────────────────────────────────────────────
-    # Core criteria: β_DCT > 0, q < threshold, bootstrap stable
-    # NEW: Sign consistency AND Anti-confounding
-    
+    #  10. Final panel
+
     if not fallback_mode:
-        # ── PRIMARY path: OLS was powered ──
+        # PRIMARY path: OLS was powered
         # 1. Significant positive beta
         c1 = (results["beta_dct"] > 0) & (results["q_BH"] < args.q_threshold)
         # 2. Bootstrap stability
@@ -644,7 +597,7 @@ def main():
         print(f"    Sign Consistent (r>0): {c3.sum()}")
         print(f"    Anti-Confounded (δ>{args.diff_threshold}): {c4.sum()}")
     else:
-        # ── FALLBACK path: OLS under-powered, use marginal correlation ──
+        # FALLBACK path: OLS under-powered, use marginal correlation
         # BH-correct the marginal p-values
         marginal_q = bh_fdr(marginal_p)
         results["marginal_q_BH"] = marginal_q
@@ -654,9 +607,7 @@ def main():
         f1 = (marginal_r >= args.min_r) & (marginal_q < args.q_threshold)
         # f2. Bootstrap stability (marginal-correlation bootstrap)
         f2 = results["bootstrap_freq"] >= args.boot_freq
-        # f3. Anti-confounding delta — use the STRICTER fallback_delta, not diff_threshold
-        #     (diff_threshold=0.0 is fine for OLS which already controls for confounders;
-        #      the marginal path has NO confounder control except this δ gate)
+        # f3. Anti-confounding delta - use the STRICTER fallback_delta, not diff_threshold
         f3 = results["delta_confound"] > args.fallback_delta
         # f4. OLS β_DCT > 0 (sign must agree, even if not significant)
         f4 = results["beta_dct"] > 0
@@ -676,7 +627,7 @@ def main():
     else:
         spec_label = ""
 
-    # ── Panel size cap: keep top genes by delta_confound ──
+    # Panel size cap: keep top genes by delta_confound
     n_passing = panel_mask.sum()
     if n_passing > args.max_panel:
         # Rank by delta_confound descending; keep top max_panel
@@ -699,7 +650,7 @@ def main():
     # Sort by beta_dct descending
     results = results.sort_values("beta_dct", ascending=False)
 
-    # ── 11. Save outputs ────────────────────────────────────────────────
+    # 11. Save outputs
     cols_order = ["gene", "beta_dct", "t_stat", "p_value", "q_BH",
                   "partial_r2", "dct_top3", "bootstrap_freq",
                   "pearson_r_vst_dct", "pearson_r_dct_resid",
@@ -724,7 +675,7 @@ def main():
         f.write("\n".join(design_col_names) + "\n")
     print(f"   Wrote design columns ({len(design_col_names)}): {design_path}")
 
-    # ── 12. Quick sanity report ─────────────────────────────────────────
+    # 12. Quick sanity report
     print(f"\n{'=' * 60}")
     print("Summary")
     print(f"{'=' * 60}")

@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
-"""
-Self-audit: report which of the 14 remediation-guide fixes are detectable in
-the current source tree and configuration. This is a static check (no pipeline
-run required) and is intended to be a quick pre-submission sanity check.
-
-A fix is reported `present` if all of its detection probes succeed, `partial`
-if some probes succeed, `absent` if none. The script does NOT verify behavior
-correctness; it verifies that the implementing artifacts exist with the
-expected semantic markers.
-
-Usage:
-    python scripts/audit_fix_status.py
-"""
+"""Self-audit: report which of the 14 remediation-guide fixes are detectable in"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -40,7 +28,7 @@ def all_or(probes: list[bool]) -> str:
     return "absent"
 
 
-# ---------------------------------------------------------------- fix probes
+# fix probes
 FIXES = [
     {
         "id": 1,

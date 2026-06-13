@@ -86,8 +86,6 @@ def main():
             sym_to_ens[k] = v
 
     # Align samples
-    # VST columns match CLR index?
-    # VST cols = sample names. CLR index = sample names.
     common = sorted(list(set(vst.columns) & set(clr.index)))
     print(f"Aligned samples: {len(common)}")
     vst_aligned = vst[common]

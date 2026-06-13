@@ -1,14 +1,4 @@
 # Marker-based cluster annotation for Chen atlas
-# Key markers from Chen et al. 2021 and kidney biology:
-#   - Slc12a1 (NKCC2): CTAL marker
-#   - Umod (Uromodulin): TAL marker
-#   - Slc12a3 (NCC): DCT marker
-#   - Pvalb: DCT1 marker
-#   - Trpm6: DCT2 marker (but also CNT)
-#   - Calb1: CNT marker
-#   - Aqp2: CD-PC marker
-#   - Slc26a4 (Pendrin): CD-IC marker
-#   - Slc34a1: PT marker
 suppressPackageStartupMessages(library(Matrix))
 
 message("Loading Chen atlas...")

@@ -1,44 +1,4 @@
-"""Module 3 — proteome observability-bias audit.
-
-Pre-empts the first-line reviewer objection to the v11 cross-layer
-discordance: *"the RNA→protein mismatch is just proteome detectability."*
-
-Three audit deliverables:
-
-  1. **Detectability gradient** — per-gene observability summary (n
-     channels quantified out of total, missing fraction, peptide count,
-     mean abundance) collapsed from ``protein_effects_by_row.tsv``,
-     then binned by RNA-effect magnitude.  Shows whether large-RNA-
-     effect genes are systematically missing from the proteome.
-
-  2. **Observability-matched re-test** — extends the Module 2 matched-
-     null stratum with a per-gene missing-fraction bin and re-runs the
-     per-pathway propagation tests.  The Module 2 q-value (matched on
-     abundance × peptide) and the Module 3 q-value (matched on
-     abundance × peptide × missing-fraction) are reported side by side.
-     If a pathway's effect drops below significance only after adding
-     missingness to the null, the central claim about that pathway must
-     be softened to "decoupling beyond what detectability explains is
-     modest."  This is the calibrated reviewer-2 check.
-
-  3. **High-coverage subset re-test** — restricts the pool to high-
-     confidence genes (``n_peptides >= N_min`` and ``missing_fraction
-     <= eps``) and re-runs the propagation tests on that subset.
-     Confirms the headline layer assignments (ecm_inverted,
-     dct_phospho_carry) persist when detectability uncertainty is at
-     a minimum.
-
-  4. **NCC/SPAK phosphosite observability check** — for each
-     pre-specified NCC regulatory phosphosite (Slc12a3 S53/S58/S65/S68,
-     Stk39 S382/S383), report observability metrics (n_fl, n_gc,
-     missing-fraction percentile vs. the phosphoproteome).  Confirms
-     the suppressed regulatory sites are NOT in the low-observability
-     tail.
-
-The matched-null engine is shared with Module 2 via
-:mod:`src.v11.matched_null`; the per-gene per-pathway statistics are
-shared with Module 2 via :mod:`src.v11.rna_protein_propagation`.
-"""
+"""Module 3 - proteome observability-bias audit."""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -56,9 +16,6 @@ from src.v11.matched_null import (
 )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Per-gene observability features
-# ─────────────────────────────────────────────────────────────────────────────
 
 def collapse_observability_to_gene(
     by_row: pd.DataFrame,
@@ -159,9 +116,6 @@ def assign_observability_strata(
     return (base.astype(str) + "_" + miss_suffix.astype(str)).reset_index(drop=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Detectability gradient (RNA effect bin → fraction quantified)
-# ─────────────────────────────────────────────────────────────────────────────
 
 def detectability_gradient(
     rna_table: pd.DataFrame,
@@ -195,9 +149,6 @@ def detectability_gradient(
     return grouped
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# High-coverage subset
-# ─────────────────────────────────────────────────────────────────────────────
 
 def high_coverage_subset(
     pool: pd.DataFrame,
@@ -223,9 +174,6 @@ def high_coverage_subset(
     return sub
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Per-pathway propagation re-test with a custom stratum column
-# ─────────────────────────────────────────────────────────────────────────────
 
 def propagation_with_strata(
     pool: pd.DataFrame,
@@ -300,9 +248,6 @@ def propagation_with_strata(
     return pd.DataFrame(rows)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# NCC / SPAK phosphosite observability
-# ─────────────────────────────────────────────────────────────────────────────
 
 def ncc_site_observability(
     phospho_all_sites: pd.DataFrame,

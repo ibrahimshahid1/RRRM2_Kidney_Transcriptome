@@ -1,16 +1,4 @@
-"""
-Module convergence: Fisher's-exact overlap between
-  (1) 11 ISS-T-Young LIONESS edge-rewiring candidates (q<0.05) and each WGCNA module
-  (2) ISS-T-Young strict silent shifters and each WGCNA module
-Plus (3) reframe of existing eigengene FLT-vs-GC contrasts as cross-method consistency.
-
-Universe = genes that were eligible for the relevant LIONESS/silent-shifter statistic
-AND assigned to a WGCNA module. This avoids inflating Fisher enrichment by counting
-WGCNA genes that could never have been selected by the candidate-generating analysis.
-Dropped genes are logged in the output.
-
-Outputs land in data/results/run_20260517_213205_2500g/module_convergence/.
-"""
+"""Module convergence: Fisher's-exact overlap between"""
 
 from __future__ import annotations
 
@@ -180,7 +168,7 @@ def main() -> None:
         f"{module_assignments['module_color'].nunique()} modules"
     )
 
-    # ---- Analysis (1) ------------------------------------------------------
+    # Analysis (1)
     lioness_genes = load_lioness_candidates()
     lioness_universe = load_phase6_universe("ISS_T_YNG_FLT_minus_GC")
     print(f"\n[1] LIONESS ISS-T-Young q<0.05 candidates: {len(lioness_genes)}")
@@ -196,7 +184,7 @@ def main() -> None:
     print(f"  -> {out1}")
     print(df1.head(5).to_string(index=False))
 
-    # ---- Analysis (2) ------------------------------------------------------
+    # Analysis (2)
     silent_dfs = []
     for contrast in [
         "ISS_T_YNG_FLT_minus_GC",
@@ -226,7 +214,7 @@ def main() -> None:
         .to_string(index=False)
     )
 
-    # ---- Analysis (3) ------------------------------------------------------
+    # Analysis (3)
     df3 = reframe_eigengene_contrasts()
     out3 = OUTDIR / "eigengene_stratum_specific_reframe.tsv"
     df3.to_csv(out3, sep="\t", index=False)

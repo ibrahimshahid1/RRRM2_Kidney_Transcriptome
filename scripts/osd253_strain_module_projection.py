@@ -1,17 +1,4 @@
-"""Metadata-aware OSD-253 strain-stratified WGCNA module projection.
-
-This is the decision analysis for the RRRM-2 grey60/TLR4 question:
-
-1. Parse ISA sample and assay metadata, not filename regexes alone.
-2. Score RRRM-2 WGCNA modules in OSD-253.
-3. Test FLT-minus-control module shifts within Strain x Duration strata.
-4. Test whether C3H/HeJ attenuates the C57BL/6J flight effect.
-5. Run original-GC and white-light rerun-control sensitivity analyses separately.
-
-The rerun-control analysis fixes the OSD-253 light-wavelength mismatch, but it
-introduces sequencing/read-length/run differences. It is therefore a sensitivity
-analysis, not a clean replacement for the original GC comparison.
-"""
+"""Metadata-aware OSD-253 strain-stratified WGCNA module projection."""
 
 from __future__ import annotations
 

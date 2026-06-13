@@ -1,24 +1,5 @@
 #!/usr/bin/env Rscript
-# =============================================================================
 # build_hybrid_reference.R
-#
-# Build a hybrid single-cell reference atlas for MuSiC deconvolution by
-# combining:
-#   - TMS (Tabula Muris Senis): background kidney cell types (PT, Podocyte,
-#     Endothelial, Mesangial, Fibroblast, Immune, CD)
-#   - Chen et al. 2021 (GSE150338): high-resolution distal nephron types
-#     (DCT1, DCT2, CNT, CTAL)
-#
-# Cluster-to-celltype mapping for Chen (from marker expression analysis):
-#   DCT1  = clusters 0, 1, 2, 8, 12  (Slc12a3+, Pvalb high)
-#   DCT2  = cluster 3                 (Slc12a3+, Pvalb low, Calb1+)
-#   CNT   = cluster 6                 (Slc12a3+, Calb1++, Scnn1g+, Pvalb-)
-#   CTAL  = clusters 4, 5, 13         (Slc12a1+, Umod+)
-#   DROP  = clusters 7, 9, 10, 11     (contaminants: stromal, CD-PC, PT, IC)
-#
-# Output: data/processed/deconvolution/hybrid_ref/
-#   matrix.mtx, barcodes.tsv, features.tsv
-# =============================================================================
 
 suppressPackageStartupMessages({
     library(Matrix)
@@ -35,7 +16,7 @@ CHEN_RDATA <- file.path(
 OUT_DIR <- file.path(REPO, "data/processed/deconvolution/hybrid_ref")
 dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
 
-# ── 1. Load Chen atlas ──────────────────────────────────────────────────────
+# 1. Load Chen atlas
 message(" Loading Chen atlas…")
 load(CHEN_RDATA)
 chen_obj <- merge.data.integrated
@@ -77,7 +58,7 @@ print(table(chen_meta$cell_type))
 chen_meta$donor_id <- paste0("Chen_", chen_meta$Batch_10X)
 message("  Donors: ", paste(unique(chen_meta$donor_id), collapse = ", "))
 
-# ── 2. Convert Chen gene symbols to Ensembl IDs ─────────────────────────────
+# 2. Convert Chen gene symbols to Ensembl IDs
 message("\n▶ Converting gene symbols → Ensembl IDs…")
 chen_symbols <- rownames(chen_counts)
 
@@ -106,7 +87,7 @@ if (any(dup_ens)) {
 }
 message("  Chen final: ", nrow(chen_counts), " genes × ", ncol(chen_counts), " cells")
 
-# ── 3. Load TMS reference ───────────────────────────────────────────────────
+# 3. Load TMS reference
 message("\n▶ Loading TMS reference…")
 tms_barcodes <- read.delim(file.path(TMS_DIR, "barcodes.tsv"),
     stringsAsFactors = FALSE
@@ -130,9 +111,7 @@ colnames(tms_counts) <- tms_barcodes$index
 
 message("  TMS: ", ncol(tms_counts), " cells × ", nrow(tms_counts), " genes")
 
-# ── 4. Remove DCT and TAL_LOH from TMS ──────────────────────────────────────
-# We need to identify which TMS cells are DCT or TAL_LOH.
-# Use the same segment_from_ct mapping logic from deconvolution.R
+#  4. Remove DCT and TAL_LOH from TMS
 segment_from_ct <- function(ct) {
     ct <- tolower(ct)
     seg <- rep(NA_character_, length(ct))
@@ -163,7 +142,7 @@ message("  TMS after removing DCT/TAL: ", ncol(tms_counts_filt), " cells retaine
 message("  TMS cell types kept:")
 print(table(tms_barcodes_filt$segment))
 
-# ── 5. Intersect gene sets ──────────────────────────────────────────────────
+# 5. Intersect gene sets
 message("\n▶ Intersecting gene sets…")
 shared_genes <- intersect(rownames(tms_counts_filt), rownames(chen_counts))
 message("  TMS genes: ", nrow(tms_counts_filt))
@@ -173,7 +152,7 @@ message("  Shared: ", length(shared_genes))
 tms_counts_filt <- tms_counts_filt[shared_genes, ]
 chen_counts <- chen_counts[shared_genes, ]
 
-# ── 6. Merge into hybrid matrix ─────────────────────────────────────────────
+# 6. Merge into hybrid matrix
 message("\n▶ Merging into hybrid matrix…")
 
 # Build unified metadata
@@ -206,7 +185,7 @@ print(table(hybrid_meta$source))
 message("  Donor distribution:")
 print(table(hybrid_meta$donor_id))
 
-# ── 7. Write output ─────────────────────────────────────────────────────────
+# 7. Write output
 message("\n▶ Writing hybrid reference to ", OUT_DIR, "…")
 
 # Write matrix.mtx
@@ -226,8 +205,6 @@ write.table(barcodes_out, file.path(OUT_DIR, "barcodes.tsv"),
 )
 
 # Write features.tsv in same format as TMS
-# Need: Ensembl ID (row name), feature_name (symbol)
-# Map Ensembl back to symbols for feature_name
 feature_symbols <- mapIds(org.Mm.eg.db,
     keys = shared_genes,
     keytype = "ENSEMBL",

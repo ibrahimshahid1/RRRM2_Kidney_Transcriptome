@@ -1,11 +1,4 @@
-"""Unit tests for Repair C -- the continuous DCT1<->DCT2 phospho gradient.
-
-These exercise the pure estimators on planted data. The contract the
-manuscript leans on is sign-faithful slope recovery: a planted monotone
-gradient must yield a positive slope/rho with a small p, and symmetric /
-no-gradient data must yield a slope ~ 0 that is not significant. The spline
-test must additionally catch curvature that the linear contrast misses.
-"""
+"""Unit tests for Repair C -- the continuous DCT1<->DCT2 phospho gradient."""
 import numpy as np
 import pandas as pd
 

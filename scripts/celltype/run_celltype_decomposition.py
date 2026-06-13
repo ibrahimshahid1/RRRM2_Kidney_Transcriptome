@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
-"""Cell-type marker-panel decomposition (memo Recommendation 4).
-
-Bounds the bulk-RNA "is this a DCT program change or a composition/dilution
-change?" ambiguity without new single-cell data:
-
-1. Cross-cohort marker-panel flight effects (DCT identity vs DCT transport vs
-   PT / TAL / CNT-CD / endothelial / stromal / macrophage), reusing the
-   per-cohort gene-effect tables built for regulator Layer B.
-2. OSD-462 animal-matched test: per-sample compartment scores, the flight
-   effect of each, and whether the DCT-transport / immune / stromal scores
-   covary with the measured NCC/SPAK regulatory phospho score (dilution check).
-3. Scenario decision per memo Section 8.3.
-"""
+"""Cell-type marker-panel decomposition (memo Recommendation 4)."""
 from __future__ import annotations
 
 import json
@@ -66,7 +54,7 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     ens_to_sym, sym_to_ens = id_map_lookup(str(ID_MAP))
 
-    # ---- 1. cross-cohort panel flight effects -------------------------------
+    # 1. cross-cohort panel flight effects
     log("Cross-cohort marker-panel flight effects")
     spec = json.loads(SPEC.read_text())
     cohort_eff = {}
@@ -78,7 +66,7 @@ def main() -> int:
     cross.to_csv(OUT / "celltype_flight_effects_by_cohort.tsv", sep="\t")
     print(cross.round(2).to_string())
 
-    # ---- 2. OSD-462 per-sample compartment scores ---------------------------
+    # 2. OSD-462 per-sample compartment scores
     log("OSD-462 per-sample compartment scores")
     vst = pd.read_csv(VST, index_col=0)
     vst.index = vst.index.astype(str).str.replace(r"\.\d+$", "", regex=True)
@@ -91,7 +79,7 @@ def main() -> int:
     print("\nOSD-462 flight effect (Space.Flight - Ground.Control), per-sample mean-z panels:")
     print(eff.round(3).to_string(index=False))
 
-    # ---- 3. animal-matched: panels vs NCC regulatory phospho ----------------
+    # 3. animal-matched: panels vs NCC regulatory phospho
     log("Animal-matched compartment <-> NCC phospho correlations")
     phospho = load_phospho_per_sample(PHOS)
     reg_keys = [f"{g}|{s}" for g, s in NCC_REGULATORY_SITES]
@@ -125,7 +113,7 @@ def main() -> int:
     print("\nAnimal-matched Spearman vs NCC regulatory phospho (FLT+GC):")
     print(corr.round(3).to_string(index=False))
 
-    # ---- 4. scenario decision (memo 8.3) ------------------------------------
+    # 4. scenario decision (memo 8.3)
     e = eff.set_index("panel")["flt_minus_gc"]
     decision = decide_scenario(e["dct_transport"], e["dct_identity"],
                                e["stromal_fibroblast"], e["macrophage_immune"])

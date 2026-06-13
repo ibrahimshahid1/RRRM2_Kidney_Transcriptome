@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Phenotype-anchoring layer -- animal-matched RNA state vs NCC activity.
-
-Builds a per-animal NCC/SPAK regulatory-phosphorylation activity score and a
-per-animal DCT/NCC-low RNA state score for OSD-462 / RR-10, matches them by
-animal, and compares at group / all-sample / condition-adjusted levels with two
-controls (non-regulatory phosphosites; RNA score with Slc12a3 removed).
-"""
+"""Phenotype-anchoring layer -- animal-matched RNA state vs NCC activity."""
 from __future__ import annotations
 
 import argparse
@@ -147,10 +141,6 @@ def main() -> int:
     rna_full = load_rna_dct(vst_path, idmap_path, drop_slc12a3=False)
     rna_noslc = load_rna_dct(vst_path, idmap_path, drop_slc12a3=True)
     # RNA score = mean-z of DCT/NCC-WNK transport genes (higher = more DCT
-    # transport program). Signed the same biological direction as the NCC
-    # activity score (higher = more NCC activating phosphorylation), so a
-    # concordant DCT-suppressed flight state lowers both and gives same-sign
-    # group effects and a positive correlation.
     rna_score_full, rna_cond = collapse_rna_by_animal(per_sample_score(rna_full, list(rna_full.index)))
     rna_score_noslc, _ = collapse_rna_by_animal(per_sample_score(rna_noslc, list(rna_noslc.index)))
 

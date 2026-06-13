@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Parent-protein-normalized OSD-462 phosphosite robustness analysis.
-
-The historical output directory is named ``h2_occupancy`` for continuity, but
-the manuscript-facing term is parent-protein-normalized phosphosite effect.
-"""
+"""Parent-protein-normalized OSD-462 phosphosite robustness analysis."""
 
 from __future__ import annotations
 

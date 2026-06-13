@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Run recurrent remodeling-axis and network-neighborhood prioritization.
-
-This phase sits downstream of the contrast-vector recurrence result.  It
-projects RRRM-2, OSD-513, and OSD-253 samples onto the recurrent ISS-T
-remodeling axis, tests candidate mechanism scores against that axis, and uses
-LIONESS/node2vec artifacts only to prioritize exploratory local contributors.
-"""
+"""Run recurrent remodeling-axis and network-neighborhood prioritization."""
 from __future__ import annotations
 
 import argparse

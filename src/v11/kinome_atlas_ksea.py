@@ -1,35 +1,4 @@
-"""Repair A -- kinome-wide KSEA from the Johnson 2023 Ser/Thr atlas.
-
-Replaces the three-substrate curated WNK--SPAK/OSR1 net (which can only ever
-*confirm* the gene that was hand-curated into it) with a motif-driven assignment
-over the *entire* OSD-462 phosphoproteome, then runs the existing Casado-style
-KSEA (:func:`src.multiomics.regulator_activity.ksea`). The question becomes
-unbiased: of all 303 Ser/Thr kinases scoreable from substrate motifs, which come
-back inferred-*down* in flight -- and do SPAK (atlas label ``STLK3``) and OSR1
-fall out near the top without having been planted there?
-
-Pipeline
---------
-1. ``load_atlas_pssms`` -- read the 303 position-normalised, log2-scaled PSSMs
-   (sheet ``ser_thr_all_norm_scaled_matrice``) into a (kinase x position x
-   residue) tensor of log2 weights.
-2. ``score_sites`` -- for each phosphosite's 13-mer motif, sum the log2 weights
-   over the atlas -5..+4 frame (the central S/T at index 6 is unscored) to get a
-   per-kinase log-odds score.
-3. ``percentile_by_kinase`` + ``build_kinome_net`` -- convert each kinase's
-   scores to a within-cohort percentile and assign a site to a kinase when its
-   percentile clears ``assign_percentile`` (Johnson's standard >=90th-percentile
-   call). This substitutes the OSD-462 phosphoproteome itself for Johnson's
-   Ochoa reference distribution, which is not redistributed on disk -- a
-   documented, honest adaptation.
-4. ``ksea`` -- the existing, independently tested KSEA statistic, unchanged.
-5. ``over_representation`` -- a parent-gene-aware one-sided Fisher cross-check:
-   are a kinase's predicted substrate *genes* enriched for suppressed sites?
-
-Positive control: STLK3 (SPAK) and OSR1 must return negative KSEA z (inferred
-activity down), consistent with NCC-activating-cluster suppression in OSD-462.
-The wording stays prioritisation, not mechanism.
-"""
+"""Repair A -- kinome-wide KSEA from the Johnson 2023 Ser/Thr atlas."""
 from __future__ import annotations
 
 import argparse
@@ -49,9 +18,7 @@ from src.multiomics.regulator_activity import (
     load_kinase_substrate_net,
 )
 
-# --------------------------------------------------------------------------- #
-# On-disk locations
-# --------------------------------------------------------------------------- #
+# #
 
 ATLAS_PSSM_PATH = Path(
     "data/external/kinase_substrate/johnson2023_atlas/johnson2023_st_kinome_pssm.xlsx"
@@ -72,18 +39,14 @@ OSD462_ANCHOR_RUN = Path("data/results/run_20260522_osd462_anchor")
 #: Effect/SE table written by the verified v9/OSD-462 anchor pipeline.
 PHOSPHO_SITES_REL = "osd462_anchor/phospho_all_sites.tsv"
 
-# --------------------------------------------------------------------------- #
-# Atlas / motif geometry
-# --------------------------------------------------------------------------- #
+# #
 
 ATLAS_POSITIONS: tuple[int, ...] = (-5, -4, -3, -2, -1, 1, 2, 3, 4)
 MOTIF_CENTER_INDEX = 6          # 13-mer: six residues either side of the site
 CENTRAL_RESIDUES = ("S", "T")   # Ser/Thr atlas; Tyr sites are excluded
 EPS = 1e-9
 
-#: Atlas labels for the manuscript's positive-control axis. SPAK is recorded in
-#: the Johnson atlas as ``STLK3``; OSR1 keeps its name; the WNK panel is present
-#: as WNK1/WNK3/WNK4 (WNK2 is absent from the Ser/Thr atlas).
+# : Atlas labels for the manuscript's positive-control axis. SPAK is recorded in
 SPAK_OSR1_KINASES: tuple[str, ...] = ("STLK3", "OSR1")
 WNK_KINASES: tuple[str, ...] = ("WNK1", "WNK3", "WNK4")
 
@@ -94,9 +57,7 @@ MIN_SUBSTRATES = 3              # KSEA minimum quantified substrates per kinase
 _HEADER_TOKEN = re.compile(r"^(-?\d+)([A-Za-z])$")
 
 
-# --------------------------------------------------------------------------- #
-# (1) atlas PSSMs
-# --------------------------------------------------------------------------- #
+# #
 
 class AtlasPSSM:
     """A (kinase x position x residue) tensor of log2 PSSM weights."""
@@ -184,9 +145,7 @@ def load_atlas_pssms(
     return AtlasPSSM(kinases, pos_list, residues, logmat)
 
 
-# --------------------------------------------------------------------------- #
-# (2) motif scoring
-# --------------------------------------------------------------------------- #
+# #
 
 def _central_residue(motif: str, center: int = MOTIF_CENTER_INDEX) -> str | None:
     if motif is None:
@@ -256,9 +215,7 @@ def percentile_by_kinase(scores: np.ndarray) -> np.ndarray:
     return pct
 
 
-# --------------------------------------------------------------------------- #
-# (3) kinome substrate net
-# --------------------------------------------------------------------------- #
+# #
 
 def assign_mask(
     percentile: np.ndarray,
@@ -328,9 +285,7 @@ def add_rank(ksea_table: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-# --------------------------------------------------------------------------- #
-# (4) parent-gene-aware over-representation cross-check
-# --------------------------------------------------------------------------- #
+# #
 
 def over_representation(
     sites: pd.DataFrame,
@@ -390,9 +345,7 @@ def over_representation(
     return out
 
 
-# --------------------------------------------------------------------------- #
-# Inputs: join phospho effects to atlas motifs
-# --------------------------------------------------------------------------- #
+# #
 
 def _load_motif_map(
     xlsx: str | Path = OSD462_PHOSPHO_XLSX,
@@ -449,9 +402,7 @@ def load_osd462_st_sites(
     return out
 
 
-# --------------------------------------------------------------------------- #
-# Orchestrator
-# --------------------------------------------------------------------------- #
+# #
 
 def _panel_stats(ksea_table: pd.DataFrame, kinases: Sequence[str]) -> dict[str, object]:
     sub = ksea_table[ksea_table["kinase"].isin(list(kinases)) & ksea_table["status"].eq("scored")]
@@ -497,7 +448,7 @@ def run_kinome_atlas_ksea(
 
     overrep = over_representation(sites, net, min_substrate_genes=min_substrates)
 
-    # ---- artifacts -------------------------------------------------------- #
+    # artifacts -------------------------------------------------------- #
     ksea_path = out_dir / "osd462_kinome_atlas_ksea.tsv"
     overrep_path = out_dir / "osd462_kinome_atlas_overrep.tsv"
     net_summary_path = out_dir / "osd462_kinome_atlas_net_summary.tsv"
@@ -526,7 +477,7 @@ def run_kinome_atlas_ksea(
         "spak_osr1_panel": spak_osr1,
         "wnk_panel": wnk,
         "positive_control_passes": bool(control_pass),
-        # ---- headline-index provenance keys ----
+        # headline-index provenance keys
         "kinome_spak_osr1_z": spak_osr1["mean_z"],
         "kinome_spak_osr1_rank": spak_osr1["best_rank"],
         "kinome_wnk_z": wnk["mean_z"],

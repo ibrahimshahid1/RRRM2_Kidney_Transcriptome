@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
-"""Layer 2 - Phosphoprotein activity of the WNK-SPAK/OSR1-NCC axis (conditional).
-
-Hard checkpoint first: confirm the phosphoproteomics workbook quantifies the
-NCC (Slc12a3) regulatory phosphosites and the SPAK/OSR1 (Stk39/Oxsr1) and WNK
-sites.  If the key sites are absent, the activity claim is abandoned and we
-report that honestly.  If present, estimate per-site FL - GC effects
-(plex-corrected linear model, with CIs), both raw and normalized to total
-protein abundance (phospho-occupancy), and integrate across layers.
-
-Usage::
-
-    python scripts/osd462/02_phospho_axis.py --run RUN_NAME
-"""
+"""Layer 2 - Phosphoprotein activity of the WNK-SPAK/OSR1-NCC axis (conditional)."""
 from __future__ import annotations
 
 import argparse
@@ -72,7 +60,7 @@ def main() -> None:
     print("[layer2] phosphosite coverage (target chain):")
     print(cov_g.to_string(index=False))
 
-    # ── Hard checkpoint ──────────────────────────────────────────────────────
+    # Hard checkpoint
     gate_ok = {}
     for g in GATE_GENES:
         gate_ok[g] = bool(cov_g.loc[cov_g["gene"] == g, "n_quantified"].sum() > 0
@@ -81,7 +69,7 @@ def main() -> None:
     print(f"[layer2] CHECKPOINT gate genes {gate_ok} -> "
           f"{'PASS' if checkpoint_pass else 'FAIL'}")
 
-    # ── Target-axis site table ───────────────────────────────────────────────
+    # Target-axis site table
     axis = sites[sites["gene_symbol"].isin(AXIS_GENES) & np.isfinite(sites["phospho_effect"])].copy()
 
     # protein-abundance normalization (phospho-occupancy = phospho - protein)
@@ -112,7 +100,7 @@ def main() -> None:
         out_dir / "phospho_all_sites.tsv", sep="\t", index=False)
     cov_g.to_csv(out_dir / "phospho_axis_coverage.tsv", sep="\t", index=False)
 
-    # ── Focused NCC regulatory cluster (SPAK/OSR1 target N-terminal Thr) ─────
+    # Focused NCC regulatory cluster (SPAK/OSR1 target N-terminal Thr)
     ncc = axis_out[axis_out["gene_symbol"] == "Slc12a3"]
     print("\n[layer2] NCC (Slc12a3) phosphosites:")
     if len(ncc):
@@ -124,7 +112,7 @@ def main() -> None:
         print(spak[["gene_symbol", "site_position", "phospho_effect",
                     "phospho_p_value"]].to_string(index=False))
 
-    # ── Cross-layer integration verdict ──────────────────────────────────────
+    # Cross-layer integration verdict
     def axis_mean(genes):
         s = axis_out[axis_out["gene_symbol"].isin(genes)]
         return float(s["phospho_effect"].mean()) if len(s) else np.nan
@@ -137,8 +125,6 @@ def main() -> None:
     ncc_reg_mean = float(ncc_reg["phospho_effect"].mean()) if len(ncc_reg) else np.nan
 
     # Gate-site support must include both the NCC regulatory cluster and the
-    # upstream SPAK/OSR1 arm; one unrelated gate-site is not enough to claim
-    # reduced NCC-pathway activity.
     sig_down = axis_out[(axis_out["gene_symbol"].isin(GATE_GENES))
                         & (axis_out["phospho_effect"] < 0)
                         & (axis_out["phospho_p_value"] < 0.05)]
