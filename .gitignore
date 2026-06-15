@@ -22,6 +22,16 @@ exports/
 *.pkl
 *.pickle
 *.emb
+*.RData
+*.Rhistory
+Rplots.pdf
+.Rproj.user/
+
+# Download bundles and generated archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
 
 # Generated models and embeddings
 results/embeddings/
@@ -59,6 +69,13 @@ wheels/
 .ipynb_checkpoints/
 */.ipynb_checkpoints/*
 
+# Test, coverage, and local agent state
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.claude/
+
 # Editors and operating-system files
 .vscode/
 .idea/
@@ -76,6 +93,42 @@ temp/
 tmp/
 transcriptomic_texts/
 COMMENT_ARCHIVE.md
+
+# Generated plots and local reference extracts
+/plots/
+/src/plots/
+/src/data/results/
+/deconv_music_out/
+/tms_kidney_female_counts/
+/tms_kidney_ytrfemale_counts/
+
+# One-off exploratory notebooks and scratch scripts
+/notebooks/notebook00.ipynb
+/notebooks/sample.py
+/scripts/sample.py
+/scripts/phase7_2
+
+# Superseded or unrelated root-level notes
+/CLOUD_DEPLOYMENT.md
+/FILE_SUMMARY.md
+/METHODOLOGY.md
+/RESULTS.md
+/results.txt
+/walkthrough.md
+/chrome_paper_doi_links.txt
+/node2vec_asgsr_osd771_kidney_transcriptomics.pdf
+/permutedStats-actualModules.RData
+
+# Manuscript revision scratchpads superseded by v11 and the main README
+/docs/biology_first_framing.md
+/docs/final_version_plan.md
+/docs/manuscript_v11_critique_revision_plan.md
+/docs/project_closeout_packet.md
+/docs/v10_route_assessment_and_plan.md
+/docs/v11_layer_specificity_analysis_log_2026-06-07.md
+/docs/v11_prose_critique_*.md
+/docs/v11_reaudit_*.md
+/docs/v11_revision_round*.md
 
 # LaTeX history; v11 is the maintained manuscript.
 latex_paper/*
