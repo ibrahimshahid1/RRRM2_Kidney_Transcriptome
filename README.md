@@ -2,15 +2,15 @@
 
 ## Broad distal-nephron phosphoregulatory suppression in the spaceflight kidney
 
-This repository contains the analysis code, frozen configuration, validation tests, run manifests, figures, and maintained v11 manuscript for a cross-cohort and cross-omic study of mouse kidney responses to spaceflight.
+This repository contains the analysis code, frozen configuration, validation tests, run manifests, figures, and manuscript for a cross-cohort and cross-omic study of mouse kidney responses to spaceflight.
 
-The project began as an RRRM-2/OSD-771 transcriptomic network-rewiring analysis. The maintained v11 study is narrower and more directly supported by the public data. It asks how a recurrent whole-kidney RNA response relates to matched protein abundance and regulatory phosphorylation, with special attention to the WNK-SPAK/OSR1-NCC distal-nephron transport axis.
+The study asks how a recurrent whole-kidney RNA response relates to matched protein abundance and regulatory phosphorylation, with special attention to the WNK-SPAK/OSR1-NCC distal-nephron transport axis.
 
 The main conclusion is layer-specific:
 
 > Spaceflight produces a recurrent matrix/endothelial-high and DCT-transport-low bulk RNA state, but that RNA state does not propagate cleanly to protein abundance. The clearest transporter phenotype is suppression of regulatory phosphorylation across NCC, SPAK, and WNK-associated distal-nephron programs while total NCC protein remains approximately flat.
 
-The current manuscript is [`latex_paper/manuscript_v11.tex`](latex_paper/manuscript_v11.tex). Earlier network and manuscript iterations remain in the repository as supporting or historical analyses, but v11 is the maintained scientific interpretation.
+The manuscript source is available in [the LaTeX paper directory](latex_paper/manuscript_v11.tex).
 
 ## Contents
 
@@ -30,7 +30,7 @@ The current manuscript is [`latex_paper/manuscript_v11.tex`](latex_paper/manuscr
 
 ## Scientific question
 
-Whole-kidney RNA-seq can report tissue remodeling, cell-composition changes, and transcriptional regulation, but it cannot directly report transporter protein abundance or activation state. The v11 study therefore separates four questions by molecular layer:
+Whole-kidney RNA-seq can report tissue remodeling, cell-composition changes, and transcriptional regulation, but it cannot directly report transporter protein abundance or activation state. The study therefore separates four questions by molecular layer:
 
 1. **RNA recurrence:** Does a matrix/endothelial-high and DCT/NCC-WNK-low response recur across independent mouse kidney spaceflight cohorts?
 2. **Cross-layer propagation:** Does that RNA response propagate to protein abundance in matched OSD-462/RR-10 kidney multi-omics?
@@ -154,7 +154,7 @@ The supported interpretation is **distal-nephron subtype-prior enrichment led by
 
 Datasets are analyzed within study and are not pooled at raw-expression level. Their roles are fixed so that each claim uses data at an appropriate resolution.
 
-| Dataset | Modality | Role in v11 | Important boundary |
+| Dataset | Modality | Role in the study | Important boundary |
 |---|---|---|---|
 | RRRM-2 / OSD-771 | whole-kidney RNA-seq | primary RNA anchor; ISS terminal, live return, age-stratified contrasts | no matched protein/phosphoprotein layer |
 | OSD-513 | whole-kidney RNA-seq | primary independent recurrence cohort | recurrence, not raw-data pooling |
@@ -171,13 +171,13 @@ Datasets are analyzed within study and are not pooled at raw-expression level. T
 | OSD-656 | human post-flight urine inflammation panel | recovery/inflammation context | no direct distal-nephron validation markers |
 | LINCS/CMap GSE92742 | cell-line perturbation signatures | perturbagen-class hypotheses | context screen, not treatment discovery |
 
-Large external inputs and generated runs are excluded from Git by `.gitignore`. The committed repository contains code, configuration, tests, fixtures, documentation, and the v11 manuscript; a complete local analysis also requires the external data bundle.
+Large external inputs and generated runs are excluded from Git by `.gitignore`. The committed repository contains code, configuration, tests, fixtures, documentation, and the manuscript; a complete local analysis also requires the external data bundle.
 
 ## Analysis workflow
 
 ### 1. Within-study RNA scoring
 
-The repository uses compact, literature-curated mouse gene sets rather than treating imported ontology terms as the primary biological units. The 11 v11 panels are:
+The repository uses compact, literature-curated mouse gene sets rather than treating imported ontology terms as the primary biological units. The 11 curated panels are:
 
 - `ecm_organization`
 - `fibrosis_tgfb_emt`
@@ -247,7 +247,7 @@ Animal-level phosphosite models successively adjust for parent protein abundance
 - GSE269622/GSE269719 generate spatial injury/repair context and a DCT-adjacent prediction.
 - Human urine data are scored over independent fluid/electrolyte axes.
 - CMap generates perturbagen-class mimic or reversal hypotheses only after signature metadata are merged.
-- Historical LIONESS/node2vec candidates are tested as a negative-control translation layer; they do not enrich for OSD-462 protein or phosphoprotein changes.
+- Network-derived LIONESS/node2vec candidates are tested as a negative-control translation layer; they do not enrich for OSD-462 protein or phosphoprotein changes.
 
 ## Statistical specification
 
@@ -634,7 +634,7 @@ The current mechanistic proposal is therefore reduced WNK-SPAK activity through 
 | Continuous-prior models | null | rejects a broad smooth DCT1 gradient claim |
 | PXD001729 dDAVP overlap | no shared focused transport targets | vasopressin mechanism is not testable here |
 | KLHL3/CUL3 coverage | insufficient; proteins mostly flat | turnover mechanism remains unresolved |
-| Historical network candidates | no protein/phosphoprotein enrichment | network hubs did not manufacture the v11 result |
+| Network-derived candidates | no protein/phosphoprotein enrichment | network hubs did not manufacture the phosphoproteomic result |
 | Live-return context | attenuated or anti-aligned | not a clean recovery reversal |
 | OSD-253 context | innate association without strict TLR4 dependence | mechanism specificity |
 | Aging projection | no accelerated-aging alignment | excludes a broad aging interpretation |
@@ -642,7 +642,7 @@ The current mechanistic proposal is therefore reduced WNK-SPAK activity through 
 
 ## What the study does not claim
 
-The following boundaries are central to v11:
+The following boundaries are central to the study:
 
 - It does **not** assign whole-kidney phosphosites to DCT1 or DCT2 cells.
 - It does **not** claim a newly discovered NCC dephosphorylation phenotype; prior work established that endpoint. This repository resolves its cross-layer and subtype-prior context.
@@ -655,15 +655,15 @@ The following boundaries are central to v11:
 - It does **not** validate the model in human kidney tissue.
 - It does **not** interpret CMap hits as drug candidates.
 - It does **not** treat external IRI spatial data as spaceflight spatial validation.
-- It does **not** support the earlier broad per-gene network-rewiring or classifier narratives as the manuscript's primary result.
+- It does **not** treat network-rewiring or classifier outputs as primary evidence.
 
 The highest-priority next experiment is DCT-enriched or spatially resolved spaceflight phosphoproteomics paired with serum/urine electrolytes, blood pressure, and NCC abundance/phosphorylation. This would test whether the suppressed parent-gene program localizes to DCT1, DCT2/CNT, DCT-adjacent remodeling neighborhoods, or a broader distal-nephron compartment.
 
 ## Repository structure
 
-### Maintained v11 code
+### Study analysis code
 
-- [`src/v11/`](src/v11/) contains the canonical v11 analysis modules:
+- [`src/v11/`](src/v11/) contains the primary analysis modules:
   - `core_analysis.py`: baseline lock, cross-layer tables, DCT-prior mapping, enrichment, parent-gene analyses, PXD/KLHL3 context, and covariance summaries.
   - `build_gse228367_dct_prior.R`: DCT1/DCT2 pseudobulk prior construction and marker QC.
   - `h2_composition_aware_phospho.py`: M0-M5 parent-protein and composition ladder.
@@ -679,9 +679,9 @@ The highest-priority next experiment is DCT-enriched or spatially resolved space
   - `cmap_screen.py`: LINCS/CMap context screen.
   - `rna_protein_propagation.py`: matched-null pathway propagation calibration.
   - `observability_audit.py`: proteome detectability and NCC-site observability audit.
-  - `publication_figures.py`: v11 figure generation.
+  - `publication_figures.py`: manuscript figure generation.
 
-- [`scripts/v11/`](scripts/v11/) contains command-line wrappers. The canonical implementations live under `src/v11/`; some early numbered wrappers are retained for reproducibility history.
+- [`scripts/v11/`](scripts/v11/) contains command-line wrappers for the primary analysis modules.
 
 ### Multi-omic prerequisite layer
 
@@ -690,26 +690,26 @@ The highest-priority next experiment is DCT-enriched or spatially resolved space
 - [`scripts/regulator_activity/`](scripts/regulator_activity/) builds pathway, regulator, and per-animal phenotype summaries.
 - [`scripts/celltype/`](scripts/celltype/) builds marker-panel compartment scores and NCC-phosphorylation comparisons.
 
-### Supporting and historical analysis
+### Additional analysis modules
 
 - [`src/networks/`](src/networks/) contains shared-topology, LIONESS, node2vec, Procrustes, WGCNA, contrast-vector, mechanism-axis, and recovery analyses.
 - [`src/statistics/`](src/statistics/) contains differential expression, silent-shifter definitions, edge-regression inference, permutation/bootstrap, and full-pipeline permutation code.
 - [`src/validation/`](src/validation/) contains external replication, multi-study pooling, and fold-safe classifier validation.
 - [`src/preprocessing/`](src/preprocessing/) contains VST/residualization and deconvolution-related code.
 - [`src/enrichment/`](src/enrichment/) contains gene-set loading and biological grounding.
-- [`src/visualization/`](src/visualization/) contains publication and diagnostic plotting for earlier phases.
+- [`src/visualization/`](src/visualization/) contains publication and diagnostic plotting.
 
-These modules document how the project arrived at v11 and provide negative controls or supporting context. They are not all part of the maintained manuscript's primary inference.
+These modules provide preprocessing, supporting analyses, validation, and negative controls used across the workflow.
 
 ### Configuration, tests, and manuscript
 
 - [`config/`](config/): frozen metadata design, gene sets, priors, anchors, and preregistered human predictions.
 - [`tests/`](tests/): unit tests, sign-faithfulness tests, null controls, and fixture-locked manuscript numbers.
 - [`docs/`](docs/): analysis plans, execution reports, critiques, provenance audits, and interpretation boundaries.
-- [`latex_paper/manuscript_v11.tex`](latex_paper/manuscript_v11.tex): maintained manuscript source.
-- [`docs/v11_execution_results.md`](docs/v11_execution_results.md): core v11 execution report.
-- [`docs/v11_layer_specificity_execution_summary_2026-06-07.md`](docs/v11_layer_specificity_execution_summary_2026-06-07.md): RNA-protein propagation and observability extensions.
-- [`docs/v11_reviewer_ready_revision_packet.md`](docs/v11_reviewer_ready_revision_packet.md): claim language and reviewer-facing boundaries.
+- [LaTeX manuscript source](latex_paper/manuscript_v11.tex).
+- [Core execution report](docs/v11_execution_results.md).
+- [RNA-protein propagation and observability execution summary](docs/v11_layer_specificity_execution_summary_2026-06-07.md).
+- [Claim language and reviewer-facing boundaries](docs/v11_reviewer_ready_revision_packet.md).
 
 ## Reproducing the analysis
 
@@ -745,11 +745,11 @@ data/external/lincs_cmap/
 
 A local helper at `data/external/download_reach_datasets.py` can download the Johnson atlas, NASA Twins materials, optional LINCS metadata/Level-5 matrix, and optional OSD-656 files when the external-data workspace is present. The entire `data/external/` tree is ignored by Git, so that helper and the local dataset manifests are not part of a clean clone. OSDR, GSE228367, PXD001729, and spatial-reference inputs must be restored separately.
 
-The full LINCS Level-5 matrix is very large. CMap is optional to the central scientific claim, but the current phase-11 orchestrator does not expose a dedicated `--skip-cmap` flag. Without the matrix, run the required v11 modules individually or add the input before using the complete orchestrator. Full spatial reproduction likewise requires the complete Visium time course; Xenium is handled as an optional inventory when its H5AD file is absent.
+The full LINCS Level-5 matrix is very large. CMap is optional to the central scientific claim, but the analysis orchestrator does not expose a dedicated `--skip-cmap` flag. Without the matrix, run the required modules individually or add the input before using the complete orchestrator. Full spatial reproduction likewise requires the complete Visium time course; Xenium is handled as an optional inventory when its H5AD file is absent.
 
-### Current prerequisite runs
+### Required precomputed inputs
 
-At the current code state, phase 11 is a manuscript-analysis stack rather than a fresh-clone end-to-end downloader. Several modules expect prerequisite outputs at fixed paths:
+The analysis stack is not a fresh-clone end-to-end downloader. Several modules expect prerequisite outputs at fixed paths:
 
 ```text
 data/results/run_20260519_000547_2500g/
@@ -762,14 +762,14 @@ data/results/run_20260601_repair_b/
 
 These runs provide the frozen RRRM-2 mechanism axis, OSD-462 harmonized effects, per-animal phenotype scores, compartment scores, regulator activity, and recurrence/CMap query inputs. They are intentionally excluded from Git because of size.
 
-The relevant builders are under `scripts/osd462/`, `scripts/regulator_activity/`, and `scripts/celltype/`. See [`docs/osd462_multiomics_analysis_plan.md`](docs/osd462_multiomics_analysis_plan.md) and [`docs/v11_execution_results.md`](docs/v11_execution_results.md) for the dependency chain.
+The relevant builders are under `scripts/osd462/`, `scripts/regulator_activity/`, and `scripts/celltype/`. See the [multi-omic analysis plan](docs/osd462_multiomics_analysis_plan.md) and [execution report](docs/v11_execution_results.md) for the dependency chain.
 
-### Run the core v11 stack
+### Run the full analysis
 
 From the repository root:
 
 ```bash
-python -m src.run_all_phases --v11-only --run-id run_v11_reproduction
+python -m src.run_all_phases --v11-only --run-id run_full_reproduction
 ```
 
 Useful flags:
@@ -781,7 +781,7 @@ Useful flags:
 --v11-skip-spatial       skip all external spatial-reference analyses
 --v11-skip-visium        skip Visium projection only
 --v11-skip-xenium        skip Xenium inventory only
---v11-skip-figures       skip v11 figure generation
+--v11-skip-figures       skip manuscript figure generation
 ```
 
 `--skip-r` succeeds only when `dct_prior/gse228367_dct1_vs_dct2_de.tsv` already exists inside the selected run root.
@@ -789,7 +789,7 @@ Useful flags:
 The core stack currently runs:
 
 1. GSE228367 DCT-prior construction.
-2. v11 baseline/core analysis.
+2. Baseline and core multi-omic analysis.
 3. TMT channel-centering sensitivity.
 4. Kinome-atlas KSEA.
 5. Five-cohort recurrence meta-analysis.
@@ -804,9 +804,9 @@ The core stack currently runs:
 14. Perturbation triage summary.
 15. Publication figures unless skipped.
 
-### Run the layer-specificity extensions
+### Run the layer-specificity analyses
 
-The June 2026 RNA-to-protein propagation and observability modules are not yet called by `phase_v11`; run them separately:
+RNA-to-protein propagation and observability use separate entry points:
 
 ```bash
 python scripts/v11/05_rna_protein_propagation.py
@@ -828,7 +828,7 @@ latexmk -pdf manuscript_v11.tex
 
 ## Outputs and provenance
 
-The reference local v11 run is:
+The reference local analysis run is:
 
 ```text
 data/results/run_20260526_v11_dct1_phospho_mediation/
@@ -851,7 +851,7 @@ Important output groups:
 | `human_concordance/` | Twins, OSD-656, and axis-level concordance tables |
 | `cmap_screen/` | query genes, scored signatures, perturbagens, mechanisms, and verdict |
 | `manifests/` | input SHA256 values, parameters, and run provenance |
-| `figures/v11/` | manuscript-facing v11 figures |
+| `figures/v11/` | manuscript-facing figures |
 
 The layer-specificity run contains:
 
@@ -896,13 +896,13 @@ The numerical locks are:
 
 These fixture tests require the corresponding generated result directories to exist locally. A clean Git clone contains the expected numbers but not the ignored large run artifacts needed to re-read every locked table.
 
-## Manuscript status
+## Manuscript
 
-The maintained paper title is:
+The paper title is:
 
 > **Broad distal-nephron phosphoregulatory suppression in the spaceflight kidney: Cross-cohort RNA recurrence and matched mouse-kidney multi-omics resolve the transporter phenotype beyond the NCC/DCT1 axis**
 
-The manuscript is a May 2026 draft based entirely on public datasets and repository-generated analyses. Its central contribution is not that bulk kidney RNA changes in spaceflight or that NCC dephosphorylation exists. It is the resolution of those observations across molecular layers:
+The manuscript is based entirely on public datasets and repository-generated analyses. Its central contribution is the resolution of the observations across molecular layers:
 
 1. remodeling RNA recurs across cohorts;
 2. that RNA state does not behave as a protein-abundance program;
