@@ -13,7 +13,7 @@
 \usepackage{subcaption}
 \usepackage{float}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning}
+\usetikzlibrary{arrows.meta,positioning,calc}
 \usepackage{pdflscape}
 \usepackage{xcolor}
 \usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
@@ -60,9 +60,9 @@
 
 \begin{abstract}
 \noindent
-Spaceflight dephosphorylates the sodium-chloride cotransporter NCC and its WNK--SPAK/OSR1 regulatory kinases in the kidney, but whether the accompanying transcriptomic response reflects, contradicts, or simply misses that endpoint had not been resolved. Analyzing public mouse kidney RNA-seq, TMT protein, and phosphoproteomic datasets (RRRM-2/OSD-771, OSD-513, OSD-253, and matched RR-10/OSD-462) against external DCT1/DCT2 single-nucleus, perturbation, spatial, and human-urine references, we find limited concordance across the three layers: a recurrent bulk-RNA remodeling response does not propagate to protein abundance, and the transporter signal is carried at regulatory phosphorylation, with parent-gene enrichment consistent with involvement of distal-nephron programs beyond the canonical NCC/DCT1 axis.
+Spaceflight dephosphorylates the sodium-chloride cotransporter NCC and its WNK--SPAK/OSR1 regulatory kinases in the kidney, but whether the accompanying transcriptomic response reflects, contradicts, or simply misses that endpoint had not been resolved. Analyzing public mouse kidney RNA-seq, TMT protein, and phosphoproteomic datasets (RRRM-2/OSD-771, OSD-513, OSD-253, and matched RR-10/OSD-462) against external DCT1/DCT2 single-nucleus, perturbation, spatial, and human-urine references, we find that this transporter response is largely post-translational. In bulk RNA it is weak and cohort-dependent---the robust, recurrent transcriptomic signal is instead a nonspecific matrix/endothelial remodeling program---and it is absent from total protein abundance, resolving specifically at NCC/SPAK/WNK regulatory phosphosites; an unbiased kinome-wide screen independently recovers this suppression as WNK1 and WNK3, with parent-gene enrichment pointing beyond the canonical NCC/DCT1 axis.
 
-Across independent RNA cohorts, flight raised matrix/endothelial remodeling and lowered DCT/NCC-WNK transport scores; remodeling recurred robustly in a five-cohort meta-analysis ($p=7.0\times10^{-4}$), while transport suppression was more cohort-dependent and resolved most clearly at phosphorylation. In matched OSD-462 multi-omics the RNA program did not reach protein: RNA and protein flight effects were decoupled at genome scale (Spearman $-0.034$, the loose coupling expected for bulk tissue), and the one curated set with a null-tested protein effect, matrix/ECM, showed a suggestive protein-level inversion ($q=0.091$) rather than concordance. Total NCC and related protein abundance stayed flat while NCC/SPAK/WNK regulatory phosphosites fell, and an unbiased kinome-wide screen independently recovered WNK1/WNK3 suppression from the full phosphosite background.
+Across independent RNA cohorts, flight raised matrix/endothelial remodeling and lowered DCT/NCC-WNK transport scores; remodeling recurred robustly in a five-cohort meta-analysis ($p=7.0\times10^{-4}$), while transport suppression was more cohort-dependent and resolved most clearly at phosphorylation. In matched OSD-462 multi-omics the RNA program did not reach protein: RNA and protein flight effects were decoupled at genome scale (Spearman $-0.034$, the loose coupling expected for bulk tissue), and the one curated set with a null-tested protein effect, matrix/ECM, showed a suggestive protein-level inversion ($q=0.091$) rather than concordance. Against that flat protein background, NCC/SPAK/WNK regulatory phosphosites fell, and an unbiased kinome-wide screen independently recovered WNK1 ($q=5.4\times10^{-6}$) and WNK3 ($q=1.3\times10^{-5}$) suppression from the full phosphosite background.
 
 Ranking the parent genes of nominally flight-suppressed phosphosites against the DCT1/DCT2 prior placed the suppression at distal-nephron subtype-prior extremes, most robustly in a DCT2/CNT--leaning bin that held under an observability-matched parent-gene permutation and parent-protein normalization. Because the phosphoproteomics is whole-kidney, this is parent-gene prioritization rather than cell-resolved localization; within that limit it is consistent with involvement of aldosterone-sensitive distal-nephron programs beyond the canonical NCC/DCT1 axis, and external perturbation and spatial references nominated DCT-adjacent remodeling neighborhoods as the spatial hypothesis to test.
 
@@ -79,9 +79,58 @@ The spaceflight kidney transcriptome is therefore a tissue-context readout that 
 % =====================================================================
 \section{Introduction}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[>=Stealth, font=\small,
+  layer/.style={draw, rounded corners, align=left, text width=72mm, minimum height=14mm, inner sep=5pt},
+  chip/.style={draw, rounded corners, align=center, text width=40mm, minimum height=14mm, inner sep=3pt, font=\footnotesize},
+  drv/.style={draw, rounded corners, align=center, fill=orange!12, text width=72mm, inner sep=5pt, font=\footnotesize},
+  cor/.style={draw, rounded corners, align=left, fill=green!6, text width=64mm, inner sep=4pt, font=\footnotesize},
+  banner/.style={draw, rounded corners, align=center, fill=blue!5, text width=140mm, inner sep=5pt},
+  hdr/.style={font=\footnotesize\bfseries, align=center}]
+\node[draw, rounded corners, fill=black!6, align=center, font=\footnotesize, text width=72mm] (input)
+  {\textbf{Spaceflight mouse kidney}\\[-1pt]{\scriptsize RRRM-2/OSD-771, OSD-513, OSD-253, RR-10/OSD-462}};
+\node[layer, fill=blue!8, below=7mm of input] (rna)
+  {\textbf{Transcriptome}\,\,{\scriptsize bulk RNA-seq, 5 cohorts}\\[1pt]
+   {\scriptsize Robust: matrix/endothelial remodeling $\uparrow$ (meta $p{=}7.0{\times}10^{-4}$)}\\[-1pt]
+   {\scriptsize Transporter (DCT/NCC--WNK) $\downarrow$ --- weak, cohort-dependent}};
+\node[layer, fill=gray!12, below=11mm of rna] (prot)
+  {\textbf{Proteome}\,\,{\scriptsize TMT, OSD-462}\\[1pt]
+   {\scriptsize Decoupled from RNA (Spearman $-0.034$)}\\[-1pt]
+   {\scriptsize Total NCC / transporters flat; matrix/ECM inverted ($q{=}0.091$)}};
+\node[layer, fill=green!14, below=7mm of prot] (phos)
+  {\textbf{Phosphoproteome}\,\,{\scriptsize OSD-462}\\[1pt]
+   {\scriptsize NCC / SPAK / WNK regulatory phosphosites $\downarrow$}\\[-1pt]
+   {\scriptsize \textbf{the transporter-regulatory lesion}}};
+\node[drv, below=9mm of phos] (drv)
+  {\textbf{Proposed driver} {\scriptsize(hypothesis)}\\[1pt]
+   cephalad fluid shift $\rightarrow$ RAAS/aldosterone $+$ Cl$^-$/voltage WNK switch\\[-1pt]
+   $\rightarrow$ $\downarrow$WNK--SPAK drive $\rightarrow$ NCC dephosphorylation};
+\node[chip, fill=blue!5, right=10mm of rna] (frna) {\emph{weak}\\cohort-dependent};
+\node[chip, fill=gray!6, right=10mm of prot] (fprot) {\emph{flat}\\NCC unchanged};
+\node[chip, fill=green!22, draw=green!45!black, very thick, right=10mm of phos] (fphos) {$\downarrow$~\textbf{suppressed}\\resolved here};
+\node[hdr, above=3mm of frna] (fatehdr) {NCC/WNK transporter signal};
+\node[cor, below=9mm of fphos] (cor)
+  {\textbf{Corroboration \& localization}\\[1pt]
+   Kinome screen: WNK1 ($q{=}5.4{\times}10^{-6}$), WNK3 ($q{=}1.3{\times}10^{-5}$) $\downarrow$\\[1pt]
+   Parent genes \textbf{DCT2/CNT-leaning, beyond canonical NCC/DCT1} (matched-perm $p{=}0.017$)};
+\node[banner] at ($(drv.south west)!0.5!(cor.south east) + (0,-9mm)$) (banner)
+  {\textbf{Bulk transcriptomics does not report transporter state} --- the spaceflight transporter deficit is a phosphorylation-layer event carried by NCC/SPAK/WNK regulatory sites.};
+\draw[->, thick] (input) -- (rna);
+\draw[->, red!70!black, thick] (rna) -- node[right, font=\scriptsize, text=red!70!black]{does \emph{not} propagate} (prot);
+\draw[->, thick] (prot) -- (phos);
+\draw[->, thick, orange!75!black] (drv) -- node[right, font=\scriptsize]{drives} (phos);
+\draw[->, gray!55, thick] (frna) -- (fprot);
+\draw[->, green!45!black, thick] (fprot) -- (fphos);
+\draw[->, green!45!black, dashed] (fphos) -- (cor);
+\end{tikzpicture}
+\caption{\textbf{The spaceflight kidney response is layer-resolved: the transporter deficit is a phosphorylation-layer event.} One perturbation (spaceflight) read out across three molecular layers of the same RR-10/OSD-462 mice, with independent RNA cohorts anchoring the transcriptome. The robust, recurrent bulk-RNA signal is nonspecific matrix/endothelial remodeling (five-cohort meta $p=7.0\times10^{-4}$), and it does not propagate to protein abundance (RNA--protein decoupled at genome scale, Spearman $-0.034$; the one null-tested set, matrix/ECM, inverted at protein, $q=0.091$). The NCC/WNK transporter signal (right) is weak and cohort-dependent in RNA, flat in total protein, and resolves only at regulatory phosphorylation, where NCC/SPAK/WNK sites fall; an unbiased kinome-wide screen independently recovers WNK1 ($q=5.4\times10^{-6}$) and WNK3 ($q=1.3\times10^{-5}$), and the suppressed phosphosites' parent genes are DCT2/CNT-leaning, beyond the canonical NCC/DCT1 axis (observability-matched permutation $p=0.017$). The proposed upstream driver (orange) is a hypothesis; the layer pattern is the result.}
+\label{fig:model}
+\end{figure}
+
 Kidney risk has long been part of human spaceflight medicine, framed initially around altered calcium balance and the elevated renal stone risk carried by astronauts during and after flight \citep{cockett1962astronautical,pietrzyk2007renal,smith2014men}. Its proximate cause is mechanical. In microgravity the loss of a gravitational gradient produces a cephalad fluid shift that redistributes roughly two litres of blood and interstitial fluid from the lower body toward the thorax and head, forcing thoracic vascular beds to accommodate the displaced volume \citep{spacekidney2023}. The kidney sits directly downstream of this redistribution: altered central volume sensing changes the renal handling of sodium and water---reduced urinary sodium, sodium retention, and shifts in glomerular filtration and urinary albumin excretion \citep{christensen2001renal,drummer2001water}---and these functional changes are accompanied by structural ones, with kidneys examined after real or simulated microgravity showing glomerular atrophy, interstitial edema, and degeneration of renal tubular cells \citep{liakopoulos2012kidney}. More recent rodent work has moved the emphasis from stone physiology toward active tubular dysfunction, describing renal tubulopathy, interstitial and vascular remodeling, mitochondrial and oxidative-stress responses, and altered solute handling \citep{afshinnekoo2020fundamental,daSilveira2020comprehensive,chouker2025impact}, much of it enabled by rodent studies that profile kidney tissue directly across transcriptomic, proteomic, phosphoproteomic, and histologic layers.
 
-The Cosmic Kidney Disease study integrated human and rodent spaceflight datasets with microgravity and galactic-cosmic-radiation models to define a multi-omic picture of spaceflight-induced renal dysfunction, and reported dephosphorylation of the sodium-chloride cotransporter NCC (\gene{Slc12a3}) and related distal-nephron transport machinery alongside distal convoluted tubule (DCT) remodeling \citep{siew2024cosmic}. That work established the dephosphorylation endpoint; it did not resolve whether the same transporter phenotype is reflected, or contradicted, across the transcriptomic and protein-abundance layers, nor how far across the distal-nephron subtype map the suppressed phosphoregulation extends. The mouse kidney omics in that study derive from Rodent Research-10, deposited as OSD-462: kidney RNA-seq, TMT proteomics, and phosphoproteomics measured on the same flight and ground-control mice (B6129SF2/J; $n=20$ in the matched flight-versus-control comparison). We analyze OSD-462 together with independent mouse kidney RNA-seq cohorts to define the flight RNA signature, compare RNA against protein abundance across the remodeling and distal-nephron programs, quantify NCC/SPAK/WNK regulatory phosphosite changes, and rank the parent genes of suppressed phosphosites against an external DCT1/DCT2 subtype reference.
+The Cosmic Kidney Disease study integrated human and rodent spaceflight datasets with microgravity and galactic-cosmic-radiation models to define a multi-omic picture of spaceflight-induced renal dysfunction, and reported dephosphorylation of the sodium-chloride cotransporter NCC (\gene{Slc12a3}) and related distal-nephron transport machinery alongside distal convoluted tubule (DCT) remodeling \citep{siew2024cosmic}. That work established the dephosphorylation endpoint; it did not resolve whether the same transporter phenotype is reflected, or contradicted, across the transcriptomic and protein-abundance layers, nor how far across the distal-nephron subtype map the suppressed phosphoregulation extends. The mouse kidney omics in that study derive from Rodent Research-10, deposited as OSD-462: kidney RNA-seq, TMT proteomics, and phosphoproteomics measured on the same flight and ground-control mice (B6129SF2/J; $n=20$ in the matched flight-versus-control comparison). We analyze OSD-462 together with independent mouse kidney RNA-seq cohorts to define the flight RNA signature, compare RNA against protein abundance across the remodeling and distal-nephron programs, quantify NCC/SPAK/WNK regulatory phosphosite changes, and rank the parent genes of suppressed phosphosites against an external DCT1/DCT2 subtype reference; Figure~\ref{fig:model} summarizes the resulting layer-resolved model.
 
 NCC reabsorbs sodium and chloride in the distal convoluted tubule, and its activity is governed less by its abundance than by phosphorylation of an N-terminal regulatory cluster: the WNK kinases activate the Ste20-type kinases SPAK and OSR1, which phosphorylate this cluster to switch the transporter on \citep{vitari2005wnk,moriguchi2005wnk,richardson2008wnk,pachecoalvarez2006ncc} (Fig.~\ref{fig:axis}). Suppression of these regulatory phosphosites therefore lowers NCC activation largely independently of transporter protein level, with downstream effects on distal sodium-chloride balance and on the coupled potassium, calcium, and magnesium handling of the segment. Loss of NCC activity is the molecular lesion of Gitelman syndrome---salt wasting with volume contraction and a tendency to hypotension, hypokalemia, and hypomagnesemia \citep{gamba2005cct}---so a spaceflight-induced reduction in NCC activation would be expected to perturb fluid and electrolyte balance in microgravity, which makes the regulatory phosphorylation layer the physiologically decisive one. The DCT is itself heterogeneous: DCT1 carries this WNK--SPAK/OSR1--NCC electroneutral NaCl-reabsorption axis, whereas the later DCT2/CNT transition enters the aldosterone-sensitive distal nephron, where SGK1--NEDD4L control of ENaC overlaps with principal calcium/magnesium machinery including \gene{Trpv5}, \gene{Calb1}, and \gene{Trpm6} \citep{arroyo2011aldosterone,subramanya2014dct,su2024dct,loffing2001distal}. Which subtype a suppressed phosphosite belongs to is therefore biologically informative, and motivates the DCT1/DCT2 prior introduced below.
 
@@ -504,21 +553,7 @@ The second constraint is translational. In the NASA Twins flight subject, urine 
 % =====================================================================
 \section{Discussion}
 
-\begin{figure}[t]
-\centering
-\begin{tikzpicture}[>=Stealth, node distance=6mm,
-  layer/.style={draw, rounded corners, align=left, text width=0.78\textwidth, minimum height=11mm, inner sep=5pt},
-  drv/.style={draw, rounded corners, align=center, fill=orange!10, text width=0.78\textwidth, inner sep=4pt}]
-\node[layer, fill=blue!8] (rna) {\textbf{RNA (bulk, 5 cohorts):} matrix/endothelial remodeling $\uparrow$, DCT/NCC-WNK transport $\downarrow$ --- recurs as tissue context};
-\node[layer, fill=gray!10, below=of rna] (prot) {\textbf{Protein (OSD-462):} decoupled from RNA (Spearman $-0.03$); matrix/ECM \emph{inverted}; total NCC flat};
-\node[layer, fill=green!12, below=of prot] (phos) {\textbf{Phosphorylation (OSD-462):} NCC/SPAK/WNK regulatory sites $\downarrow$ --- the transporter-regulatory deficit};
-\node[drv, below=of phos] (drv) {\textbf{Proposed upstream driver:} cephalad fluid shift $\rightarrow$ volume/aldosterone axis $+$ Cl$^-$/voltage WNK switch $\rightarrow$ $\downarrow$WNK--SPAK drive};
-\draw[->, red!70!black, thick] (rna.east) to[bend left=55] node[right, font=\footnotesize, align=left]{does \emph{not}\\propagate} (prot.east);
-\draw[->, thick] (drv) -- (phos);
-\end{tikzpicture}
-\caption{\textbf{Model: the spaceflight kidney response is layer-resolved.} The recurrent bulk-RNA remodeling state does not propagate to protein abundance (the matrix/ECM set is inverted at protein), so the RNA layer is a tissue-context readout. The transporter-regulatory deficit is carried by NCC/SPAK/WNK regulatory phosphorylation, which we propose is driven by reduced WNK--SPAK activity downstream of the microgravity fluid shift---through the volume/aldosterone axis, the chloride/voltage potassium switch, or both. The driver arrow is a hypothesis; the layer pattern is the result.}
-\label{fig:model}
-\end{figure}
+% (Graphical-abstract model figure promoted to the Introduction as Figure~\ref{fig:model}.)
 
 \subsection{Main interpretation}
 

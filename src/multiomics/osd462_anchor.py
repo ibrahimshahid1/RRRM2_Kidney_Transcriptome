@@ -199,7 +199,7 @@ def compute_flight_effect(
 
     For each plex the effect is ``mean(log2 FL) - mean(log2 GC)`` over the
     available channels; the two plex estimates are then averaged.  Optional
-    per-channel median centering (``channel_center``) performs standard TMT
+    per-channel med=ian centering (``channel_center``) performs standard TMT
     sample-loading normalization within each plex; because the differencing is
     within plex, both the per-plex normalization constant and (after centering)
     per-channel loading cancel.
