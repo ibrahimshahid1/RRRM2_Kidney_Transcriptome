@@ -118,11 +118,11 @@ def ksea(
 
 
 def ksea_positive_control_passes(ksea_table: pd.DataFrame, *, control_kinases: Sequence[str]) -> bool:
-    """Positive control: the WNK--SPAK/OSR1 axis must come back inferred-down.
+    """Evaluate a predeclared down-direction control *after* site qualification.
 
-    The OSD-462 phosphoproteome shows NCC activating-cluster and SPAK
-    suppression (independently verified); a correct KSEA run must therefore
-    return the control kinases with negative z and nominal significance.
+    This helper does not establish substrate identity. The caller must first
+    enforce residue and phosphoform provenance; an unscored or under-covered
+    control correctly returns ``False``.
     """
     sub = ksea_table[ksea_table["kinase"].isin(list(control_kinases))]
     sub = sub[sub["status"].eq("scored")]

@@ -1,0 +1,125 @@
+analysis_id: grey60_adversarial_2026_07_29
+seed: 7716029
+
+inputs:
+  rrrm2_rtech: data/results/run_20260408_191759_2500g/phase1_residuals/Rtech.tsv.gz
+  rrrm2_meta: data/results/run_20260408_191759_2500g/phase1_residuals/meta_phase1.tsv.gz
+  rrrm2_vst: data/processed/aligned_outputs/vst_rRNArm_counts.csv
+  rrrm2_clr: data/results/run_20260408_191759_2500g/deconvolution/music_segment_direct_proportions_CLR.csv
+  module_assignments: data/results/run_20260505_remediated_2500g/wgcna/module_assignments.csv
+  module_eigengenes: data/results/run_20260505_remediated_2500g/wgcna/module_eigengenes.csv
+  grey60_genes: data/results/run_20260505_remediated_2500g/wgcna/module_gene_lists/grey60.txt
+  grey60_kme: data/results/run_20260505_remediated_2500g/wgcna/manuscript_followup/grey60_hub_genes_kME.csv
+  gc_reference_assignments: data/results/run_20260505_remediated_2500g/wgcna/gc_reference/gc_only_module_assignments.csv
+  atlas_comparator_sets: data/processed/v13_dct_reference/atlas_comparator_gene_sets.tsv
+  id_map: data/processed/resources/id_map.tsv
+  gene_sets: config/gene_sets.yaml
+  external_root: data/external/osdr
+
+frozen_hashes:
+  grey60_genes_sha256: cfefe6ff93204aa3a9607dd8cf8456a7f07b8980bf1b8ef51d731f074445a685
+  module_assignments_sha256: bb71360ea078c7d5821cd171c6bf559b45071b51c0f3c5d4ea294ec06f1a5f61
+  module_eigengenes_sha256: 115f22260017e3836176076ae8acfc5c753723e3136ba234d4de1b3c87c527b4
+  rrrm2_rtech_sha256: cbef47a681703234d6efa0399e6fa26c8843abfb4e3485435e1e2d7f5a3a704a
+  rrrm2_vst_sha256: bd7b981ef443382ef8c997dcdcc655219ec2dc3c9f6f2f5224d55600cac74d8f
+  rrrm2_clr_sha256: 2183ec95489a35077bcdd66e6fb3a56ff8df0d49823cd9bd8867d9ade1ec32c2
+  atlas_comparator_sets_sha256: 548ada3747a5f1873bc7238f63d95ddfa431591351cc05728bd0dd7259c9eb12
+
+score:
+  primary: mean_z
+  sensitivities:
+    - median_z
+    - fixed_kme_weighted_mean_z
+    - saved_ME17
+  orientation: saved_ME17_positive
+  frozen_gene_count: 48
+
+resampling:
+  maxT_permutations: 100000
+  animal_bootstrap: 10000
+  matched_subsets: 10000
+  external_permutations: 10000
+  seed: 7716029
+
+selection_family:
+  factorial_terms:
+    - Flight
+    - Age
+    - Arm
+    - Flight:Age
+    - Flight:Arm
+    - Age:Arm
+    - Flight:Age:Arm
+  stratum_flight_contrasts:
+    - ISS-T_YNG
+    - ISS-T_OLD
+    - LAR_YNG
+    - LAR_OLD
+  n_non_grey_modules: 20
+  n_tests: 220
+
+wgcna:
+  network_type: signed
+  tom_type: signed
+  correlation: bicor
+  max_p_outliers: 0.05
+  power: 7
+  flight_blind_groups:
+    - BSL
+    - VIV
+  grid:
+    max_genes: [2500, 5000, 10000]
+    min_module_size: [20, 30, 50]
+    merge_cut: [0.15, 0.25, 0.35]
+
+external:
+  terminal_primary:
+    - OSD-102
+    - OSD-163
+    - OSD-253
+    - OSD-462
+  recovery_moderator:
+    - OSD-513
+  osd253_primary_control: original_gc_blue
+  osd253_sensitivity_control: rerun_white_gc
+  osd462_primary_synthesis: within_animal_mean_across_UPX_mRNA_totRNA
+  model: REML_modified_Hartung_Knapp
+  sensitivity_model: DerSimonian_Laird
+
+go_no_go:
+  gate_A:
+    maxT_fwer_lte: 0.05
+    pooled_iss_terminal_bootstrap_ci_above_zero: true
+    both_age_specific_point_estimates_positive: true
+  gate_B:
+    flight_blind_overlap_genes_gte: 24
+    flight_blind_overlap_bh_q_lte: 0.05
+    flight_blind_jaccard_gte: 0.30
+    flight_blind_projected_permutation_p_lte: 0.05
+    matched_subset_percentile_gte: 0.95
+    grid_recovery_count_gte: 18
+    grid_positive_effect_count_gte: 22
+  gate_C:
+    all_leave_one_mouse_effects_positive: true
+    all_leave_one_gene_effects_positive: true
+    positive_gene_contrasts_gte: 32
+    sign_test_p_lte: 0.05
+    maximum_gene_absolute_contribution_lte: 0.20
+  gate_D:
+    composition_adjusted_effect_positive: true
+    adjusted_to_unadjusted_ratio_gte: 0.50
+    maximum_vif_lt: 5.0
+    baseline_maxT_p_gt: 0.05
+    baseline_abs_hedges_g_lt: 0.50
+  gate_E:
+    positive_terminal_studies_gte: 3
+    pooled_ci_above_zero: true
+    i_squared_lt: 60.0
+    all_leave_one_study_point_estimates_positive: true
+    maximum_study_weight_lte: 0.50
+  gate_F:
+    adjusted_effect_positive: true
+    adjusted_to_unadjusted_ratio_gte: 0.50
+    matched_set_percentile_gte: 0.95
+
+output_dir: data/results/run_20260729_grey60_adversarial

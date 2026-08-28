@@ -152,10 +152,13 @@ def baseline_lock(root: Path):
         },
         {
             "component": "OSD462_phospho",
-            "metric": "ncc_regulatory_mean_phospho",
-            "value": summary["layer2_phospho"]["ncc_regulatory_mean_phospho"],
-            "status": "SUPPORTED",
-            "interpretation": "NCC regulatory phosphosites suppressed with total NCC protein flat",
+            "metric": "isolated_canonical_ncc_spak_coverage",
+            "value": 0,
+            "status": "UNRESOLVED",
+            "interpretation": (
+                "Stage 0 found zero isolated canonical assay features; "
+                "T53/Y65 and S382/S383 rows are co-modified context only"
+            ),
         },
     ]
     for _, row in ksea.iterrows():
@@ -165,7 +168,10 @@ def baseline_lock(root: Path):
                 "metric": row["kinase"],
                 "value": row["z_score"],
                 "status": row["direction"],
-                "interpretation": "positive-control kinase activity anchor",
+                "interpretation": (
+                    "kinase activity is not inferred without isolated, "
+                    "phosphoform-qualified substrate features"
+                ),
             }
         )
     for _, row in pheno_summary.iterrows():
@@ -183,9 +189,12 @@ def baseline_lock(root: Path):
             {
                 "component": "celltype_vs_ncc_phospho",
                 "metric": row["panel"],
-                "value": row["spearman_vs_ncc_phospho"],
-                "status": "correlation",
-                "interpretation": "compartment score correlation with NCC regulatory phosphorylation",
+                "value": np.nan,
+                "status": "INVALIDATED_AS_ACTIVITY_EVIDENCE",
+                "interpretation": (
+                    "historical score used co-modified position-indexed features; "
+                    "it is not NCC regulatory-site activity"
+                ),
             }
         )
     out = pd.DataFrame(rows)
@@ -1774,6 +1783,45 @@ def approximate_bayes_linear(y, X, n_draws=10000, seed=20260526):
 
 
 def run_mediation(root: Path):
+    # Stage 0 invalidated the outcome used by the historical mediation:
+    # position-indexed T53 and S383 rows are co-modified phosphoforms, and no
+    # isolated canonical NCC/SPAK feature qualifies. Fail closed.
+    reason = (
+        "not_run: zero isolated canonical OSD-462 NCC/SPAK assay features; "
+        "historical ncc_activity_score_regulatory is invalid as an activity outcome"
+    )
+    pd.DataFrame([{"status": "UNRESOLVED", "reason": reason}]).to_csv(
+        root / "h3_mediation" / "h3_mediation_input_scores.tsv",
+        sep="\t",
+        index=False,
+    )
+    pd.DataFrame(
+        columns=[
+            "mediator",
+            "parameter",
+            "posterior_median",
+            "ci_low",
+            "ci_high",
+            "p_less_than_zero",
+            "p_greater_than_zero",
+            "n_animals",
+            "model",
+        ]
+    ).to_csv(
+        root / "h3_mediation" / "h3_mediation_model_summary.tsv",
+        sep="\t",
+        index=False,
+    )
+    pd.DataFrame(columns=["status", "reason"]).to_csv(
+        root / "h3_mediation" / "h3_mediation_power_simulation.tsv",
+        sep="\t",
+        index=False,
+    )
+    (root / "h3_mediation" / "h3_mediation_verdict.json").write_text(
+        json.dumps({"status": "UNRESOLVED", "reason": reason}, indent=2)
+    )
+    return
+
     pheno = read_tsv(PHENO / "phenotype_anchor_per_animal.tsv")
     scores = pd.read_csv(CELLTYPE / "osd462_compartment_scores_per_sample.tsv", sep="\t", index_col=0).T
     rows = []

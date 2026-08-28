@@ -80,7 +80,7 @@ def test_high_coverage_subset_filters_by_both_criteria():
     assert set(sub["gene_symbol"]) == {"B", "E"}
 
 
-def test_ncc_site_observability_finds_regulatory_and_control_sites():
+def test_ncc_site_observability_labels_comodified_context_and_controls():
     sites = pd.DataFrame({
         "gene_symbol": ["Slc12a3", "Slc12a3", "Slc12a3", "Slc12a3",
                         "Slc12a3", "Slc12a3", "Stk39", "Stk39",
@@ -95,11 +95,14 @@ def test_ncc_site_observability_finds_regulatory_and_control_sites():
         "n_gc": [5, 5, 5, 5, 4, 3, 5, 5, 5, 5],
     })
     out = ncc_site_observability(sites)
-    assert (out["role"] == "regulatory").sum() == 6
+    assert (out["role"] == "canonical-indexed co-modified context").sum() == 2
     assert (out["role"] == "non-regulatory control").sum() == 2
-    # Regulatory sites should have higher coverage_percentile (n=10 each) than
+    # Context features should have higher coverage_percentile (n=10 each) than
     # the two NCC nonreg sites we included that have lower n_fl/n_gc.
-    reg_med = out.loc[out["role"].eq("regulatory"), "coverage_percentile"].median()
+    reg_med = out.loc[
+        out["role"].eq("canonical-indexed co-modified context"),
+        "coverage_percentile",
+    ].median()
     ctrl_med = out.loc[out["role"].eq("non-regulatory control"), "coverage_percentile"].median()
     assert reg_med >= ctrl_med
 

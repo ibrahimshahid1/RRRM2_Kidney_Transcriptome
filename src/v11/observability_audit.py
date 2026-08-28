@@ -7,7 +7,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from src.multiomics.phenotype_anchor import NCC_REGULATORY_SITES, NCC_NONREGULATORY_SITES
+from src.multiomics.phenotype_anchor import (
+    NCC_NONREGULATORY_SITES,
+    OSD462_COMODIFIED_CANONICAL_INDEX_FEATURES,
+)
 from src.v11.matched_null import (
     assign_match_strata,
     ols_slope,
@@ -259,15 +262,15 @@ def ncc_site_observability(
 ) -> pd.DataFrame:
     """Per-NCC/SPAK site: observability metrics + percentile vs the phosphoproteome.
 
-    For each pre-specified regulatory site (and the non-regulatory
-    sentinels), report:
+    For each residue-indexed co-modified context feature (and the
+    non-regulatory sentinels), report:
       - n_fl + n_gc (channels with a finite, positive scaled S/N),
       - missing_fraction percentile within the full phospho table,
       - intensity (effect magnitude) percentile,
-      - role tag ("regulatory" vs "non-regulatory control").
+      - an explicit role tag that does not imply isolated canonical occupancy.
 
-    Confirms the suppressed regulatory sites are high-coverage / high-
-    intensity rather than living in the low-observability tail.
+    This is an observability audit only. It cannot upgrade position-only effect
+    rows into isolated canonical-site evidence.
     """
     sites = phospho_all_sites.copy()
     sites["gene_upper"] = sites["gene_symbol"].astype(str).str.upper()
@@ -284,10 +287,10 @@ def ncc_site_observability(
         return str(s).strip()
 
     site_rows = []
-    for gene, pos in NCC_REGULATORY_SITES:
+    for gene, pos in OSD462_COMODIFIED_CANONICAL_INDEX_FEATURES:
         sel = sites[(sites["gene_upper"].eq(str(gene).upper()))
                     & (sites[site_position_col].astype(str).map(_key).eq(_key(pos)))]
-        role = "regulatory"
+        role = "canonical-indexed co-modified context"
         for _, row in sel.iterrows():
             site_rows.append({
                 "gene_symbol": gene, "site_position": pos, "role": role,

@@ -54,15 +54,16 @@ def panel_b(ax):
 def panel_c(ax):
     s = pd.read_csv(ANCHOR / "phospho_axis_summary.tsv", sep="\t")
     s["key"] = s["gene_symbol"] + " " + s["site_position"].astype(str)
-    reg = [("Slc12a3", "53"), ("Slc12a3", "65"), ("Slc12a3", "68"),
-           ("Stk39", "382"), ("Stk39", "383")]
+    # Residue-indexed but co-modified context features.  T53 is carried with
+    # Y65 and S383 with S382; neither is isolated canonical-site evidence.
+    context = [("Slc12a3", "53"), ("Stk39", "383")]
     non = [("Slc12a3", "96"), ("Slc12a3", "120"), ("Slc12a3", "122"), ("Slc12a3", "124")]
     def eff(g, p):
         r = s[(s.gene_symbol == g) & (s.site_position.astype(str) == p)]
         return float(r["phospho_effect"].iloc[0]) if len(r) else np.nan
     labels, vals, cols = [], [], []
-    for g, p in reg:
-        labels.append(f"{g[:4]} {p}*"); vals.append(eff(g, p)); cols.append(DOWN)
+    for g, p in context:
+        labels.append(f"{g[:4]} {p}†"); vals.append(eff(g, p)); cols.append(DOWN)
     for g, p in non:
         labels.append(f"{g[:4]} {p}"); vals.append(eff(g, p)); cols.append(NEUT)
     labels.append("NCC total\nprotein"); vals.append(0.0889); cols.append("#27ae60")
@@ -70,7 +71,7 @@ def panel_c(ax):
     ax.bar(range(len(vals)), vals, color=cols, edgecolor="k", lw=.4)
     ax.set_xticks(range(len(labels))); ax.set_xticklabels(labels, rotation=60, ha="right", fontsize=5.8)
     ax.set_ylabel("flight effect (log2)")
-    ax.set_title("C  Phospho layer: regulatory* down,\nnon-reg flat, total NCC flat (H3)", fontsize=9, loc="left", weight="bold")
+    ax.set_title("C  Phospho layer: co-modified† features down;\nisolated canonical occupancy unresolved", fontsize=9, loc="left", weight="bold")
 
 
 def panel_d(ax):
@@ -111,7 +112,7 @@ def panel_e(ax):
     ax.set_xticklabels([p.replace("_", "\n") for p in panels], fontsize=6)
     ax.set_ylabel("mean flight stat")
     ax.legend(fontsize=5, ncol=2, loc="lower left")
-    ax.set_title("E  Cell-type: DCT down, endothelial/stromal up\n(endo vs NCC phospho rho=-0.76, p<.001)", fontsize=9, loc="left", weight="bold")
+    ax.set_title("E  Cell-type: DCT down, endothelial/stromal up\n(pooled correlation used co-modified context score)", fontsize=9, loc="left", weight="bold")
 
 
 def panel_f(ax):
@@ -119,9 +120,9 @@ def panel_f(ax):
     rows = [
         ("Recurrent RNA context (matrix-high/DCT-low)", "supported", UP),
         ("Protein-abundance concordance", "falsified (null)", DOWN),
-        ("NCC/SPAK regulatory phospho suppression", "supported (anchor)", UP),
+        ("T53/Y65 + S382/S383 feature suppression", "context; activity unresolved", NEUT),
         ("Network-candidate translation", "falsified (null)", DOWN),
-        ("Frozen RNA <-> NCC activity, group level", "supported", UP),
+        ("Frozen RNA <-> co-modified feature score", "group-separated context", NEUT),
         ("...per-animal predictive link", "underpowered", NEUT),
         ("Non-obvious regulator (beyond injury)", "none; endo. axis nominated", NEUT),
         ("DCT-low = pure transcriptional suppression", "no; interstitial component", NEUT),

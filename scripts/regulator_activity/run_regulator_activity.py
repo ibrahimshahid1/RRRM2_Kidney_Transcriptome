@@ -24,6 +24,10 @@ from src.multiomics.regulator_activity import (  # noqa: E402
     recurrence_class,
     run_ulm_activity,
 )
+from src.multiomics.osd462_stage0 import (  # noqa: E402
+    audit_ncc_spak_phosphosites,
+    isolated_canonical_assay_features,
+)
 
 DEF_PHOSPHO = "data/results/run_20260521_osd462_anchor/osd462_anchor/phospho_all_sites.tsv"
 DEF_KSNET = "data/external/kinase_substrate/renal_kinase_substrate_core.tsv"
@@ -55,16 +59,51 @@ def layer_a_kinase(phospho_path: Path, ksnet_path: Path, outdir: Path) -> dict:
     log("Layer A: KSEA kinase-activity inference on OSD-462 phosphoproteomics")
     sites = pd.read_csv(phospho_path, sep="\t")
     net = load_kinase_substrate_net(str(ksnet_path))
-    table = ksea(sites, net, min_substrates=3)
+    provenance = isolated_canonical_assay_features(
+        audit_ncc_spak_phosphosites()
+    )
+    eligible_keys = set(
+        zip(
+            provenance["gene_symbol"].astype(str),
+            provenance["workbook_site_position"].astype(str),
+        )
+    )
+    assay_net = net[
+        [
+            (str(gene), str(site)) in eligible_keys
+            for gene, site in zip(net["substrate_gene"], net["substrate_site"])
+        ]
+    ].copy()
+    if assay_net.empty:
+        # Fail closed. A position match to T53 or S383 is insufficient because
+        # both OSD-462 rows are co-modified phosphoforms.
+        table = pd.DataFrame(
+            {
+                "kinase": sorted(net["kinase"].unique()),
+                "n_substrates_quantified": 0,
+                "mean_substrate_effect": np.nan,
+                "z_score": np.nan,
+                "p_value": np.nan,
+                "status": "no_qualified_isolated_substrates",
+                "q_value": np.nan,
+                "direction": "not_inferred",
+                "background_n_sites": int(len(sites)),
+            }
+        )
+    else:
+        table = ksea(sites, assay_net, min_substrates=3)
     table.to_csv(outdir / "osd462_kinase_activity_summary.tsv", sep="\t", index=False)
     control_pass = ksea_positive_control_passes(table, control_kinases=CONTROL_KINASES)
     log(f"  kinases scored: {int(table['status'].eq('scored').sum())}; "
         f"WNK-SPAK/OSR1 positive control passed: {control_pass}")
     if not control_pass:
-        log("  WARNING: positive control did not pass -- inspect the kinase-substrate net "
-            "before trusting any kinase result.")
+        log(
+            "  WARNING: kinase activity not inferred -- no isolated canonical "
+            "OSD-462 substrate phosphoform passes provenance."
+        )
     return {
         "n_kinases_scored": int(table["status"].eq("scored").sum()),
+        "n_qualified_isolated_substrate_features": int(len(assay_net)),
         "positive_control_passed": bool(control_pass),
         "output": str(outdir / "osd462_kinase_activity_summary.tsv"),
     }
@@ -162,7 +201,10 @@ def main() -> int:
         "layer_b_tf_pathway": layer_b,
         "positive_control": {
             "kinases": list(CONTROL_KINASES),
-            "rule": "WNK and SPAK_OSR1 must return inferred_activity_down at p<0.05",
+            "rule": (
+                "Only residue- and phosphoform-qualified isolated substrates "
+                "may enter KSEA; otherwise activity is not inferred."
+            ),
             "passed": layer_a.get("positive_control_passed"),
         },
     }

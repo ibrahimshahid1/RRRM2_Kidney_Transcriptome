@@ -199,11 +199,17 @@ def recurrence_fig(out_dir):
     ncc_rna = float(ncc_row["osd462_rna_effect"])
     ncc_prot = float(ncc_row["protein_flight_effect"])
     ncc_sites = phos[phos["gene_symbol"] == "Slc12a3"]
-    reg = ncc_sites[ncc_sites["site_position"].astype(str).isin(["53", "65", "68", "89", "65;68", "58;65"])]
-    ncc_phos = float(reg["phospho_effect"].mean())
-    spak = phos[(phos["gene_symbol"] == "Stk39") & (phos["site_position"].astype(str).isin(["366", "382", "383", "382;383"]))]
-    spak_phos = float(spak["phospho_effect"].mean())
-    labels = ["NCC\nRNA", "NCC\nprotein", "NCC reg.\nphospho", "SPAK\nphospho"]
+    # Context-only residue-indexed features.  The T53 row is a T53/Y65
+    # phosphoform and the S383 row is an S382/S383 phosphoform; neither is an
+    # isolated canonical-site measurement.
+    ncc_context = ncc_sites[ncc_sites["site_position"].astype(str).eq("53")]
+    ncc_phos = float(ncc_context["phospho_effect"].mean())
+    spak_context = phos[
+        (phos["gene_symbol"] == "Stk39")
+        & phos["site_position"].astype(str).eq("383")
+    ]
+    spak_phos = float(spak_context["phospho_effect"].mean())
+    labels = ["NCC\nRNA", "NCC\nprotein", "T53-indexed†\nphospho", "S383-indexed†\nphospho"]
     vals = [ncc_rna, ncc_prot, ncc_phos, spak_phos]
     colors = [C_GC, "0.6", C_DOWN, C_DOWN]
     bars = ax.bar(np.arange(4), vals, color=colors, edgecolor="k", linewidth=0.5)
@@ -215,7 +221,7 @@ def recurrence_fig(out_dir):
     for xi, v in enumerate(vals):
         ax.text(xi, v + (0.03 if v >= 0 else -0.03), f"{v:+.2f}", ha="center",
                 va="bottom" if v >= 0 else "top", fontsize=8)
-    ax.text(0.5, 0.96, "RNA down; abundance slightly up; activating phosphorylation suppressed",
+    ax.text(0.5, 0.96, "† co-modified site features; isolated canonical occupancy unresolved",
             transform=ax.transAxes, ha="center", va="top", fontsize=7, color="0.3")
 
     fig.tight_layout()

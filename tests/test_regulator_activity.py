@@ -105,3 +105,11 @@ def test_load_kinase_substrate_net_core():
         "data/external/kinase_substrate/renal_kinase_substrate_core.tsv")
     assert {"kinase", "substrate_gene", "substrate_site"}.issubset(net.columns)
     assert set(net["kinase"]) == {"SPAK_OSR1", "WNK"}
+    assert set(net["annotation_status"]) == {"strict_canonical"}
+    assert set(net["reference_scope"]) == {
+        "literature_definition_not_assay_qualification"}
+    assert set(net["substrate_residue"]) <= {"S", "T"}
+    ncc = net[net["substrate_gene"].eq("Slc12a3")]
+    assert set(zip(ncc["substrate_site"], ncc["substrate_residue"])) == {
+        ("53", "T"), ("58", "T"), ("71", "S")}
+    assert not net["substrate_site"].isin(["65", "68", "382", "339"]).any()

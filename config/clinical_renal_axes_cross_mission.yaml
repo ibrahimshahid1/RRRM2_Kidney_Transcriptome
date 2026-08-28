@@ -1,0 +1,270 @@
+analysis_id: clinical_renal_axes_cross_mission_v1
+lock_date: 2026-08-11
+status: frozen_retrospective_targeted_analysis
+seed: 20260811
+
+question: >-
+  Which clinically anchored renal tissue programs show directional engagement
+  during terminal spaceflight, and which recur across independent mouse
+  missions?
+
+interpretation_boundary:
+  allowed:
+    - kidney tissue transcriptional program engagement
+    - cross-mission recurrence or heterogeneity
+    - nomination of urine, blood, or histology assays for prospective measurement
+  prohibited:
+    - measured urinary or circulating biomarker change
+    - AKI or CKD diagnosis
+    - albuminuria or filtration-barrier failure
+    - histologic fibrosis or renal morphology
+    - renal cancer risk
+
+primary_family:
+  # All scores are oriented so a positive value denotes the declared adverse
+  # tissue-program direction. Genes are equally weighted within a subdomain;
+  # subdomains are equally weighted within a composite axis.
+  glomerular_barrier_identity_loss:
+    role: primary_biological_axis
+    direction_label: lower podocyte/barrier identity
+    subdomains:
+      barrier_core:
+        genes:
+          Nphs1: -1
+          Nphs2: -1
+          Synpo: -1
+          Ptpro: -1
+          Magi2: -1
+          Wt1: -1
+        minimum_present: 4
+    sensitivity_additions:
+      barrier_expanded:
+        Podxl: -1
+        Cd2ap: -1
+
+  tubular_epithelial_injury_induction:
+    role: primary_biological_axis
+    direction_label: higher tubular epithelial injury response
+    subdomains:
+      injury_core:
+        genes:
+          Havcr1: 1
+          Lcn2: 1
+        minimum_present: 2
+    gene_level_requirement: both genes must be observable and reported separately
+    secondary_markers:
+      Il18: 1
+
+  fibrosis_maladaptive_remodeling:
+    role: primary_biological_axis
+    direction_label: higher maladaptive repair and matrix deposition
+    subdomains:
+      maladaptive_repair:
+        genes:
+          Dkk3: 1
+          Mmp7: 1
+          Timp1: 1
+          Ccl2: 1
+          Egf: -1
+        minimum_present: 4
+      extracellular_matrix_deposition:
+        genes:
+          Col1a1: 1
+          Col1a2: 1
+          Col3a1: 1
+          Col6a1: 1
+          Col6a2: 1
+          Col6a3: 1
+          Fn1: 1
+          Postn: 1
+        minimum_present: 6
+    pass_requirement: both subdomains retain the pooled direction
+
+  distal_transport_identity_loss:
+    role: contextual_reference_axis
+    direction_label: lower distal epithelial transport-associated transcript abundance
+    subdomains:
+      dct_identity:
+        genes:
+          Slc12a3: -1
+          Pvalb: -1
+          Trpm6: -1
+          Kcnj10: -1
+          Kcnj16: -1
+          Clcnkb: -1
+        minimum_present: 5
+      asdn_identity:
+        genes:
+          Hsd11b2: -1
+          Nr3c2: -1
+          Sgk1: -1
+          Nedd4l: -1
+          Scnn1a: -1
+          Scnn1b: -1
+          Scnn1g: -1
+        minimum_present: 6
+    interpretation_note: >-
+      This is transcript abundance/identity, not transporter flux or WNK-SPAK
+      kinase activity. It is included in the four-axis multiplicity family but
+      cannot by itself make the study a biological go.
+
+primary_missions:
+  OSD-102:
+    context: terminal
+    vst: data/external/osdr/OSD-102/GLDS-102_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv
+    counts: data/external/osdr/OSD-102/GLDS-102_rna_seq_RSEM_Unnormalized_Counts_rRNArm_GLbulkRNAseq.csv
+    runsheet: data/external/osdr/OSD-102/GLDS-102_rna_seq_bulkRNASeq_v1_runsheet.csv
+    qc: data/external/osdr/OSD-102/GLDS-102_rna_seq_qc_metrics_GLbulkRNAseq.csv
+    selection: Space Flight versus Ground Control
+    blocks: []
+
+  OSD-163:
+    context: terminal
+    vst: data/external/osdr/OSD-163/GLDS-163_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv
+    counts: data/external/osdr/OSD-163/GLDS-163_rna_seq_RSEM_Unnormalized_Counts_rRNArm_GLbulkRNAseq.csv
+    runsheet: data/external/osdr/OSD-163/GLDS-163_rna_seq_bulkRNASeq_v1_runsheet.csv
+    qc: data/external/osdr/OSD-163/GLDS-163_rna_seq_qc_metrics_GLbulkRNAseq.csv
+    selection: Space Flight versus Ground Control; Basal Control excluded
+    blocks: []
+
+  OSD-253:
+    context: terminal
+    vst: data/external/osdr/OSD-253/GLDS-253_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv
+    counts: data/external/osdr/OSD-253/GLDS-253_rna_seq_RSEM_Unnormalized_Counts_rRNArm_GLbulkRNAseq.csv
+    runsheet: data/external/osdr/OSD-253/GLDS-253_rna_seq_bulkRNASeq_v2_runsheet.csv
+    qc: data/external/osdr/OSD-253/GLDS-253_rna_seq_qc_metrics_GLbulkRNAseq.csv
+    selection: >-
+      C57BL/6J only; Space Flight versus original Ground Control; approximately
+      25-day and 75-day strata estimated separately and fixed-effect combined
+      within mission
+    blocks: [duration]
+    known_design_limit: >-
+      Original ground controls differ in light-treatment annotation from
+      flight. White-light rerun controls also differ in sequencing run/read
+      length and are therefore sensitivity-only.
+
+  OSD-462:
+    context: terminal
+    vst: data/external/osdr/OSD-462/GLDS-462_rna_seq_VST_Counts_totRNA_GLbulkRNAseq.csv
+    counts: data/external/osdr/OSD-462/GLDS-462_rna_seq_RSEM_Unnormalized_Counts_totRNA_GLbulkRNAseq.csv
+    sample_table: data/external/osdr/OSD-462/GLDS-462_rna_seq_SampleTable_totRNA_GLbulkRNAseq.csv
+    qc: data/external/osdr/OSD-462/GLDS-462_rna_seq_qc_metrics_totRNA_GLbulkRNAseq.csv
+    selection: wild-type Space Flight versus wild-type Ground Control; total RNA
+    blocks: []
+    preparation_sensitivities: [mRNA, UPX]
+
+  OSD-771:
+    context: terminal
+    vst: data/processed/vst_normalized/GLDS-674_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv
+    counts: data/raw/counts/GLDS-674_rna_seq_RSEM_Unnormalized_Counts_rRNArm_GLbulkRNAseq.csv
+    metadata: data/raw/metadata/s_OSD-771.txt
+    qc: data/external/osdr/OSD-771/GLDS-674_rna_seq_qc_metrics_GLbulkRNAseq.csv
+    selection: ISS-T Space Flight versus ISS-T Ground Control
+    blocks: [age]
+
+moderator_cohorts:
+  OSD-513:
+    context: live_return
+    vst: data/external/osdr/OSD-513/GLDS-513_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv
+    counts: data/external/osdr/OSD-513/GLDS-513_rna_seq_RSEM_Unnormalized_Counts_rRNArm_GLbulkRNAseq.csv
+    runsheet: data/external/osdr/OSD-513/GLDS-513_rna_seq_bulkRNASeq_v2_runsheet.csv
+    qc: data/external/osdr/OSD-513/GLDS-513_rna_seq_qc_metrics_GLbulkRNAseq.csv
+    selection: Space Flight versus Ground Control after live return
+  OSD-771-LAR:
+    context: long_recovery
+    parent: OSD-771
+    selection: LAR Space Flight versus LAR Ground Control, age-blocked
+
+gene_mapping:
+  path: data/processed/resources/id_map.tsv
+  annotation_fallback: data/external/osdr/OSD-462/GLDS-462_rna_seq_differential_expression_totRNA_GLbulkRNAseq.csv
+  ensembl_column: ensembl_gene_id
+  symbol_column: mgi_symbol
+  strip_ensembl_version: true
+
+eligibility:
+  count_filter: CPM >= 0.1 in at least half of either contrasted arm within a mission
+  cpm_threshold: 0.1
+  axis_coverage: every subdomain-specific minimum must be met
+  no_gene_substitution: true
+  one_biological_kidney_per_animal: true
+
+technical_qc:
+  primary_metric: ratio_genebody_cov_3_to_5
+  secondary_metrics:
+    - rin
+    - read_depth
+    - uniquely_mapped_percent
+  exact_analysis_cells_only: true
+  imbalance_flag: two-sided Welch p < 0.05 and absolute Hedges g >= 0.50
+  handling: >-
+    A flagged primary coverage imbalance excludes that mission from the primary
+    synthesis; secondary metric flags trigger a covariate sensitivity rather
+    than automatic exclusion. Technical replicates are collapsed to one
+    biological-animal value before QC and expression scoring.
+
+primary_scoring:
+  method: signed mean of gene z-scores
+  standardization: >-
+    Gene-wise z-score over the complete frozen mission analysis set; do not
+    standardize separately within age or duration blocks.
+  subdomain_weighting: equal
+  axis_weighting: equal subdomain weight
+  sensitivities:
+    - signed median within subdomain
+    - common gene intersection across eligible missions
+    - leave one gene out
+    - leave one mission out
+
+inference:
+  mission_effect: Hedges g, flight minus matched ground control
+  within_mission_strata: inverse-variance fixed-effect combination
+  meta_analysis: REML random effects with modified Hartung-Knapp uncertainty
+  prediction_interval: true
+  primary_multiplicity: blocked whole-pipeline max absolute meta-statistic across four axes
+  permutations: 100000
+  monte_carlo_correction: plus_one
+  conventional_sensitivity: Holm-adjusted modified-Hartung-Knapp p-values
+
+go_no_go:
+  axis_go:
+    - maxT_FWER <= 0.05
+    - modified_HK_95CI excludes 0
+    - at least 4 of 5 mission effects, or 3 of 4 eligible mission effects, share pooled direction
+    - every leave-one-mission pooled estimate retains direction
+    - no mission random-effects weight exceeds 0.50
+    - I2 < 60 percent for a recurrence claim
+    - every leave-one-gene estimate retains direction and at least 50 percent of full magnitude
+    - no single gene contributes more than 25 percent of aggregate signed effect
+    - mean, median, and common-intersection scores agree in direction
+  paper_go: >-
+    At least one of glomerular barrier, tubular injury, or
+    fibrosis/maladaptive remodeling passes all required gates. A distal-only
+    result is not a paper go.
+
+excluded_primary_markers:
+  Fabp1: ordinary wild-type mouse kidney does not model human renal L-FABP expression
+  B2m: tissue RNA is ubiquitous and immune-sensitive; urinary analyte depends on filtration and reabsorption
+  Cst3: kidney tissue RNA is not a filtration or circulating cystatin-C assay proxy
+  Timp2_Igfbp7_pair: urinary protein risk assay is not represented by directional tissue transcript abundance
+  Tgfb1: bulk transcript abundance does not measure latent TGF-beta activation
+
+provenance_disclosure: >-
+  This lock was created after earlier repository analyses had already shown an
+  ECM/fibrosis-like RNA signal and a heterogeneous distal-transport signal.
+  It is therefore retrospective, not preregistered. The glomerular-barrier and
+  HAVCR1/LCN2 panel-level results had not been inspected before this file was
+  frozen. All deviations require a dated changelog and cannot replace the
+  primary result.
+
+lock_amendments:
+  - date: 2026-08-11
+    stage: label-blind observability audit before any new axis effect was computed
+    change: CPM eligibility threshold changed from 1.0 to 0.1
+    reason: >-
+      CPM 1.0 made the two-gene HAVCR1/LCN2 endpoint unavailable in two
+      missions and excluded four of five repair genes despite finite processed
+      measurements. CPM 0.1 retains markers with roughly 5-15 expected counts
+      in these libraries while still excluding near-zero features such as Mmp7
+      where not observably measured. No flight-control direction or effect
+      estimate was examined before this amendment.

@@ -1,0 +1,173 @@
+analysis:
+  id: dct_asdn_phospho_reanalysis_20260728
+  status: prospective_after_exploratory_v11_v12
+  frozen_date: "2026-07-28"
+  starting_commit: 1d165c4
+  plan: docs/DCT_ASDN_PHOSPHO_REANALYSIS_PLAN_2026-07-28.md
+  claim_object: parent_proteins_associated_with_external_expression_programs
+
+input:
+  workbook: data/external/osdr/OSD-462/GLDS-462_phosphproteomics_2021-12-31_tc882-883_Pho_WorkUp_JM.xlsx
+  protein_workbook: data/external/osdr/OSD-462/GLDS-462_proteomics_2021-12-31_tc884-885_Protein_WorkUp.xlsx
+  assay_metadata: data/external/osdr/OSD-462/metadata/a_OSD-462_phosphoprotein-profiling_mass-spectrometry_Orbitrap Eclipse.txt
+  discovery_reference_raw: data/external/dct_reference/GSE228367/GSE228367_RAW.tar
+  subtype_reference_config: config/dct_subtype_reference_freeze_v1.yaml
+  gene_sets: data/processed/v13_dct_reference/frozen_gene_sets.tsv
+  stage0_phosphoform_provenance: data/results/run_20260728_osd462_stage0/reporting/osd462_slc12a3_stk39_phosphoform_provenance_compact.tsv
+
+contrast:
+  flight_label: FL
+  ground_label: GC
+  exclude_label: BL
+  n_flight: 10
+  n_ground: 10
+  plexes: 2
+  per_plex_per_condition: 5
+  condition_reporter_position_confounded: true
+
+normalization:
+  primary: log2_official_scaled_signal_channel_median_centered
+  sensitivities:
+    - log2_official_scaled_signal_uncentered
+    - log2_signal_to_noise_sum_channel_median_centered
+  permitted_claim: relative_site_specific_phosphorylation_shift
+  forbidden_claim: absolute_global_dephosphorylation
+
+site_filter:
+  primary_sheets:
+    - siteQuant_360
+  include_composite_primary: false
+  require_singly_modified_primary: true
+  min_localization_score_primary: 19
+  min_localization_score_sensitivity: 13
+  min_finite_total: 16
+  min_finite_per_plex: 6
+  label_blind: true
+  deduplication_primary: accession_modified_peptide_phosphoform
+  site_position_collapse_sensitivity: true
+  deduplicated_multimodified_sensitivity: true
+
+site_model:
+  estimator: equal_weight_mean_of_within_plex_flight_minus_ground_contrasts
+  complete_data_equivalent_formula: reporter_log2 ~ flight + plex
+  minimum_finite_per_permuted_group_within_plex: 3
+  effect: flight_minus_ground
+  p_value_not_used_for_primary_membership: true
+
+gene_score:
+  positive_direction: lower_phosphorylation_in_flight
+  primary: median_negative_site_effect
+  sensitivities:
+    - mean_negative_site_effect
+    - one_sided_maxmean
+  calibrate_against_gene_specific_label_null: true
+
+permutation:
+  mode: exact
+  block: plex
+  preserve_per_plex_balance: true
+  exact_assignments: 63504
+  seed_for_ordering_only: 20260728
+  chunk_size: 1024
+  observed_assignment_included: true
+
+set_test:
+  primary_statistic: mean_gene_z_in_set_minus_eligible_background
+  self_contained_mean_secondary: true
+  primary_family:
+    - DCT2_CNT_transition
+    - ASDN
+  primary_multiplicity: maxT
+  comparator_multiplicity: benjamini_hochberg
+  minimum_observable_genes: 8
+
+canonical_exclusions:
+  primary:
+    - Slc12a3
+    - Stk39
+    - Oxsr1
+    - Wnk4
+  strict:
+    - Slc12a3
+    - Stk39
+    - Oxsr1
+    - Wnk4
+    - Wnk1
+  strict_remove_manual_anchor_phosphoforms: true
+
+asdn_gene_set:
+  source_status: literature_frozen_before_new_permutation_results
+  genes:
+    - Nr3c2
+    - Hsd11b2
+    - Sgk1
+    - Nedd4l
+    - Scnn1a
+    - Scnn1b
+    - Scnn1g
+    - Wnk1
+    - Wnk4
+    - Klhl3
+    - Cul3
+    - Stk39
+    - Oxsr1
+    - Slc12a3
+    - Kcnj1
+    - Kcnj10
+    - Kcnj16
+    - Kcnq1
+    - Kcne1
+    - Clcnkb
+    - Bsnd
+    - Trpv5
+    - Calb1
+    - S100g
+    - Slc8a1
+    - Atp2b1
+    - Pth1r
+    - Vdr
+    - Fxyd4
+
+comparator_sets:
+  - proximal_tubule
+  - thick_ascending_limb
+  - DCT1
+  - DCT2_CNT_transition
+  - principal_cell
+  - intercalated_cell
+  - podocyte
+  - endothelial
+  - fibroblast
+  - immune
+
+robustness:
+  require_normalization_direction_concordance: true
+  broad_expression_exclusion: true
+  non_distal_or_broad_expression_exclusion_diagnostic: true
+  leave_one_gene_out: true
+  second_reference_direction_concordance: true
+  matched_observability_annotation_permutation_secondary: true
+  parent_protein_subtraction_secondary: true
+
+matched_observability:
+  profiles:
+    - primary
+  gene_scores:
+    - median_negative_site_effect
+  exclusions:
+    - primary
+  gene_sets:
+    - DCT2_CNT_transition
+    - ASDN
+
+publication_promotion_gate:
+  qualified_canonical_anchor_required_for_extension_claim: true
+
+claim_gates:
+  alpha: 0.05
+  require_positive_competitive_effect: true
+  require_all_leave_one_gene_out_positive: true
+  require_no_unrelated_compartment_equal_or_stronger: true
+  dct2_title_requires_transition_and_external_signature: true
+  asdn_only_result_forbids_dct2_title: true
+  neither_result_rejects_beyond_axis_claim: true

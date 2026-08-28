@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phenotype-anchoring layer -- animal-matched RNA state vs NCC activity."""
+"""Animal-matched RNA state vs co-modified OSD-462 phosphosite features."""
 from __future__ import annotations
 
 import argparse
@@ -21,8 +21,9 @@ if str(REPO_ROOT) not in sys.path:
 from src.common import id_map_lookup  # noqa: E402
 from src.multiomics.phenotype_anchor import (  # noqa: E402
     NCC_NONREGULATORY_SITES,
-    NCC_REGULATORY_SITES,
-    NCC_REGULATORY_SITES_SENS,
+    OSD462_COMODIFIED_CANONICAL_INDEX_FEATURES,
+    OSD462_ISOLATED_CANONICAL_ASSAY_FEATURES,
+    RENAL_AXIS_LITERATURE_CANONICAL_SITES,
     channel_to_animal,
     compare_scores,
     per_sample_score,
@@ -132,9 +133,17 @@ def main() -> int:
     phospho = load_phospho_per_sample(phos_path)
     log(f"  phosphosites x channels: {phospho.shape}")
 
-    log("Building per-animal NCC activity scores")
-    reg_score, reg_cond = phospho_score_by_animal(phospho, NCC_REGULATORY_SITES)
-    sens_score, _ = phospho_score_by_animal(phospho, NCC_REGULATORY_SITES_SENS)
+    log("Building per-animal phosphosite-feature scores")
+    if OSD462_ISOLATED_CANONICAL_ASSAY_FEATURES:
+        strict_score, _ = phospho_score_by_animal(
+            phospho, OSD462_ISOLATED_CANONICAL_ASSAY_FEATURES
+        )
+    else:
+        strict_score = pd.Series(dtype=float)
+        log("  strict canonical score disabled: no isolated canonical assay features")
+    context_score, context_cond = phospho_score_by_animal(
+        phospho, OSD462_COMODIFIED_CANONICAL_INDEX_FEATURES
+    )
     ctrl_score, _ = phospho_score_by_animal(phospho, NCC_NONREGULATORY_SITES)
 
     log("Building per-animal RNA DCT transport state scores")
@@ -144,20 +153,27 @@ def main() -> int:
     rna_score_full, rna_cond = collapse_rna_by_animal(per_sample_score(rna_full, list(rna_full.index)))
     rna_score_noslc, _ = collapse_rna_by_animal(per_sample_score(rna_noslc, list(rna_noslc.index)))
 
-    common = sorted(set(reg_score.index) & set(rna_score_full.index))
-    log(f"  animals matched (RNA + phospho): {len(common)}")
-    cond = reg_cond.reindex(common)
+    common = sorted(set(context_score.index) & set(rna_score_full.index))
+    log(f"  animals matched (RNA + co-modified phosphosite features): {len(common)}")
+    cond = context_cond.reindex(common)
 
     comparisons = {
-        "regulatory_vs_rna": compare_scores(rna_score_full.reindex(common),
-                                            reg_score.reindex(common), cond),
-        "regulatory_sens_T89_vs_rna": compare_scores(rna_score_full.reindex(common),
-                                                     sens_score.reindex(common), cond),
+        "comodified_canonical_index_features_vs_rna": compare_scores(
+            rna_score_full.reindex(common), context_score.reindex(common), cond
+        ),
         "control_nonregulatory_vs_rna": compare_scores(rna_score_full.reindex(common),
                                                        ctrl_score.reindex(common), cond),
-        "regulatory_vs_rna_no_Slc12a3": compare_scores(rna_score_noslc.reindex(common),
-                                                       reg_score.reindex(common), cond),
+        "comodified_features_vs_rna_no_Slc12a3": compare_scores(
+            rna_score_noslc.reindex(common), context_score.reindex(common), cond
+        ),
     }
+    if not strict_score.empty:
+        strict_common = sorted(set(strict_score.index) & set(rna_score_full.index))
+        comparisons["isolated_canonical_features_vs_rna"] = compare_scores(
+            rna_score_full.reindex(strict_common),
+            strict_score.reindex(strict_common),
+            context_cond.reindex(strict_common),
+        )
 
     rows = []
     for name, res in comparisons.items():
@@ -173,21 +189,36 @@ def main() -> int:
     per_animal = pd.DataFrame({
         "condition": cond,
         "rna_dct_transport_score": rna_score_full.reindex(common),
-        "ncc_activity_score_regulatory": reg_score.reindex(common),
+        "comodified_canonical_index_feature_score": context_score.reindex(common),
+        # Backward-compatible fail-closed field: no isolated canonical feature
+        # qualifies, so legacy activity analyses receive NA rather than the
+        # co-modified context score.
+        "ncc_activity_score_regulatory": np.nan,
         "ncc_activity_score_nonregulatory_control": ctrl_score.reindex(common),
     }).reset_index(names="animal")
     per_animal.to_csv(outdir / "phenotype_anchor_per_animal.tsv", sep="\t", index=False)
 
     manifest = {
-        "analysis": "phenotype-anchoring: animal-matched RNA state vs NCC activity",
-        "framing": "molecular activity-phenotype anchoring (Tier 1); not tissue/physiology",
+        "analysis": "animal-matched RNA state vs OSD-462 phosphosite features",
+        "framing": (
+            "co-modified residue-indexed context only; no isolated canonical "
+            "site or physiological activity claim"
+        ),
         "timestamp": datetime.now().isoformat(),
         "inputs": {
             "phospho_xlsx": str(phos_path), "phospho_sha256": sha256(phos_path),
             "rna_vst": str(vst_path), "rna_vst_sha256": sha256(vst_path),
             "id_map": str(idmap_path), "id_map_sha256": sha256(idmap_path),
         },
-        "regulatory_sites": [f"{g}:{s}" for g, s in NCC_REGULATORY_SITES],
+        "literature_canonical_sites": [
+            f"{g}:{s}" for g, s in RENAL_AXIS_LITERATURE_CANONICAL_SITES
+        ],
+        "qualified_isolated_canonical_assay_features": [
+            f"{g}:{s}" for g, s in OSD462_ISOLATED_CANONICAL_ASSAY_FEATURES
+        ],
+        "comodified_canonical_index_features": [
+            f"{g}:{s}" for g, s in OSD462_COMODIFIED_CANONICAL_INDEX_FEATURES
+        ],
         "nonregulatory_control_sites": [f"{g}:{s}" for g, s in NCC_NONREGULATORY_SITES],
         "dct_rna_gene_set": list(DCT_GENES),
         "n_animals_matched": len(common),

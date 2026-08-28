@@ -1,0 +1,382 @@
+schema_version: 1
+freeze_id: dct_subtype_reference_freeze_v1_20260728
+frozen_date: "2026-07-28"
+flight_blind: true
+purpose: >
+  Define DCT1, DCT2/CNT, ASDN, broad-expression, and major kidney comparator
+  annotations entirely from external reference data and literature before any
+  v13 flight-label permutation result is examined.
+
+reference_builder:
+  production_config_consistency:
+    production_analysis_config: config/dct_asdn_phospho_reanalysis.yaml
+
+  inputs:
+    GSE228367:
+      - role: control_DCT1_seurat_rds
+        path: data/external/dct_reference/GSE228367/GSE228367_CONTROL_DCT1.rds.gz
+        required: true
+        sha256: d103fd41b92a00dd849722428e1c3d88d66fbcd1e353e8c7842a95e3001f4e50
+        note: >
+          Author-separated normal-potassium DCT1 cell membership and Rep
+          metadata only; corrected/fractional RNA@counts is explicitly rejected.
+      - role: control_DCT2_seurat_rds
+        path: data/external/dct_reference/GSE228367/GSE228367_CONTROL_DCT2.rds.gz
+        required: true
+        sha256: 255dae1606c856e074f202499b522a591b5d2c7291d0dc798205b73778e257ca
+        note: >
+          Author-separated normal-potassium DCT2 cell membership and Rep
+          metadata only; corrected/fractional RNA@counts is explicitly rejected.
+      - role: six_sample_raw_10x_archive
+        path: data/external/dct_reference/GSE228367/GSE228367_RAW.tar
+        required: true
+        sha256: 8995577d17a10b144edc39d7f7fb068d05f8327233ca97426a9c8f54957c3763
+        note: >
+          Official integer 10x matrices. NK1-NK3 filtered H5 counts are matched
+          exactly to subtype-object barcodes; RDS RNA@counts is not used.
+
+    GSE150338:
+      - role: microdissected_segment_replicate_TPM
+        path: data/external/single_cell_atlases/chen_atlas/GSE150338_Mouse_TPM_Replicates.txt.gz
+        required: true
+        sha256: daf8b6f46bf772bbbc950b68d688b7540528e2ec52b357440fac1ebe224d5488
+        source_url: https://ftp.ncbi.nlm.nih.gov/geo/series/GSE150nnn/GSE150338/suppl/GSE150338_Mouse_TPM_Replicates.txt.gz
+        note: Official microdissected DCT/CNT/CCD replicate TPM matrix; external transition/retention validation only.
+      - role: author_integrated_seurat_rdata
+        path: data/external/single_cell_atlases/chen_atlas/GSE150338_Seurat_IntegrateData.RData.gz
+        required: true
+        sha256: fe06f521d1f7ff742ecac03a0cc4593abb32d11cbdc489866bfede94f48b551d
+        source_url: https://ftp.ncbi.nlm.nih.gov/geo/series/GSE150nnn/GSE150338/suppl/GSE150338_Seurat_IntegrateData.RData.gz
+        note: Author-integrated object with raw RNA counts, Batch_10X replicate field, and clusters used for flight-blind marker annotation.
+
+    Mouse_Kidney_Atlas:
+      - role: integrated_raw_count_anndata
+        path: data/external/single_cell_atlases/mouse_kidney_atlas/mka.h5ad
+        required: true
+        md5: 6a2e53086f100acffe99c054d3e8b7e9
+        note: Integrated 141,401-cell atlas with raw-count layer, Origin study labels, and Celltype_finest annotations.
+
+    Tabula_Muris_Senis_fallback:
+      - role: broad_compartment_raw_count_anndata
+        path: data/external/single_cell_atlases/tms_kidney_female_ALLDATASETS_counts_innerGenes.h5ad
+        required: false
+        note: Nine-donor broad-compartment fallback; not an independent DCT1/DCT2/CNT validation.
+
+  gse228367:
+    replicate_column: Rep
+    diet_column: Diet
+    allowed_control_values:
+      - NK
+    control_condition: normal_potassium
+    coefficient_direction: DCT2_minus_DCT1
+    model: paired_edgeR_QL_replicate_plus_subtype
+    raw_count_extractor: scripts/subtype_reference/02a_extract_gse228367_raw_pseudobulk.py
+    python_executable: venv/bin/python
+
+  gse150338:
+    gene_symbol_column: Gene_symbol
+    biological_replicate_regex: "^(m[0-9]+)_(DCT|CNT|CCD)_[a-z]+$"
+    segments:
+      - DCT
+      - CNT
+      - CCD
+    tpm_detection_threshold: 1.0
+    log2_pseudocount: 0.1
+    validation_role: >
+      Independent microdissected-segment retention validation. DCT is not
+      relabeled as DCT1 or DCT2; this input cannot validate a strict DCT2 peak.
+    integrated_object_name: merge.data.integrated
+    replicate_column: Batch_10X
+    cluster_column: seurat_clusters
+    cluster_map_source: scripts/build_hybrid_reference.R
+    cluster_map:
+      DCT1:
+        - "0"
+        - "1"
+        - "2"
+        - "8"
+        - "12"
+      DCT2:
+        - "3"
+      CNT:
+        - "6"
+
+  thresholds:
+    minimum_biological_replicates: 3
+    min_cells_per_pseudobulk: 25
+    min_cpm: 1.0
+    min_replicates_expressed_per_subtype: 2
+    discovery_abs_log2_fc: 1.0
+    discovery_fdr: 0.05
+    strict_min_target_detection_fraction: 0.20
+    transition_discovery_log2_fc: 0.50
+    transition_min_target_detection_fraction: 0.20
+    validation_direction_min_abs_log2_fc: 0.0
+    validation_fdr: 0.05
+    min_consistent_pairs: 3
+    dct2_peak_vs_cnt_log2_fc: 0.50
+    cnt_retention_log2_fc_floor: -0.50
+    external_cnt_retention_log2_margin: -1.0
+    external_retention_fdr: 0.05
+    external_min_replicate_detection_fraction: 1.0
+
+  broad_expression:
+    target_compartments:
+      - DCT1
+      - DCT2
+      - CNT
+      - DCT_general
+      - DCT2_CNT_atlas
+      - principal_cell
+    min_cpm: 1.0
+    min_source_study_detection_fraction: 0.50
+    min_unrelated_compartments: 4
+    unrelated_compartment_ratio_floor: 0.25
+    unrelated_to_target_ratio: 0.50
+    flag_semantics:
+      broadly_expressed: >
+        True multi-compartment breadth: target-expressed and detected above the
+        compartment floor in at least min_unrelated_compartments unrelated
+        compartments. This is the flag consumed by the phosphoproteomic
+        broad-expression sensitivity.
+      non_distal_specific_or_broad: >
+        Signature-specificity compatibility flag preserving the earlier
+        combined rule: target-expressed and either broadly_expressed or with
+        unrelated_max_cpm/target_max_cpm at least unrelated_to_target_ratio.
+        Data-driven DCT signatures use this stricter exclusion.
+
+  whole_kidney_compartment_aliases:
+    principal_cell:
+      - "^pc$"
+      - "collecting duct principal"
+    intercalated_cell:
+      - "^ic$"
+      - "^ica$"
+      - "^icb$"
+      - "^cd-trans$"
+      - "intercalated"
+    DCT2_CNT_atlas:
+      - "^dct-cnt$"
+      - "^cnt$"
+    proximal_tubule:
+      - "^pt$"
+      - "^pts"
+      - "^pct$"
+      - "^pst$"
+      - "proximal convoluted"
+      - "proximal straight"
+      - "epithelial cell of proximal tubule"
+    thick_ascending_limb:
+      - "^ctal$"
+      - "^mtal$"
+      - "thick ascending limb"
+      - "loop of henle ascending limb"
+    DCT_general:
+      - "^dct$"
+      - "distal convoluted tubule"
+    podocyte:
+      - "^podo$"
+      - "podocyte"
+      - "glomerular visceral epithelial"
+    endothelial:
+      - "endo"
+      - "vasa-recta"
+      - "^vas-"
+      - "endothelial"
+    fibroblast:
+      - "^fib$"
+      - "stroma"
+      - "^per$"
+      - "fibroblast"
+      - "mesangial"
+    immune:
+      - "^macro$"
+      - "^mp/dc$"
+      - "^nk$"
+      - "lymph"
+      - "^neutro$"
+      - "macrophage"
+      - "lymphocyte"
+      - "t cell"
+      - "b cell"
+      - "plasma cell"
+      - "natural killer"
+      - "leukocyte"
+
+  atlas_comparator_targets:
+    proximal_tubule:
+      - proximal_tubule
+    thick_ascending_limb:
+      - thick_ascending_limb
+    DCT1:
+      - DCT_general
+    DCT2_CNT_atlas_context:
+      - DCT2_CNT_atlas
+    principal_cell:
+      - principal_cell
+    intercalated_cell:
+      - intercalated_cell
+    podocyte:
+      - podocyte
+    endothelial:
+      - endothelial
+    fibroblast:
+      - fibroblast
+    immune:
+      - immune
+
+  atlas_comparator_rule:
+    min_target_cpm: 1.0
+    min_target_source_study_fraction: 0.50
+    min_log2_target_to_max_other: 1.0
+    max_genes_per_set: 200
+
+  atlas_qc:
+    minimum_mapping_fraction: 0.90
+    minimum_source_studies_per_compartment: 3
+    required_compartments:
+      - proximal_tubule
+      - thick_ascending_limb
+      - DCT_general
+      - DCT2_CNT_atlas
+      - principal_cell
+      - intercalated_cell
+      - podocyte
+      - endothelial
+      - fibroblast
+      - immune
+
+  qc_marker_panels:
+    DCT1:
+      - Slc12a3
+      - Pvalb
+      - Trpm6
+      - Kcnj10
+      - Kcnj16
+    DCT2_CNT:
+      - Slc12a3
+      - Trpv5
+      - Calb1
+      - S100g
+      - Scnn1b
+      - Scnn1g
+      - Hsd11b2
+    ASDN:
+      - Nr3c2
+      - Sgk1
+      - Nedd4l
+      - Scnn1a
+
+  curated_sets:
+    ASDN:
+      mineralocorticoid_sensing:
+        - Nr3c2
+        - Hsd11b2
+        - Sgk1
+        - Nedd4l
+      ENaC:
+        - Scnn1a
+        - Scnn1b
+        - Scnn1g
+      WNK_NCC_regulation:
+        - Wnk1
+        - Wnk4
+        - Klhl3
+        - Cul3
+        - Stk39
+        - Oxsr1
+        - Slc12a3
+      potassium_chloride_transport:
+        - Kcnj1
+        - Kcnj10
+        - Kcnj16
+        - Kcnq1
+        - Kcne1
+        - Clcnkb
+        - Bsnd
+      late_distal_calcium:
+        - Trpv5
+        - Calb1
+        - S100g
+        - Slc8a1
+        - Atp2b1
+        - Pth1r
+        - Vdr
+      aldosterone_responsive_transport:
+        - Fxyd4
+
+  major_kidney_comparator_sets:
+    proximal_tubule:
+      - Slc34a1
+      - Slc5a2
+      - Lrp2
+      - Cubn
+      - Aqp1
+      - Slc22a6
+    thick_ascending_limb:
+      - Slc12a1
+      - Umod
+      - Kcnj1
+      - Clcnka
+      - Clcnkb
+      - Bsnd
+    DCT1:
+      - Slc12a3
+      - Pvalb
+      - Trpm6
+      - Kcnj10
+      - Kcnj16
+      - Fxyd2
+    DCT2_CNT_transition_curated_context:
+      - Slc12a3
+      - Trpv5
+      - Calb1
+      - S100g
+      - Slc8a1
+      - Atp2b1
+      - Scnn1b
+      - Scnn1g
+      - Hsd11b2
+    principal_cell:
+      - Aqp2
+      - Aqp3
+      - Avpr2
+      - Scnn1a
+      - Scnn1b
+      - Scnn1g
+      - Fxyd4
+    intercalated_cell:
+      - Atp6v1b1
+      - Atp6v0d2
+      - Slc4a1
+      - Slc26a4
+      - Foxi1
+      - Aqp6
+    podocyte:
+      - Nphs1
+      - Nphs2
+      - Podxl
+      - Synpo
+      - Magi2
+      - Ptpro
+    endothelial:
+      - Kdr
+      - Emcn
+      - Pecam1
+      - Cdh5
+      - Esam
+      - Klf2
+    fibroblast:
+      - Col1a1
+      - Col1a2
+      - Col3a1
+      - Dcn
+      - Pdgfra
+      - Col6a1
+    immune:
+      - Ptprc
+      - Lyz2
+      - Cd68
+      - Tyrobp
+      - Cd3d
+      - Ms4a1

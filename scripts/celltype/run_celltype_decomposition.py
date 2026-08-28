@@ -19,7 +19,11 @@ from src.common import id_map_lookup  # noqa: E402
 from src.multiomics.celltype_panels import (  # noqa: E402
     KIDNEY_PANELS, decide_scenario, panel_flight_effect, per_sample_panel_scores)
 from src.multiomics.phenotype_anchor import (  # noqa: E402
-    NCC_REGULATORY_SITES, channel_to_animal, per_sample_score, rna_sample_animal)
+    OSD462_COMODIFIED_CANONICAL_INDEX_FEATURES,
+    channel_to_animal,
+    per_sample_score,
+    rna_sample_animal,
+)
 from scripts.regulator_activity.run_phenotype_anchor import (  # noqa: E402
     load_phospho_per_sample)
 
@@ -79,11 +83,13 @@ def main() -> int:
     print("\nOSD-462 flight effect (Space.Flight - Ground.Control), per-sample mean-z panels:")
     print(eff.round(3).to_string(index=False))
 
-    # 3. animal-matched: panels vs NCC regulatory phospho
-    log("Animal-matched compartment <-> NCC phospho correlations")
+    # 3. animal-matched: panels vs co-modified T53/S383-indexed features.
+    log("Animal-matched compartment <-> co-modified phosphosite-feature correlations")
     phospho = load_phospho_per_sample(PHOS)
-    reg_keys = [f"{g}|{s}" for g, s in NCC_REGULATORY_SITES]
-    reg_per_channel = per_sample_score(phospho, reg_keys)
+    context_keys = [
+        f"{g}|{s}" for g, s in OSD462_COMODIFIED_CANONICAL_INDEX_FEATURES
+    ]
+    reg_per_channel = per_sample_score(phospho, context_keys)
     ncc = {}
     for ch, v in reg_per_channel.items():
         m = channel_to_animal(ch)
@@ -107,10 +113,14 @@ def main() -> int:
         common = sorted(set(pa.index) & set(ncc.index) & set(flight_ground))
         rho, p = stats.spearmanr(pa.reindex(common), ncc.reindex(common))
         corr_rows.append({"panel": panel, "n_animals": len(common),
-                          "spearman_vs_ncc_phospho": float(rho), "p": float(p)})
+                          "spearman_vs_comodified_site_feature_score": float(rho),
+                          # Fail-closed compatibility field: this is not an
+                          # isolated NCC regulatory-site score.
+                          "spearman_vs_ncc_phospho": np.nan,
+                          "p": float(p)})
     corr = pd.DataFrame(corr_rows)
     corr.to_csv(OUT / "osd462_compartment_vs_ncc_phospho.tsv", sep="\t", index=False)
-    print("\nAnimal-matched Spearman vs NCC regulatory phospho (FLT+GC):")
+    print("\nAnimal-matched Spearman vs co-modified T53/S383-indexed score (FLT+GC):")
     print(corr.round(3).to_string(index=False))
 
     # 4. scenario decision (memo 8.3)
@@ -130,7 +140,8 @@ def main() -> int:
         "dilution_check": (
             "If DCT-transport-low tracked immune-high per-animal, the DCT signal "
             "could be interstitial dilution; reported in "
-            "osd462_compartment_vs_ncc_phospho.tsv."),
+            "osd462_compartment_vs_ncc_phospho.tsv. The phosphosite score is "
+            "context-only because both indexed rows contain additional modifications."),
         "panels": {k: v for k, v in KIDNEY_PANELS.items()},
     }
     (OUT / "celltype_decomposition_verdict.json").write_text(json.dumps(verdict, indent=2) + "\n")

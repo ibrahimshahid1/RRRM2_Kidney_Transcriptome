@@ -16,15 +16,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from src.common import bh_fdr  # noqa: E402
 from src.multiomics.osd462_anchor import (compute_site_flight_effect_lm,  # noqa: E402
                                           parse_tmt_sheet)
+from src.multiomics.osd462_stage0 import (  # noqa: E402
+    audit_ncc_spak_phosphosites,
+)
 
 # DCT / WNK-SPAK/OSR1-NCC chain plus regulators.
 AXIS_GENES = ["Slc12a3", "Stk39", "Oxsr1", "Wnk1", "Wnk4", "Klhl3", "Cul3",
               "Nedd4l", "Sgk1", "Calb1"]
-# The phosphosites that gate the activity claim (must be quantified).
+# The genes that gate the broad axis-coverage checkpoint (must be quantified).
 GATE_GENES = {"Slc12a3", "Stk39", "Oxsr1"}  # NCC + SPAK + OSR1
-NCC_REGULATORY_SITES = {"53", "65", "68", "89", "53;65", "58;65", "65;68"}
-
-
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", default=default_run())
@@ -66,11 +66,41 @@ def main() -> None:
         gate_ok[g] = bool(cov_g.loc[cov_g["gene"] == g, "n_quantified"].sum() > 0
                           if (cov_g["gene"] == g).any() else False)
     checkpoint_pass = all(gate_ok.values())
-    print(f"[layer2] CHECKPOINT gate genes {gate_ok} -> "
-          f"{'PASS' if checkpoint_pass else 'FAIL'}")
+    print(
+        f"[layer2] BROAD GENE-COVERAGE checkpoint (not canonical provenance) "
+        f"{gate_ok} -> {'PASS' if checkpoint_pass else 'FAIL'}"
+    )
 
-    # Target-axis site table
+    # Target-axis site table.  Join residue/phosphoform provenance before any
+    # canonical-site claim; a position-only match is not sufficient.
     axis = sites[sites["gene_symbol"].isin(AXIS_GENES) & np.isfinite(sites["phospho_effect"])].copy()
+    axis["site_position"] = (
+        axis["site_position"].astype(str).str.replace(r"\.0$", "", regex=True)
+    )
+    provenance = audit_ncc_spak_phosphosites()
+    provenance = provenance.rename(
+        columns={
+            "source_sheet": "sheet",
+            "workbook_site_position": "site_position",
+        }
+    )
+    provenance_cols = [
+        "gene_symbol",
+        "sheet",
+        "site_position",
+        "residue_resolved_site_labels",
+        "sequence",
+        "n_hash_modifications_in_sequence",
+        "isolated_canonical_assay_feature",
+        "residue_indexed_canonical_but_comodified",
+        "canonical_claim_class",
+    ]
+    axis = axis.merge(
+        provenance[provenance_cols],
+        on=["gene_symbol", "sheet", "site_position"],
+        how="left",
+        validate="many_to_one",
+    )
 
     # protein-abundance normalization (phospho-occupancy = phospho - protein)
     prot_path = out_dir / "osd462_flight_effects.tsv"
@@ -90,7 +120,9 @@ def main() -> None:
     keep = ["gene_symbol", "site_position", "site_kind", "sheet", "n_fl", "n_gc",
             "phospho_effect", "phospho_se", "phospho_ci_low", "phospho_ci_high",
             "phospho_p_value", "phospho_q_value", "protein_flight_effect",
-            "phospho_occupancy_effect"]
+            "phospho_occupancy_effect", "residue_resolved_site_labels", "sequence",
+            "n_hash_modifications_in_sequence", "isolated_canonical_assay_feature",
+            "residue_indexed_canonical_but_comodified", "canonical_claim_class"]
     keep = [c for c in keep if c in axis.columns]
     axis_out = axis[keep]
     axis_out.to_csv(out_dir / "phospho_axis_summary.tsv", sep="\t", index=False)
@@ -100,7 +132,8 @@ def main() -> None:
         out_dir / "phospho_all_sites.tsv", sep="\t", index=False)
     cov_g.to_csv(out_dir / "phospho_axis_coverage.tsv", sep="\t", index=False)
 
-    # Focused NCC regulatory cluster (SPAK/OSR1 target N-terminal Thr)
+    # Residue-indexed NCC display.  The strict isolated-canonical set is empty
+    # for the current workbook because T53 is carried on a T53/Y65 phosphoform.
     ncc = axis_out[axis_out["gene_symbol"] == "Slc12a3"]
     print("\n[layer2] NCC (Slc12a3) phosphosites:")
     if len(ncc):
@@ -120,21 +153,42 @@ def main() -> None:
     ncc_mean = axis_mean(["Slc12a3"])
     spak_osr_mean = axis_mean(["Stk39", "Oxsr1"])
     chain_mean = axis_mean(["Slc12a3", "Stk39", "Oxsr1", "Wnk1", "Wnk4"])
-    ncc_reg = axis_out[(axis_out["gene_symbol"] == "Slc12a3")
-                       & axis_out["site_position"].astype(str).isin(NCC_REGULATORY_SITES)]
+    isolated = axis_out["isolated_canonical_assay_feature"].fillna(False).astype(bool)
+    comodified = (
+        axis_out["residue_indexed_canonical_but_comodified"]
+        .fillna(False)
+        .astype(bool)
+    )
+    ncc_reg = axis_out[(axis_out["gene_symbol"] == "Slc12a3") & isolated]
+    ncc_comodified = axis_out[
+        (axis_out["gene_symbol"] == "Slc12a3") & comodified
+    ]
     ncc_reg_mean = float(ncc_reg["phospho_effect"].mean()) if len(ncc_reg) else np.nan
 
-    # Gate-site support must include both the NCC regulatory cluster and the
-    sig_down = axis_out[(axis_out["gene_symbol"].isin(GATE_GENES))
-                        & (axis_out["phospho_effect"] < 0)
-                        & (axis_out["phospho_p_value"] < 0.05)]
+    # Strict activity support requires isolated canonical NCC and upstream
+    # features.  Broad gate-gene and co-modified rows are reported separately.
+    sig_down = axis_out[
+        (axis_out["gene_symbol"].isin(GATE_GENES))
+        & (axis_out["phospho_effect"] < 0)
+        & (axis_out["phospho_p_value"] < 0.05)
+    ]
     ncc_reg_sig_down = ncc_reg[(ncc_reg["phospho_effect"] < 0)
                                & (ncc_reg["phospho_p_value"] < 0.05)]
-    spak_osr_sig_down = axis_out[(axis_out["gene_symbol"].isin(["Stk39", "Oxsr1"]))
-                                 & (axis_out["phospho_effect"] < 0)
-                                 & (axis_out["phospho_p_value"] < 0.05)]
+    isolated_upstream = axis_out[
+        axis_out["gene_symbol"].isin(["Stk39", "Oxsr1"]) & isolated
+    ]
+    spak_osr_sig_down = isolated_upstream[
+        (isolated_upstream["phospho_effect"] < 0)
+        & (isolated_upstream["phospho_p_value"] < 0.05)
+    ]
+    comodified_sig_down = axis_out[
+        comodified
+        & (axis_out["phospho_effect"] < 0)
+        & (axis_out["phospho_p_value"] < 0.05)
+    ]
+    canonical_checkpoint_pass = bool(len(ncc_reg) and len(isolated_upstream))
     activity_reduced = bool(
-        checkpoint_pass
+        canonical_checkpoint_pass
         and chain_mean < 0
         and np.isfinite(ncc_reg_mean)
         and ncc_reg_mean < 0
@@ -145,22 +199,34 @@ def main() -> None:
 
     verdict = pd.DataFrame([{
         "checkpoint_pass": checkpoint_pass,
+        "broad_gene_coverage_checkpoint_pass": checkpoint_pass,
+        "canonical_provenance_checkpoint_pass": canonical_checkpoint_pass,
         "ncc_mean_phospho_effect": ncc_mean,
+        "ncc_comodified_canonical_index_mean_phospho_effect": (
+            float(ncc_comodified["phospho_effect"].mean())
+            if len(ncc_comodified) else np.nan
+        ),
         "ncc_regulatory_mean_phospho_effect": ncc_reg_mean,
         "spak_osr1_mean_phospho_effect": spak_osr_mean,
         "wnk_spak_osr1_ncc_chain_mean": chain_mean,
         "n_gate_sites_sig_down": int(len(sig_down)),
+        "n_isolated_canonical_assay_features": int(isolated.sum()),
+        "n_comodified_canonical_index_features": int(comodified.sum()),
+        "n_comodified_canonical_index_features_sig_down": int(len(comodified_sig_down)),
         "n_ncc_regulatory_sites_sig_down": int(len(ncc_reg_sig_down)),
         "n_spak_osr1_sites_sig_down": int(len(spak_osr_sig_down)),
         "activity_reduced_supported": activity_reduced,
         "interpretation": (
-            "phospho-axis reduced in flight (supports lower NCC transport activity)"
+            "isolated canonical phosphoforms support lower NCC transport activity"
             if activity_reduced else
-            "phospho-axis not reduced; reduced-activity claim NOT supported by phospho layer"),
+            "strict canonical activity claim unresolved: no isolated canonical "
+            "NCC/SPAK phosphoform qualifies; co-modified site features are context only"
+        ),
     }])
     verdict.to_csv(out_dir / "phospho_axis_verdict.tsv", sep="\t", index=False)
     print("\n[layer2] chain mean phospho FL-GC = "
           f"{chain_mean:+.3f}; gate sites sig down = {len(sig_down)}; "
+          f"isolated canonical features = {int(isolated.sum())}; "
           f"activity_reduced_supported = {activity_reduced}")
 
     write_manifest(

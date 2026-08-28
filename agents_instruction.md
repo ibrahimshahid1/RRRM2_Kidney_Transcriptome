@@ -5,7 +5,16 @@
 **Date locked:** May 2026.
 **Working scope:** Minimum-viable (RRRM-2 + OSD-513 + OSD-253). Full-scope extension only after MV is shipped and signal is confirmed.
 
-This document is the canonical reference for every agent working on this analysis. Read it before opening a code editor. When in doubt about a methodological choice, this document overrides earlier drafts (`manuscript_v2.tex`, `rrrm2_network_wgcna_consolidated_reference.pdf`, `remediation_guide.tex`). Earlier documents are kept for historical context; this one supersedes them.
+This document is the canonical reference for the historical cross-OSDR
+network-aging analysis. Read it before changing that analysis. It no longer
+governs the phosphoproteomic manuscript rebuild authorized on 2026-07-28.
+For that work, the controlling prospective specification is
+`docs/DCT_ASDN_PHOSPHO_REANALYSIS_PLAN_2026-07-28.md`, with the scope change
+recorded in `docs/plan_changelog.md`. When in doubt about a methodological
+choice inside the older network-aging project, this document still overrides
+earlier drafts (`manuscript_v2.tex`,
+`rrrm2_network_wgcna_consolidated_reference.pdf`, `remediation_guide.tex`).
+Earlier documents are kept for historical context.
 
 ---
 

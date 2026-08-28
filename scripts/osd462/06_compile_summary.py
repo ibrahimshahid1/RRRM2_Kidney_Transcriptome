@@ -42,20 +42,20 @@ def main() -> None:
     if matrix_conc and dct_conc and phospho_down:
         row = "Strongest: transcript+protein+signaling concordant remodeling"
     elif matrix_conc and dct_conc:
-        row = "Protein-level concordant remodeling; activity layer separate"
+        row = "Protein-level concordant remodeling; canonical phospho activity unresolved"
     elif matrix_conc and not dct_conc:
         row = "Matrix protein-anchored; DCT transcript-level"
     else:
         row = ("Protein-abundance concordance NULL for both matrix and DCT; "
-               "DCT signal relocates to the phospho/activity layer")
+               "co-modified phosphosite features provide context, but isolated "
+               "canonical NCC/SPAK activity is unresolved")
 
     summary = {
         "run": args.run,
         "headline": ("RNA matrix-high/DCT-low direction recurs in OSD-462 (gate PASS); "
-                     "it does NOT translate to protein-abundance concordance, but the "
-                     "WNK-SPAK/OSR1-NCC activating phosphorylation is specifically and "
-                     "strongly suppressed - evidence for reduced NCC transport activity "
-                     "rather than altered transporter abundance."),
+                     "it does NOT translate to protein-abundance concordance. "
+                     "T53/Y65 and S382/S383 co-modified phosphoforms decrease, "
+                     "but no isolated canonical NCC/SPAK feature qualifies."),
         "layer4_rna_gate": {
             "point_cosine": float(rec["point_cosine"]),
             "ci": [float(rec["ci_low"]), float(rec["ci_high"])],
@@ -75,15 +75,28 @@ def main() -> None:
         },
         "layer2_phospho": {
             "checkpoint_pass": bool(verdict["checkpoint_pass"]),
+            "canonical_provenance_checkpoint_pass": bool(
+                verdict.get("canonical_provenance_checkpoint_pass", False)
+            ),
             "ncc_total_protein_effect": float(ncc["protein_flight_effect"]),
             "ncc_rna_effect_osd462": float(ncc["osd462_rna_effect"]),
             "ncc_rna_effect_rrrm2": float(ncc["rrrm2_iss_t_rna_effect"]),
             "ncc_regulatory_mean_phospho": float(verdict["ncc_regulatory_mean_phospho_effect"]),
+            "ncc_comodified_canonical_index_mean_phospho": float(
+                verdict.get(
+                    "ncc_comodified_canonical_index_mean_phospho_effect",
+                    np.nan,
+                )
+            ),
             "spak_osr1_mean_phospho": float(verdict["spak_osr1_mean_phospho_effect"]),
             "chain_mean_phospho": float(verdict["wnk_spak_osr1_ncc_chain_mean"]),
             "n_ncc_regulatory_sites_sig_down": int(verdict["n_ncc_regulatory_sites_sig_down"]),
             "n_spak_osr1_sites_sig_down": int(verdict["n_spak_osr1_sites_sig_down"]),
             "activity_reduced_supported": phospho_down,
+            "inference_boundary": (
+                "co-modified canonical-indexed context only; no isolated "
+                "canonical assay feature"
+            ),
         },
         "layer3_network": {
             "protein_enrichment_p_min": float(net["protein_enrichment_p"].min()),
@@ -93,7 +106,10 @@ def main() -> None:
         "hypotheses": {
             "H1_matrix_protein_concordance": "FALSIFIED" if not matrix_conc else "SUPPORTED",
             "H2_dct_protein_concordance": "FALSIFIED" if not dct_conc else "SUPPORTED",
-            "H3_phospho_activity": "SUPPORTED" if phospho_down else "FALSIFIED/not-supported",
+            "H3_phospho_activity": (
+                "SUPPORTED" if phospho_down
+                else "UNRESOLVED/no-qualified-isolated-feature"
+            ),
             "H4_network_translation": "SUPPORTED" if net_enriched else "FALSIFIED",
         },
         "decision_table_row": row,

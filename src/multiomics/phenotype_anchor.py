@@ -10,12 +10,35 @@ from scipy import stats
 
 EPS = 1e-12
 
-# Pre-specified NCC/SPAK regulatory (SPAK/OSR1-target activating) phosphosites
-NCC_REGULATORY_SITES = (
-    ("Slc12a3", "53"), ("Slc12a3", "58"), ("Slc12a3", "65"), ("Slc12a3", "68"),
-    ("Stk39", "382"), ("Stk39", "383"),
+# Literature definition.  This is deliberately separate from OSD-462 assay
+# qualification: the source workbook does not contain an isolated canonical
+# phosphoform for any of these positions.
+RENAL_AXIS_LITERATURE_CANONICAL_SITES = (
+    ("Slc12a3", "53"), ("Slc12a3", "58"), ("Slc12a3", "71"),
+    ("Stk39", "243"), ("Stk39", "383"),
 )
-NCC_REGULATORY_SITES_SENS = NCC_REGULATORY_SITES + (("Slc12a3", "89"),)
+
+# No OSD-462 row qualifies as an isolated canonical-site measurement after
+# residue and peptide-phosphoform provenance are enforced.  The T53-indexed
+# sequence also contains pY65; the S383-indexed sequence also contains pS382.
+OSD462_ISOLATED_CANONICAL_ASSAY_FEATURES: tuple[tuple[str, str], ...] = ()
+
+# These rows may be shown as supportive, residue-indexed *co-modified*
+# features.  They must not be scored or labeled as isolated canonical sites.
+OSD462_COMODIFIED_CANONICAL_INDEX_FEATURES = (
+    ("Slc12a3", "53"),
+    ("Stk39", "383"),
+)
+
+# Backward-compatible names intentionally resolve to the empty qualified set.
+# This makes legacy position-only code fail closed instead of silently treating
+# T53/Y65 or S382/S383 phosphoforms as isolated regulatory-site evidence.
+NCC_REGULATORY_SITES = OSD462_ISOLATED_CANONICAL_ASSAY_FEATURES
+NCC_REGULATORY_SITES_SENS = OSD462_ISOLATED_CANONICAL_ASSAY_FEATURES
+
+# S89 is biologically interesting but is neither in the strict literature set
+# above nor an isolated SPAK/OSR1 assay feature.
+OSD462_EXPLORATORY_NCC_SITE_FEATURES = (("Slc12a3", "89"),)
 # Non-regulatory NCC sites -- negative control (should not track the RNA state)
 NCC_NONREGULATORY_SITES = (
     ("Slc12a3", "96"), ("Slc12a3", "120"), ("Slc12a3", "122"), ("Slc12a3", "124"),

@@ -1,0 +1,251 @@
+analysis:
+  id: v13_compartment_adversarial_audit_20260802
+  status: post_hoc_adversarial_after_compartment_results_known
+  frozen_date: "2026-08-02"
+  starting_commit: 1d165c4
+  plan: docs/V13_COMPARTMENT_ADVERSARIAL_AUDIT_PLAN_2026-08-02.md
+  claim_object: parent_proteins_associated_with_external_kidney_compartment_annotations
+
+input:
+  workbook: data/external/osdr/OSD-462/GLDS-462_phosphproteomics_2021-12-31_tc882-883_Pho_WorkUp_JM.xlsx
+  protein_workbook: data/external/osdr/OSD-462/GLDS-462_proteomics_2021-12-31_tc884-885_Protein_WorkUp.xlsx
+  assay_metadata: data/external/osdr/OSD-462/metadata/a_OSD-462_phosphoprotein-profiling_mass-spectrometry_Orbitrap Eclipse.txt
+  gene_sets: data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+  atlas_expression: data/processed/v13_dct_reference/mouse_kidney_atlas/atlas_compartment_expression.tsv.gz
+  stage0_phosphoform_provenance: data/results/run_20260728_osd462_stage0/reporting/osd462_slc12a3_stk39_phosphoform_provenance_compact.tsv
+  structural_scaffold_reference: data/processed/gene_sets/KEGG_2019_Mouse.json
+  source_exact_run: data/results/run_20260729_v13_continuous_phospho_exact_final
+  source_intensity_audit: data/results/run_20260729_v13_intensity_confound_audit
+  source_reporter_diagnostic: data/results/run_20260729_osd462_reporter_position
+  source_layer_block_diagnostic: data/results/run_20260729_osd462_layer_block_shift
+  grey60_gene_contrasts: data/results/run_20260729_grey60_adversarial/internal/influence/gene_contrasts.tsv
+
+contrast:
+  flight_label: FL
+  ground_label: GC
+  exclude_label: BL
+  n_flight: 10
+  n_ground: 10
+  plexes: 2
+  per_plex_per_condition: 5
+  condition_reporter_position_confounded: true
+
+normalization:
+  primary: log2_official_scaled_signal_channel_median_centered
+  sensitivities:
+    - log2_official_scaled_signal_uncentered
+    - log2_signal_to_noise_sum_channel_median_centered
+  permitted_claim: relative_parent_protein_annotation_enrichment
+  forbidden_claim: cell_localized_injury_or_absolute_global_dephosphorylation
+
+site_filter:
+  primary_sheets:
+    - siteQuant_360
+  include_composite_primary: false
+  require_singly_modified_primary: true
+  min_localization_score_primary: 19
+  min_localization_score_sensitivity: 13
+  min_finite_total: 16
+  min_finite_per_plex: 6
+  label_blind: true
+  deduplication_primary: accession_modified_peptide_phosphoform
+  site_position_collapse_sensitivity: true
+  deduplicated_multimodified_sensitivity: true
+
+site_model:
+  estimator: equal_weight_mean_of_within_plex_flight_minus_ground_contrasts
+  complete_data_equivalent_formula: reporter_log2 ~ flight + plex
+  minimum_finite_per_permuted_group_within_plex: 3
+  effect: flight_minus_ground
+  p_value_not_used_for_primary_membership: true
+
+gene_score:
+  positive_direction: lower_phosphorylation_in_flight_labeled_channels
+  primary: median_negative_site_effect
+  sensitivities:
+    - mean_negative_site_effect
+    - one_sided_maxmean
+  calibrate_against_gene_specific_label_null: true
+
+permutation:
+  mode: exact
+  block: plex
+  preserve_per_plex_balance: true
+  exact_assignments: 63504
+  seed_for_ordering_only: 20260802
+  chunk_size: 1024
+  observed_assignment_included: true
+
+marker_tiers:
+  source_is_flight_blind: true
+  target_mean_cpm_min: 1.0
+  target_source_study_detection_fraction_min: 0.5
+  all_enriched_log2_target_to_max_other_min: 1.0
+  within_kidney_broad_non_target_count_min: 4
+  within_kidney_broad_non_target_mean_cpm_min: 1.0
+  within_kidney_broad_non_target_detection_fraction_min: 0.5
+  high_specificity_log2_target_to_max_other_min: 2.0
+  high_specificity_target_detection_fraction_min: 0.75
+  terminology_boundary: within_kidney_not_broad_not_kidney_organ_restricted
+  tiers:
+    - all_enriched
+    - within_kidney_not_broad
+    - high_specificity
+    - broad_enriched
+    - scaffold_excluded
+
+compartment_mapping:
+  proximal_tubule: proximal_tubule
+  thick_ascending_limb: thick_ascending_limb
+  DCT_general: DCT1_context
+  DCT2_CNT_atlas: DCT2_CNT_context
+  principal_cell: principal_cell
+  intercalated_cell: intercalated_cell
+  podocyte: podocyte
+  endothelial: endothelial
+  fibroblast: mesenchymal_stromal
+  immune: immune
+
+structural_scaffold_control:
+  gene_set_name: broad_structural_scaffold_control__all
+  source_terms:
+    - Adherens junction
+    - ECM-receptor interaction
+    - Focal adhesion
+    - Regulation of actin cytoskeleton
+    - Tight junction
+    - Vascular smooth muscle contraction
+
+set_test:
+  primary_statistic: mean_gene_z_in_set_minus_eligible_background
+  self_contained_mean_secondary: true
+  primary_family:
+    - proximal_tubule__all_enriched
+    - proximal_tubule__within_kidney_not_broad
+    - proximal_tubule__high_specificity
+    - proximal_tubule__broad_enriched
+    - proximal_tubule__scaffold_excluded
+    - thick_ascending_limb__all_enriched
+    - thick_ascending_limb__within_kidney_not_broad
+    - thick_ascending_limb__high_specificity
+    - thick_ascending_limb__broad_enriched
+    - thick_ascending_limb__scaffold_excluded
+    - DCT1_context__all_enriched
+    - DCT1_context__within_kidney_not_broad
+    - DCT1_context__high_specificity
+    - DCT1_context__broad_enriched
+    - DCT1_context__scaffold_excluded
+    - DCT2_CNT_context__all_enriched
+    - DCT2_CNT_context__within_kidney_not_broad
+    - DCT2_CNT_context__high_specificity
+    - DCT2_CNT_context__broad_enriched
+    - DCT2_CNT_context__scaffold_excluded
+    - principal_cell__all_enriched
+    - principal_cell__within_kidney_not_broad
+    - principal_cell__high_specificity
+    - principal_cell__broad_enriched
+    - principal_cell__scaffold_excluded
+    - intercalated_cell__all_enriched
+    - intercalated_cell__within_kidney_not_broad
+    - intercalated_cell__high_specificity
+    - intercalated_cell__broad_enriched
+    - intercalated_cell__scaffold_excluded
+    - podocyte__all_enriched
+    - podocyte__within_kidney_not_broad
+    - podocyte__high_specificity
+    - podocyte__broad_enriched
+    - podocyte__scaffold_excluded
+    - endothelial__all_enriched
+    - endothelial__within_kidney_not_broad
+    - endothelial__high_specificity
+    - endothelial__broad_enriched
+    - endothelial__scaffold_excluded
+    - mesenchymal_stromal__all_enriched
+    - mesenchymal_stromal__within_kidney_not_broad
+    - mesenchymal_stromal__high_specificity
+    - mesenchymal_stromal__broad_enriched
+    - mesenchymal_stromal__scaffold_excluded
+    - immune__all_enriched
+    - immune__within_kidney_not_broad
+    - immune__high_specificity
+    - immune__broad_enriched
+    - immune__scaffold_excluded
+    - broad_structural_scaffold_control__all
+  primary_multiplicity: max_absT_across_all_51_sets
+  minimum_observable_genes: 8
+
+comparator_sets: []
+canonical_exclusions: {}
+asdn_gene_set:
+  genes: []
+
+robustness:
+  require_normalization_direction_concordance: true
+  broad_expression_exclusion: false
+  non_distal_or_broad_expression_exclusion_diagnostic: false
+  leave_one_gene_out: false
+  second_reference_direction_concordance: false
+  matched_observability_annotation_permutation_secondary: false
+  parent_protein_subtraction_secondary: true
+
+observability_matching:
+  status: post_hoc_secondary_annotation_null
+  gene_sets:
+    - proximal_tubule__all_enriched
+    - thick_ascending_limb__all_enriched
+    - DCT1_context__all_enriched
+    - DCT2_CNT_context__all_enriched
+    - principal_cell__all_enriched
+    - intercalated_cell__all_enriched
+    - podocyte__all_enriched
+    - endothelial__all_enriched
+    - mesenchymal_stromal__all_enriched
+    - immune__all_enriched
+    - broad_structural_scaffold_control__all
+  n_draws: 10000
+  propensity_bins_per_parent_availability_class: 8
+  seed: 20260802
+  minimum_observable_genes: 8
+  multiplicity: benjamini_hochberg_single_11_set_family
+  covariates:
+    - log1p_quantified_site_count
+    - median_phosphopeptide_log2_signal
+    - mean_missing_fraction
+    - log1p_median_phosphopeptide_count
+    - parent_protein_available
+    - parent_protein_log2_abundance
+    - log1p_parent_protein_peptide_count
+
+post_hoc_candidate_gate:
+  alpha: 0.05
+  require_primary_positive_and_max_absT_fwer: true
+  require_all_three_parent_gene_statistics_positive: true
+  require_all_leave_one_gene_out_statistics_positive: true
+  require_high_specificity_tier_evaluable_and_positive: true
+  require_observability_matched_bh_q: true
+  require_uncentered_and_parent_protein_adjusted_direction_positive: true
+  maximum_top_gene_fraction_of_positive_z: 0.10
+  maximum_top_ten_fraction_of_positive_z: 0.50
+  publication_promotion_forbidden_by_reporter_alias: true
+
+claim_gates:
+  alpha: 0.05
+  require_positive_competitive_effect: true
+  require_all_leave_one_gene_out_positive: false
+  require_no_unrelated_compartment_equal_or_stronger: false
+  dct2_title_requires_transition_and_external_signature: true
+  asdn_only_result_forbids_dct2_title: true
+  neither_result_rejects_beyond_axis_claim: true
+
+publication_promotion_gate:
+  qualified_canonical_anchor_required_for_extension_claim: false
+
+clinical_axis_mapping:
+  status: descriptive_ad_hoc_question_first_translation
+  forbidden_equivalences:
+    - tissue_Lcn2_is_not_urinary_NGAL
+    - tissue_Havcr1_is_not_urinary_KIM1
+    - tissue_Timp2_Igfbp7_is_not_urinary_NephroCheck
+    - tissue_Cst3_is_not_serum_cystatin_C_or_GFR
+    - collagen_gene_abundance_is_not_urinary_PIIINP_or_PRO_C6
+    - podocyte_parent_annotation_is_not_albuminuria_or_barrier_failure

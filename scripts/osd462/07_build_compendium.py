@@ -140,13 +140,13 @@ def main() -> None:
             fp(r["phospho_q_value"]),
             f(occ) if np.isfinite(occ) else "--",
         ])
-    tabph = table(["Gene", "site", "FL/GC", "effect", "95\\% CI", "$p$", "$q$", "occ."],
+    tabph = table(["Gene", "site", "FL/GC", "effect", "95\\% CI", "$p$", "$q$", "protein-adj."],
                   tph_rows, "llcrrrrr",
                   "Layer 2 WNK-SPAK/OSR1-NCC phosphosite flight effects (FL$-$GC, log$_2$; "
-                  "plex-adjusted per-site model). ``occ.'' is the protein-abundance-normalized "
-                  "phospho-occupancy effect (phospho $-$ total protein). The NCC N-terminal "
-                  "regulatory threonine cluster (53--89) and SPAK activating sites (366, 382/383) "
-                  "are strongly down; NCC C-terminal sites (96--124) and OSR1-339 are flat.",
+                  "plex-adjusted per-site model). ``protein-adj.'' is the site-feature effect "
+                  "minus total parent-protein effect, not isolated occupancy. Co-modified "
+                  "T53/Y65 and S382/S383 features decrease; no isolated canonical feature "
+                  "qualifies. NCC C-terminal features (96--124) and OSR1-339 are flat.",
                   "tab:phospho", small=True)
 
     # Table: network translation
@@ -222,20 +222,17 @@ RNA level}} in OSD-462 (pathway-vector cosine $={g['point_cosine']:.2f}$, 95\% C
 $[{g['ci'][0]:.2f},{g['ci'][1]:.2f}]$; gate \pass{{}}). (ii) It does \emph{{not}} translate
 into protein-abundance concordance: no targeted set is concordant in the predicted
 direction, and matrix proteins move significantly \emph{{opposite}} to their transcripts
-(two-sided matched-null $p={matrix_anti:.3f}$). (iii) However, the NCC activating
-phosphorylation is specifically and strongly suppressed --- the N-terminal regulatory
-threonine cluster (mean $={l2['ncc_regulatory_mean_phospho']:.2f}$ log$_2$;
-{int(l2['n_ncc_regulatory_sites_sig_down'])} sites $p<0.05$) and the upstream SPAK
-activating sites (mean $={l2['spak_osr1_mean_phospho']:.2f}$) rank among the most
-down-regulated phosphosites in the entire kidney phosphoproteome --- while total NCC
+(two-sided matched-null $p={matrix_anti:.3f}$). (iii) A T53-indexed NCC feature is
+suppressed
+(${phos.set_index(['gene_symbol','site_position']).loc[('Slc12a3','53'),'phospho_effect']:.2f}$
+log$_2$), as is an upstream S383-indexed SPAK feature
+(${phos.set_index(['gene_symbol','site_position']).loc[('Stk39','383'),'phospho_effect']:.2f}$
+log$_2$), while total NCC
 protein is unchanged (${l2['ncc_total_protein_effect']:+.2f}$). (iv) Network-nominated
 candidate genes are \emph{{not}} enriched among protein- or phospho-changing genes.
-\textbf{{Interpretation.}} The transcriptomic remodeling signal is real and reproducible,
-but its protein-level correlate is a change in \emph{{transport-pathway signaling activity}}
-(reduced NCC phosphoactivation), not in transporter or matrix \emph{{abundance}}. The claim
-is upgraded from ``a co-expression network shifted'' to ``a transcript- and
-signaling-concordant suppression of the WNK--SPAK--NCC activation arm,'' while the matrix
-arm is shown to be transcript-level only.
+\textbf{{Interpretation.}} Both residue-indexed rows arise from co-modified peptide
+sequences (T53/Y65 and S382/S383), so they are compatible with, but do not isolate,
+canonical NCC/SPAK phosphoactivation. The strict activity claim remains unresolved.
 \end{{abstract}}
 
 \section{{Purpose and design}}
@@ -288,8 +285,9 @@ RNA-predicted (up) direction; they move significantly down (Table~\ref{{tab:laye
 \item[H2 -- DCT protein concordance] \fail{{}}. DCT/WNK/NCC \emph{{abundance}} is flat
 (NCC ${l2['ncc_total_protein_effect']:+.2f}$ log$_2$); not concordant with the predicted
 decrease.
-\item[H3 -- phospho activity] \pass{{}}. The WNK--SPAK/OSR1--NCC activating phosphorylation
-is specifically and strongly reduced in flight (Table~\ref{{tab:phospho}}).
+\item[H3 -- phospho activity] unresolved. Canonical-site-indexed features decrease, but
+all are co-modified phosphoforms; no isolated canonical NCC/SPAK feature qualifies
+(Table~\ref{{tab:phospho}}).
 \item[H4 -- network translation] \fail{{}}. LIONESS/node2vec candidates are not enriched
 among protein- or phospho-changing genes (Table~\ref{{tab:layer3}}).
 \end{{description}}
@@ -332,23 +330,22 @@ Table~\ref{{tab:detect}}.
 
 {tabdet}
 
-\subsection{{Layer 2 --- but NCC \emph{{activation}} is specifically suppressed (\pass{{}})}}
-The phosphoproteomics workbook passes the hard checkpoint: NCC (\textit{{Slc12a3}}), SPAK
-(\textit{{Stk39}}) and OSR1 (\textit{{Oxsr1}}) regulatory sites are all quantified. The NCC
-N-terminal regulatory threonine cluster --- the canonical SPAK/OSR1 target that activates
-the cotransporter --- is strongly down in flight (mean
-${l2['ncc_regulatory_mean_phospho']:.2f}$ log$_2$;
-{int(l2['n_ncc_regulatory_sites_sig_down'])} sites with $p<0.05$, composite site 65;68 at
-${phos.set_index(['gene_symbol','site_position']).loc[('Slc12a3','65;68'),'phospho_effect']:.2f}$),
-while the NCC C-terminal sites are unchanged --- a within-protein specificity that rules out
-a trivial abundance artifact. The upstream SPAK activating sites fall in parallel (mean
-${l2['spak_osr1_mean_phospho']:.2f}$; S383 at
+\subsection{{Layer 2 --- canonical-site-indexed co-modified features are suppressed}}
+The phosphoproteomics workbook contains NCC (\textit{{Slc12a3}}), SPAK
+(\textit{{Stk39}}), and OSR1 (\textit{{Oxsr1}}) site features. Residue-level provenance
+identifies a T53-indexed feature; it is down in flight
+(${phos.set_index(['gene_symbol','site_position']).loc[('Slc12a3','53'),'phospho_effect']:.2f}$
+log$_2$), but its reported peptide sequence also carries Y65 phosphorylation. Workbook
+positions 65 and 68 resolve to Y65 and Y68 and are excluded from canonical-site inference.
+NCC C-terminal sites are unchanged, a within-protein specificity that argues against a
+simple abundance artifact. The upstream S383-indexed SPAK feature, carried on an S382/S383
+phosphoform, falls in parallel (
 ${phos.set_index(['gene_symbol','site_position']).loc[('Stk39','383'),'phospho_effect']:.2f}$,
 $p={phos.set_index(['gene_symbol','site_position']).loc[('Stk39','383'),'phospho_p_value']:.1e}$).
-Genome-wide the phosphoproteome is centered (median $+0.007$), and these NCC/SPAK sites sit
-in its extreme down tail (bottom $\sim$0.0--0.7 percentile). Because total NCC protein is
-unchanged, the phospho-occupancy change is at least as large (Table~\ref{{tab:phospho}},
-Fig.~\ref{{fig:dash}}C, Fig.~\ref{{fig:recur}}B).
+Genome-wide the phosphoproteome is centered (median $+0.007$), and these NCC/SPAK features sit
+in its extreme down tail (bottom $\sim$0.0--0.7 percentile). Total NCC protein is unchanged,
+but the co-modified peptides do not permit isolated-site occupancy inference
+(Table~\ref{{tab:phospho}}, Fig.~\ref{{fig:dash}}C, Fig.~\ref{{fig:recur}}B).
 
 {tabph}
 
@@ -366,9 +363,9 @@ candidate-prioritization device with no independent proteomic support.
 \caption{{Multi-omics anchor dashboard. \textbf{{A}} Transcript (RRRM-2 ISS-T RNA) vs.\ OSD-462
 protein flight effects; targeted sets coloured. Matrix genes (orange) occupy the
 transcript-up / protein-down quadrant. \textbf{{B}} DCT/NCC/WNK protein abundances are flat
-(NCC slightly up). \textbf{{C}} WNK--SPAK/OSR1--NCC phosphosite effects with 95\% CIs; the NCC
-N-terminal cluster and SPAK activating sites (red, $p<0.05$) are strongly down while
-C-terminal sites are flat. \textbf{{D}} Network-candidate translation: observed mean
+(NCC slightly up). \textbf{{C}} WNK--SPAK/OSR1--NCC phosphosite effects with 95\% CIs;
+co-modified T53/Y65 and S382/S383 features decrease while C-terminal features are flat;
+isolated canonical activity is unresolved. \textbf{{D}} Network-candidate translation: observed mean
 $|$effect$|$ tracks the matched null at protein and phospho layers.}}
 \label{{fig:dash}}
 \end{{figure}}
@@ -392,21 +389,20 @@ The honest reading across layers is two-pronged:
 level in both cohorts but matrix protein abundance is not increased (it is mildly,
 significantly decreased), indicating transcript--protein uncoupling at terminal collection
 rather than net matrix deposition.
-\item \textbf{{DCT/NCC arm:}} an activity/signaling change. NCC transcript is down and total
-NCC protein is preserved, but the SPAK$\to$NCC activating phosphorylation arm is specifically
-suppressed. This both \emph{{explains}} why the DCT abundance test was null and \emph{{upgrades}}
-the DCT claim to a signaling-level statement.
+\item \textbf{{DCT/NCC arm:}} NCC transcript is down and total NCC protein is preserved.
+T53/Y65 and S382/S383 co-modified features decrease, but they do not isolate the canonical
+SPAK$\to$NCC activation sites. The signaling-activity claim therefore remains unresolved.
 \end{{itemize}}
 
 \section{{Biological implications}}
 The WNK--SPAK/OSR1--NCC cascade is the master switch for Na--Cl reabsorption in the distal
 convoluted tubule; phosphorylation of the NCC N-terminal threonines by SPAK/OSR1 is the
-activating step, and SPAK is itself activated by WNK-dependent phosphorylation. Finding the
-NCC activating cluster and the SPAK activating sites coordinately among the most
-down-regulated phosphosites in the flight kidney --- with total NCC protein unchanged ---
-is direct molecular evidence that spaceflight reduces NCC \emph{{transport-pathway activation}},
-not transporter abundance. This is mechanistically more specific than the original
-transcriptomic observation and connects to the physiological context that motivated the axis
+activating step, and SPAK is itself activated by WNK-dependent phosphorylation. The current
+workbook instead identifies strongly decreased, co-modified T53/Y65 and S382/S383
+phosphoforms while total NCC protein is unchanged. This is supportive molecular context,
+but it is not direct evidence that spaceflight reduces isolated canonical NCC
+\emph{{transport-pathway activation}}. Resolving that claim requires a site- and
+phosphoform-specific assay and connects to the physiological context that motivated the axis
 (distal Na--Cl handling, K$^+$/Ca$^{{2+}}$ balance, volume regulation, and renal stone risk).
 It also reframes the matrix result: the ``matrix-high'' signature is, in this cohort, a
 transcriptional program not yet realised as protein, consistent with active remodeling
@@ -416,11 +412,10 @@ prioritise transcripts, not protein-level biology.
 
 \section{{What this can and cannot establish}}
 \textbf{{Can:}} that the RNA remodeling \emph{{direction}} reproduces in a second, independent,
-cross-strain flight cohort at the RNA level; that the specific WNK--SPAK--NCC activation arm
-is suppressed at the phosphoprotein level; and that matrix induction is transcript-level only.
-\textbf{{Cannot:}} physiology. There is no histology and no urine/serum electrolyte data in
-scope; even perfect concordance would yield a molecular claim (``reduced NCC
-transport-pathway activation''), not a functional one (``kidney Na--Cl handling changed'').
+cross-strain flight cohort at the RNA level; that T53/Y65- and S382/S383-indexed
+phosphoforms decrease; and that matrix induction is transcript-level only.
+\textbf{{Cannot:}} isolated canonical NCC/SPAK activity or physiology. There is no qualified
+single-phosphoform canonical feature, histology, or urine/serum electrolyte data in scope.
 A single terminal time point cannot resolve the transcript$\to$protein timing that would
 explain the matrix uncoupling. The result does not rehabilitate ``network rewiring'' as a
 mechanism-discovery method. Histology and urine/serum chemistry remain explicit future work.
@@ -440,7 +435,9 @@ references them. Pipeline: \texttt{{scripts/osd462/00\_harmonize.py}} $\to$
 \texttt{{05\_plot\_dashboard.py}} $\to$ \texttt{{06\_compile\_summary.py}} $\to$
 \texttt{{07\_build\_compendium.py}}; core estimators in
 \texttt{{src/multiomics/osd462\_anchor.py}} with unit tests in
-\texttt{{tests/test\_osd462\_anchor.py}}. Matched nulls use {10000} draws (seed 20260521);
+\texttt{{tests/test\_osd462\_anchor.py}}. Residue and phosphoform claims additionally require
+\texttt{{scripts/osd462/08\_stage0\_provenance\_audit.py}} and its zero-row
+isolated-canonical qualification table. Matched nulls use {10000} draws (seed 20260521);
 the RNA recurrence bootstrap uses {int(rec['n_bootstrap'])} resamples.
 
 \end{{document}}

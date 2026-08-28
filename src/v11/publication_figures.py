@@ -569,13 +569,13 @@ def fig_h3_mediation_forest(run_root: Path, out_dir: Path) -> bool:
     ax.set_yticks(y)
     ax.set_yticklabels([label_map.get(str(m), str(m)) for m in sub["mediator"].astype(str)])
     ax.invert_yaxis()
-    ax.set_xlabel("Covariance-decomposition path summary for NCC regulatory phospho score")
-    ax.set_title("Exploratory remodeling/transporter covariance decomposition")
+    ax.set_xlabel("Historical co-modified phosphosite-feature score (not canonical activity)")
+    ax.set_title("Invalidated activity mediation shown for provenance only")
     clean_axis(ax)
     ax.text(
         0.01,
         -0.2,
-        "Approximate Bayesian OLS; cross-sectional bulk tissue; not causal evidence.",
+        "Stage 0: no isolated canonical feature qualifies; not activity or causal evidence.",
         transform=ax.transAxes,
         fontsize=8,
         color=PALETTE["gray"],
