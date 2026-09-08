@@ -20,10 +20,7 @@ ENSEMBL_REST = "https://rest.ensembl.org"
 
 def ensembl_batch_lookup(ids: list[str], chunk: int = 500,
                          sleep: float = 0.3, retries: int = 5) -> dict:
-    """
-    Batch POST to /lookup/id.
-    Returns dict: {ensembl_id: {display_name, biotype, description, ...}}
-    """
+    """Batch POST to Ensembl /lookup/id; returns {ensembl_id: {display_name, biotype, ...}}."""
     out = {}
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
 
@@ -65,10 +62,7 @@ def ensembl_batch_lookup(ids: list[str], chunk: int = 500,
 
 def ensembl_xref_symbol(symbol: str, species: str = "mus_musculus",
                         retries: int = 3) -> list[str]:
-    """
-    Look up a gene symbol → Ensembl gene IDs via xrefs.
-    Returns list of Ensembl gene IDs matching the symbol.
-    """
+    """Look up a gene symbol via Ensembl xrefs; returns the matching Ensembl gene IDs."""
     headers = {"Accept": "application/json"}
     url = f"{ENSEMBL_REST}/xrefs/symbol/{species}/{symbol}"
 

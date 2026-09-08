@@ -1,15 +1,5 @@
 # scripts/phase3_procrustes_rewiring.py
-"""
-Phase 3.3: Procrustes alignment + cosine rewiring (multi-seed)
-
-- Builds anchors from the 4 FLT–GC rewiring tables (lowest median rewiring_abs)
-- Aligns embeddings per seed via orthogonal Procrustes
-- Computes rewiring = 1 − cosine_similarity
-- Reports seed mean/std + rank variance
-
-Usage:
-    python scripts/phase3_procrustes_rewiring.py
-"""
+"""Phase 3.3: align per-seed embeddings by orthogonal Procrustes and score 1 - cosine rewiring."""
 from __future__ import annotations
 
 import os
@@ -31,12 +21,7 @@ def cosine_distance_rows(A: np.ndarray, B: np.ndarray, eps: float = 1e-12) -> np
 
 
 def pick_phase2_anchors(node_rewiring_dir: Path, genes: list[str], anchor_k: int) -> np.ndarray:
-    """
-    Anchor recipe:
-      - read the 4 FLT_minus_GC rewiring tables
-      - compute per gene median rewiring_abs
-      - take bottom K genes as anchors (lowest rewiring = most stable)
-    """
+    """Pick the K genes with lowest median rewiring_abs across the four FLT-GC tables as anchors."""
     needed = [
         "ISS_T_YNG_FLT_minus_GC_node_rewiring.tsv",
         "ISS_T_OLD_FLT_minus_GC_node_rewiring.tsv",
@@ -71,11 +56,7 @@ def pick_phase2_anchors(node_rewiring_dir: Path, genes: list[str], anchor_k: int
 
 
 def orthogonal_procrustes_align(B: np.ndarray, A: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Rotate B to best match A using orthogonal Procrustes:
-      find R minimizing ||B R - A||_F
-      return (B_aligned, R)
-    """
+    """Rotate B onto A by orthogonal Procrustes minimizing ||B R - A||_F; return (B_aligned, R)."""
     try:
         from scipy.linalg import orthogonal_procrustes
     except Exception as e:

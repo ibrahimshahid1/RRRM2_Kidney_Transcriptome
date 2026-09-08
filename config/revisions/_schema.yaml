@@ -1,0 +1,39 @@
+# Schema reference for config/revisions/*.yaml — documentation only, not loaded.
+#
+# Every experiment class ("revision") in this project gets exactly one file here.
+# `rrrm2 list` / `rrrm2 show` / `rrrm2 run` read these and nothing else, so a
+# revision that is not described here is not runnable through the CLI.
+
+schema_version: 1
+
+id: kebab-case-identifier          # required; must equal the filename stem
+title: One-line human name         # required
+workflow: A|B|C|D|-                # audit §2 workflow letter, or - if outside them
+status: locked|complete|retired|exploratory|blocked
+lock_date: YYYY-MM-DD              # null when never frozen
+
+question: >-                       # the scientific question this revision answers
+  ...
+conclusion: >-                     # what it actually concluded; null if not run to conclusion
+  ...
+
+spec_config: config/<file>.yaml    # frozen machine-readable spec, or null
+docs: []                           # plan / decision records, in reading order
+results_root: data/results/<id>    # class-level results folder for NEW runs
+reference_run: data/results/run_...   # the historical locked run, or null
+figures_root: figures/<id>         # or null
+
+requires:                          # preflight checks before any stage runs
+  data: []                         # paths that must exist
+  r: false                         # true when a stage shells out to Rscript
+
+stages:                            # ordered; each is one executable step
+  - id: kebab-case
+    title: One line
+    needs: []                      # ids of stages that must run first
+    runner: python|rscript
+    entry: scripts/<path>.py       # path relative to repo root
+    args: []                       # {run_dir}, {spec_config}, {figures_root},
+                                   # {repo}, {reference_run} are substituted
+    optional: false                # true = skipped unless --with-optional
+    outputs: []                    # representative artifacts, for `rrrm2 show`

@@ -187,13 +187,7 @@ def gene_contributions(gene_effect_path: Path):
 
 
 def secondary_qc_covariate_sensitivity(missions, family, threshold):
-    """Residualize the flagged OSD-163 mapping metric, then recompute Hedges g.
-
-    This is deliberately a sensitivity rather than the primary estimand.  The
-    residualization model is label-blind (score ~ QC metric), and the resulting
-    residuals enter the same standardized flight-control effect calculation as
-    the other mission scores.
-    """
+    """Recompute Hedges g on label-blind QC-residualized scores; a sensitivity, not the primary estimand."""
     scores, design, _, _ = combined_score_design(
         missions, family, cpm_threshold=threshold
     )

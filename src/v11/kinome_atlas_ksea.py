@@ -88,13 +88,7 @@ def load_atlas_pssms(
     sheet: str = PSSM_SHEET,
     positions: Sequence[int] = ATLAS_POSITIONS,
 ) -> AtlasPSSM:
-    """Read the Ser/Thr atlas into log2 weights.
-
-    Column headers are ``{position}{residue}`` (e.g. ``-3R``); the
-    position-normalised scaled matrix is positive everywhere, so ``log2`` of each
-    cell is a clean per-position log-odds contribution that sums across the
-    window.
-    """
+    """Read the Ser/Thr kinase atlas into per-position log2 weights keyed {position}{residue}."""
     import openpyxl  # lazy: only the loader needs it
 
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
@@ -160,12 +154,7 @@ def score_sites(
     *,
     center: int = MOTIF_CENTER_INDEX,
 ) -> np.ndarray:
-    """Per-site, per-kinase summed log2 PSSM score over the atlas frame.
-
-    ``motifs`` is a sequence of 13-mers centred on the phosphosite. Returns an
-    ``(n_sites, n_kinases)`` array. Residues absent from a kinase's matrix (rare
-    priming positions, terminal padding) contribute nothing for that position.
-    """
+    """Summed log2 PSSM score per site x kinase over 13-mers; absent residues contribute zero."""
     K = len(atlas)
     P = len(atlas.positions)
     N = len(motifs)
@@ -199,12 +188,7 @@ def score_sites(
 
 
 def percentile_by_kinase(scores: np.ndarray) -> np.ndarray:
-    """Within-cohort percentile of each site's score, computed per kinase.
-
-    Column ``k`` is replaced by the percentile rank (0--100) of each site within
-    the distribution of kinase ``k``'s scores across all sites -- the on-disk
-    stand-in for Johnson's Ochoa reference distribution.
-    """
+    """Within-cohort per-kinase percentile of each site's score, standing in for Ochoa."""
     N, K = scores.shape
     if N <= 1:
         return np.full_like(scores, 100.0)
@@ -223,17 +207,7 @@ def assign_mask(
     threshold: float = ASSIGN_PERCENTILE,
     k_per_site: int | None = K_PER_SITE,
 ) -> np.ndarray:
-    """Boolean (n_sites x n_kinases) assignment mask.
-
-    A site is assigned to a kinase when (a) its score clears the kinase's
-    ``threshold`` percentile *and* (b) that kinase is among the site's
-    ``k_per_site`` best-matching kinases. The per-site top-k constraint is what
-    restores substrate specificity: because the percentile is computed *within
-    cohort* (no external reference), a bare per-kinase floor would assign a fixed
-    ``100 - threshold`` percent of sites to *every* kinase, collapsing the KSEA
-    substrate sets to a near-constant size and an n-inflated z. Capping each site
-    to its top-k kinases concentrates each kinase's net on its cognate motifs.
-    """
+    """Site x kinase mask: clears the kinase percentile floor and ranks in the site's top-k."""
     mask = percentile >= threshold
     N, K = percentile.shape
     if k_per_site and k_per_site < K:
@@ -255,11 +229,7 @@ def build_kinome_net(
     threshold: float = ASSIGN_PERCENTILE,
     k_per_site: int | None = K_PER_SITE,
 ) -> pd.DataFrame:
-    """Assign sites to their top-ranked kinases; emit the KSEA net schema.
-
-    Emits exactly the ``kinase / substrate_gene / substrate_site`` schema that
-    :func:`load_kinase_substrate_net` validates and :func:`ksea` consumes.
-    """
+    """Assign sites to top-ranked kinases in the kinase/substrate_gene/substrate_site schema."""
     genes = list(gene_symbol)
     sites = [str(s) for s in site_position]
     mask = assign_mask(percentile, threshold=threshold, k_per_site=k_per_site)
@@ -297,12 +267,7 @@ def over_representation(
     p_thresh: float = 0.05,
     min_substrate_genes: int = MIN_SUBSTRATES,
 ) -> pd.DataFrame:
-    """One-sided Fisher: are a kinase's substrate *genes* enriched for down sites?
-
-    Sites are collapsed to one representative per parent gene (lowest phospho
-    p-value, then most-negative effect) so a single gene with many sites cannot
-    dominate. ``down`` := representative effect < 0 and p < ``p_thresh``.
-    """
+    """One-sided Fisher enrichment of down sites among a kinase's substrate genes, one per gene."""
     g = sites.dropna(subset=[gene_col]).copy()
     g["_p"] = pd.to_numeric(g[p_col], errors="coerce")
     g["_e"] = pd.to_numeric(g[effect_col], errors="coerce")
@@ -377,12 +342,7 @@ def load_osd462_st_sites(
     phospho_xlsx: str | Path = OSD462_PHOSPHO_XLSX,
     sheet: str = PHOSPHO_SHEET,
 ) -> pd.DataFrame:
-    """Join the verified phospho effect table to atlas motifs; keep S/T sites.
-
-    Returns ``gene_symbol, site_position, motif, phospho_effect, phospho_se,
-    phospho_p_value`` for every quantified single phosphosite whose motif is
-    centred on Ser or Thr (Tyr sites are dropped -- the atlas is Ser/Thr only).
-    """
+    """Join verified phospho effects to atlas motifs, keeping Ser/Thr-centred single sites only."""
     root = Path(root)
     candidate_roots = [Path(sites_root)] if sites_root is not None else []
     candidate_roots.extend([root, OSD462_ANCHOR_RUN])

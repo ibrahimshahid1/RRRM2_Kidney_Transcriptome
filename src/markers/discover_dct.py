@@ -24,14 +24,7 @@ def build_design_matrix(meta: pd.DataFrame, clr: pd.DataFrame,
                         cell_cols: list[str],
                         tech_cols: list[str] | None = None,
                         drop_segment: str = "PT") -> tuple[np.ndarray, int]:
-    """
-    Build the full design matrix X [n_samples × p]:
-      intercept | CLR(DCT) | CLR(other) | tech covariates | cell dummies
-
-    Returns:
-        X : (n, p) float64 design matrix
-        dct_col_idx : column index of CLR(DCT) in X
-    """
+    """Build design matrix [intercept | CLR(DCT) | CLR(other) | tech | cells]; returns (X, idx)."""
     n = len(meta)
     parts = [np.ones((n, 1))]  # intercept
     col_names = ["intercept"]
@@ -105,17 +98,7 @@ def build_design_matrix(meta: pd.DataFrame, clr: pd.DataFrame,
 
 def ols_all_genes(X: np.ndarray, Y: np.ndarray,
                   dct_col: int) -> pd.DataFrame:
-    """
-    Vectorised OLS: solve X @ B = Y in one shot.
-
-    Args:
-        X:   (n, p) design matrix
-        Y:   (n, G) expression matrix (samples × genes)
-        dct_col: index of CLR(DCT) column in X
-
-    Returns:
-        DataFrame with columns: beta_dct, t_stat, p_value, partial_r2
-    """
+    """Vectorised OLS over all genes; returns beta_dct, t_stat, p_value, partial_r2 per gene."""
     n, p = X.shape
     G = Y.shape[1]
     rank = np.linalg.matrix_rank(X)
@@ -157,16 +140,7 @@ def specificity_filter(X: np.ndarray, Y: np.ndarray,
                        clr_col_indices: dict[str, int],
                        dct_col: int,
                        top_n: int = 3) -> np.ndarray:
-    """
-    For each gene, check if |β_DCT| is among the top-N segment coefficients.
-
-    DCT is a minority cell type in bulk kidney, so requiring it to be THE
-    largest beta is too stringent (PT/TAL_LOH dominate). Top-3 ensures
-    DCT markers are reasonably specific without being impossible.
-
-    Returns:
-        Boolean array (G,): True if β_DCT ranks in top-N segments.
-    """
+    """Flag genes whose |beta_DCT| ranks top-N among segment coefficients (DCT is a minority)."""
     X_pinv = np.linalg.pinv(X)
     B = X_pinv @ Y  # (p, G)
 
@@ -189,12 +163,7 @@ def bootstrap_stability(X: np.ndarray, Y: np.ndarray, meta: pd.DataFrame,
                         cell_cols: list[str], dct_col: int,
                         n_boot: int, alpha: float,
                         rng: np.random.Generator) -> np.ndarray:
-    """
-    Stratified bootstrap within experimental cells.
-    Counts gene as passing when BOTH β_DCT > 0 AND q < alpha,
-    matching the actual marker selection criterion.
-    Returns: (G,) array of fraction of bootstraps where gene passes.
-    """
+    """Stratified within-cell bootstrap fraction where beta_DCT > 0 and q < alpha."""
     G = Y.shape[1]
     pass_counts = np.zeros(G, dtype=int)
 
@@ -244,15 +213,7 @@ def bootstrap_marginal_stability(Y: np.ndarray, dct_vec: np.ndarray,
                                  meta: pd.DataFrame, cell_cols: list[str],
                                  n_boot: int, alpha: float,
                                  rng: np.random.Generator) -> np.ndarray:
-    """
-    Fallback bootstrap using marginal Pearson correlation instead of OLS.
-    Used when the full OLS model is over-parameterised (≈0 genes pass q<α).
-
-    For each bootstrap resample, compute Pearson r(gene, DCT) and test
-    whether r > 0 with BH-corrected p < α.
-
-    Returns: (G,) array of fraction of bootstraps where gene passes.
-    """
+    """Marginal Pearson bootstrap fallback used when the full OLS model is over-parameterised."""
     from scipy.stats import pearsonr as _pearsonr
 
     G = Y.shape[1]

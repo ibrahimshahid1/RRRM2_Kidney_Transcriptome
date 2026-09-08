@@ -1,10 +1,4 @@
-"""Read-only reporting for v13 continuous phosphoproteomic inference outputs.
-
-This module deliberately consumes the frozen inference artifacts instead of
-recomputing any site, parent-gene, permutation, multiplicity, or claim-gate
-quantity.  Its only derived values are descriptive joins, observable-member
-counts for sets omitted as non-evaluable, labels, and display ordering.
-"""
+"""Read-only v13 phospho reporting; recomputes no site, permutation, or claim-gate value."""
 
 from __future__ import annotations
 

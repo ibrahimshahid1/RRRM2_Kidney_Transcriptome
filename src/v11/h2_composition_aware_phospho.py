@@ -534,8 +534,7 @@ def site_fixed_long_models(long: pd.DataFrame, site_meta: pd.DataFrame) -> pd.Da
         if len(d) < 1000:
             continue
         cols = ["phosphosite_abundance"] + covars
-        # Absorb phosphosite baseline by within-site demeaning. This is the
-        # scalable fixed-effect analogue of a random phosphosite intercept.
+        # Within-site demeaning absorbs the phosphosite baseline (fixed-effect intercept analogue).
         means = d.groupby("site_row_id")[cols].transform("mean")
         yd = d["phosphosite_abundance"] - means["phosphosite_abundance"]
         Xd = d[covars] - means[covars]

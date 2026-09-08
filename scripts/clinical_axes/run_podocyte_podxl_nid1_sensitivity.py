@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-"""Force Podxl and Nid1 into the cross-mission podocyte RNA program.
-
-This is a post-hoc, adversarial sensitivity analysis prompted by the PODXL/NID1
-comparison with prior spaceflight literature.  The frozen high-specificity
-podocyte set already contains Podxl; this script adds Nid1, verifies that both
-genes pass the frozen CPM eligibility rule in every mission, and reruns the
-animal-level blocked-label permutation.  It also reports Podxl and Nid1
-separately so a stable set result cannot conceal discordant individual genes.
-"""
+"""Post-hoc sensitivity forcing Podxl and Nid1 into the podocyte program; reports both genes separately."""
 
 from __future__ import annotations
 

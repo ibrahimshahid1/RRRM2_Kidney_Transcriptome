@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Describe gene-level coherence of the cross-mission podocyte RNA program.
-
-This is a descriptive follow-up to the multiplicity-controlled compartment
-family.  Gene-level intervals and p-values are retained for auditability but
-must not be interpreted as a second confirmatory testing family.
-"""
+"""Describe gene-level podocyte RNA coherence; descriptive follow-up only, not a confirmatory testing family."""
 
 from __future__ import annotations
 

@@ -860,13 +860,7 @@ def fisher_table(df: pd.DataFrame, flag: str, suppressed_col: str):
 
 
 def one_representative_site_per_gene(df: pd.DataFrame) -> pd.DataFrame:
-    """Select one phosphosite row per parent gene for row-dependence sensitivity.
-
-    The representative row is the most statistically responsive site on the
-    parent gene, using phosphosite p value as the primary key and more negative
-    flight effect as the tie-breaker. This is distinct from
-    ``is_single_site``, which only excludes composite/multi-position rows.
-    """
+    """Pick the most responsive phosphosite per parent gene (p value, then most negative effect)."""
     cols = ["gene_symbol", "phospho_p_value", "phospho_effect", "site_id"]
     sub = df.dropna(subset=["gene_symbol"]).copy()
     return (
@@ -1154,12 +1148,7 @@ def site_count_stratified_permutation(
     n_perm: int = 2000,
     seed: int = 20260526,
 ) -> dict:
-    """Shuffle subtype-prior flags among parent genes within site-count strata.
-
-    The row-level suppressed/not-suppressed pattern is held fixed; only the
-    parent-gene subtype-prior label is permuted within bins of quantified site
-    count. This preserves parent-gene site density in the null.
-    """
+    """Permute parent-gene subtype-prior flags within site-count strata, holding rows fixed."""
     sub = df[df["dct1_enrichment_score"].notna()].copy()
     sub = sub.dropna(subset=["gene_symbol"])
     if sub.empty:
@@ -1507,12 +1496,7 @@ def run_h2_parent_gene_level(root: Path, phospho_prior: pd.DataFrame) -> pd.Data
 
 
 def _gradient_directional_read(rho: float, p: float, score_label: str) -> str:
-    """Sign-aware interpretation of a DCT1-score vs phosphosite-effect Spearman.
-
-    A continuous suppression gradient predicts NEGATIVE rho (more negative effect
-    at higher DCT1 prior). The label reports the OBSERVED sign so a positive rho is
-    never silently read as supportive of suppression.
-    """
+    """Label a DCT1-vs-effect Spearman by observed sign; positive rho never reads as suppression."""
     if not np.isfinite(rho):
         return f"insufficient data for Spearman of DCT1 prior vs {score_label}"
     sig = bool(np.isfinite(p) and p < 0.05)
@@ -1783,9 +1767,7 @@ def approximate_bayes_linear(y, X, n_draws=10000, seed=20260526):
 
 
 def run_mediation(root: Path):
-    # Stage 0 invalidated the outcome used by the historical mediation:
-    # position-indexed T53 and S383 rows are co-modified phosphoforms, and no
-    # isolated canonical NCC/SPAK feature qualifies. Fail closed.
+    # Stage 0 invalidated the mediation outcome: T53/S383 rows are co-modified. Fail closed.
     reason = (
         "not_run: zero isolated canonical OSD-462 NCC/SPAK assay features; "
         "historical ncc_activity_score_regulatory is invalid as an activity outcome"

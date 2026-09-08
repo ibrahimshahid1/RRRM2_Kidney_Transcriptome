@@ -1,0 +1,49 @@
+schema_version: 1
+
+id: contrast-vectors
+title: Cross-OSDR network-contrast (aging-vector) framework
+workflow: A
+status: retired
+lock_date: 2026-05-18
+
+question: >-
+  Does spaceflight amplify, dampen, reverse, or redirect age-related kidney
+  transcriptional network change, separately for ISS-T and LAR?
+
+conclusion: >-
+  Not carried to a publication claim. Guardrail A (the control-aging-vector
+  stability gate) governs whether any decomposition downstream is interpretable;
+  see agents_instruction.md sections 2.1 and 4.1 before rerunning.
+
+spec_config: config/contrast_vector_framework.yaml
+docs:
+  - agents_instruction.md
+  - docs/ANALYSIS_TRIAGE_AND_NETWORK_REFRAME_2026-07-29.md
+
+results_root: data/results/contrast-vectors
+reference_run: data/results/run_20260518_172747_contrast_vectors
+figures_root: null
+
+requires:
+  data:
+    - data/external/osdr
+  r: false
+
+stages:
+  - id: framework
+    title: Stability gate, decomposition, module annotation, external projection
+    needs: []
+    runner: python
+    entry: scripts/run_contrast_vector_framework.py
+    args: ["--config", "{spec_config}", "--outdir", "{run_dir}", "--run-id", "{run_id}"]
+    optional: false
+    outputs: []
+
+  - id: audit-gates
+    title: Confirm recorded stability decisions match pre-registered thresholds
+    needs: [framework]
+    runner: python
+    entry: scripts/audit_stability_gates.py
+    args: []
+    optional: true
+    outputs: []

@@ -1,0 +1,560 @@
+# Versioned gene-panel registry — tubule_segments
+#
+# Nephron-segment identity panels (PT, TAL, CNT/CD, intercalated).
+# DCT and ASDN panels live in dct_asdn_transport.yaml.
+#
+# Extracted 2026-08-28 by an inventory pass over src/**, scripts/**, tests/**.
+# Membership and ordering are reproduced EXACTLY as they appear in the source
+# literal. Nothing was added, dropped, corrected, or reordered.
+#
+# provenance.frozen: true marks a panel that belongs to a locked analysis
+# (config/clinical_renal_axes_cross_mission.yaml,
+#  config/dct_asdn_phospho_reanalysis.yaml,
+#  config/dct_subtype_reference_freeze_v1.yaml).  Those entries must never be
+# edited; see docs/GENE_PANEL_INVENTORY.md section 4.
+#
+# See docs/GENE_PANEL_INVENTORY.md for the duplication/drift analysis.
+
+schema_version: 1
+panels:
+  proximal_tubule_composition_6:
+    description: "Proximal-tubule composition-reference panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/multiomics/celltype_panels.py
+          symbol: KIDNEY_PANELS
+          key: proximal_tubule
+          lines: "16"
+      literature:
+        - "Chen et al. 2021 (GSE150338) — src/multiomics/celltype_panels.py:9"
+      frozen: false
+      in_test: false
+    genes:
+      Slc34a1: 1
+      Lrp2: 1
+      Slc5a2: 1
+      Slc7a13: 1
+      Gatm: 1
+      Miox: 1
+    minimum_present: null
+
+  proximal_tubule_deconvolution_4:
+    description: "Proximal-tubule markers used by the deconvolution sanity check."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution_sanity.py
+          symbol: MARKERS
+          key: PT
+          lines: "15"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc34a1: 1
+      Lrp2: 1
+      Cubn: 1
+      Slc5a12: 1
+    minimum_present: null
+
+  proximal_tubule_canonical_r_5:
+    description: "Canonical proximal markers forced into the R deconvolution reference (Experiment C)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution.R
+          symbol: canonical_proximal
+          key: null
+          lines: "607"
+        - file: scripts/run_deconvolution.R
+          symbol: canonical_proximal
+          key: null
+          lines: "559"
+        - file: scripts/run_pseudobulk_test.R
+          symbol: group.markers$Proximal
+          key: null
+          lines: "331"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc34a1: 1
+      Lrp2: 1
+      Aqp1: 1
+      Slc22a6: 1
+      Slc5a2: 1
+    minimum_present: null
+
+  proximal_tubule_sanity_3:
+    description: "Minimal PT panel from the R sanity marker panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/sanity_marker_panel.R
+          symbol: panel
+          key: PT
+          lines: "18"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc34a1: 1
+      Lrp2: 1
+      Aqp1: 1
+    minimum_present: null
+
+  proximal_tubule_comparator_frozen:
+    description: "FROZEN proximal-tubule comparator set from the DCT subtype reference freeze."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.major_kidney_comparator_sets
+          key: proximal_tubule
+          lines: "309-315"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Slc34a1: 1
+      Slc5a2: 1
+      Lrp2: 1
+      Cubn: 1
+      Aqp1: 1
+      Slc22a6: 1
+    minimum_present: null
+
+  thick_ascending_limb_composition_5:
+    description: "Thick-ascending-limb composition-reference panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/multiomics/celltype_panels.py
+          symbol: KIDNEY_PANELS
+          key: thick_ascending_limb
+          lines: "17"
+      literature:
+        - "Chen et al. 2021 (GSE150338) — src/multiomics/celltype_panels.py:9"
+      frozen: false
+      in_test: false
+    genes:
+      Umod: 1
+      Slc12a1: 1
+      Cldn16: 1
+      Kcnj1: 1
+      Egf: 1
+    minimum_present: null
+
+  thick_ascending_limb_transport_9:
+    description: "TAL transport panel used by the v13 clinical-axis adversarial audit."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v13/compartment_adversarial_audit.py
+          symbol: CLINICAL_AXIS_PANELS
+          key: TAL_transport
+          lines: "66-69"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a1: 1
+      Kcnj1: 1
+      Umod: 1
+      Cldn16: 1
+      Cldn19: 1
+      Clcnka: 1
+      Clcnkb: 1
+      Bsnd: 1
+      Slc9a3: 1
+    minimum_present: null
+
+  thick_ascending_limb_canonical_r_6:
+    description: "Canonical TAL markers in the R deconvolution reference builders."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution.R
+          symbol: canon_tal
+          key: null
+          lines: "551"
+        - file: scripts/run_deconvolution.R
+          symbol: canon_tal
+          key: null
+          lines: "516"
+        - file: scripts/run_pseudobulk_test.R
+          symbol: mk_tal_final
+          key: null
+          lines: "325"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Umod: 1
+      Slc12a1: 1
+      Cldn10: 1
+      Cldn16: 1
+      Kcnj1: 1
+      Bsnd: 1
+    minimum_present: null
+
+  thick_ascending_limb_sanity_4:
+    description: "TAL panel from the R sanity marker panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/sanity_marker_panel.R
+          symbol: panel
+          key: TAL
+          lines: "19"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a1: 1
+      Umod: 1
+      Kcnj1: 1
+      Clcnkb: 1
+    minimum_present: null
+
+  thick_ascending_limb_deconvolution_2:
+    description: "Two-gene TAL/loop-of-Henle marker set for the deconvolution sanity check."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution_sanity.py
+          symbol: MARKERS
+          key: TAL_LOH
+          lines: "16"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Umod: 1
+      Slc12a1: 1
+    minimum_present: null
+
+  thick_ascending_limb_comparator_frozen:
+    description: "FROZEN thick-ascending-limb comparator set from the DCT subtype reference freeze."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.major_kidney_comparator_sets
+          key: thick_ascending_limb
+          lines: "316-322"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Slc12a1: 1
+      Umod: 1
+      Kcnj1: 1
+      Clcnka: 1
+      Clcnkb: 1
+      Bsnd: 1
+    minimum_present: null
+
+  connecting_tubule_collecting_duct_7:
+    description: "Connecting-tubule / collecting-duct composition-reference panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/multiomics/celltype_panels.py
+          symbol: KIDNEY_PANELS
+          key: connecting_tubule_cd
+          lines: "18-19"
+      literature:
+        - "Chen et al. 2021 (GSE150338) — src/multiomics/celltype_panels.py:9"
+      frozen: false
+      in_test: false
+    genes:
+      Aqp2: 1
+      Scnn1a: 1
+      Scnn1b: 1
+      Scnn1g: 1
+      Hsd11b2: 1
+      Aqp3: 1
+      Fxyd4: 1
+    minimum_present: null
+
+  collecting_duct_canonical_r_14:
+    description: "Canonical collecting-duct markers (principal + intercalated) in the hybrid-reference R deconvolution pipeline."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution.R
+          symbol: canon_cd
+          key: null
+          lines: "582-583"
+        - file: src/preprocessing/deconvolution.R
+          symbol: cd_markers
+          key: null
+          lines: "1794-1795"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Aqp2: 1
+      Aqp3: 1
+      Fxyd4: 1
+      Hsd11b2: 1
+      Scnn1g: 1
+      Krt8: 1
+      Krt18: 1
+      Atp6v1b1: 1
+      Atp6v0d2: 1
+      Slc4a1: 1
+      Aqp6: 1
+      Slc26a4: 1
+      Foxi1: 1
+      Hmx2: 1
+    minimum_present: null
+
+  collecting_duct_canonical_r_7:
+    description: "Shorter canonical collecting-duct marker vector in the legacy TMS-only R deconvolution pipeline."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/run_deconvolution.R
+          symbol: canon_cd
+          key: null
+          lines: "535"
+        - file: scripts/run_pseudobulk_test.R
+          symbol: mk_cd_final
+          key: null
+          lines: "327"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Aqp2: 1
+      Aqp3: 1
+      Fxyd4: 1
+      Hsd11b2: 1
+      Scnn1g: 1
+      Krt8: 1
+      Krt18: 1
+    minimum_present: null
+
+  collecting_duct_deconvolution_3:
+    description: "Three-gene collecting-duct marker set for the deconvolution sanity check."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution_sanity.py
+          symbol: MARKERS
+          key: CD
+          lines: "18"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Aqp2: 1
+      Aqp3: 1
+      Scnn1g: 1
+    minimum_present: null
+
+  collecting_duct_principal_sanity_3:
+    description: "Principal-cell panel from the R sanity marker panel (repeated verbatim at line 128 of the same file)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/sanity_marker_panel.R
+          symbol: panel
+          key: CD_PC
+          lines: "22"
+        - file: scripts/sanity_marker_panel.R
+          symbol: cdpc_rows
+          key: null
+          lines: "128"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Aqp2: 1
+      Avpr2: 1
+      Scnn1g: 1
+    minimum_present: null
+
+  collecting_duct_intercalated_sanity_3:
+    description: "Intercalated-cell panel from the R sanity marker panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/sanity_marker_panel.R
+          symbol: panel
+          key: CD_IC
+          lines: "23"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Atp6v1b1: 1
+      Slc4a1: 1
+      Foxi1: 1
+    minimum_present: null
+
+  principal_cell_comparator_frozen:
+    description: "FROZEN principal-cell comparator set from the DCT subtype reference freeze."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.major_kidney_comparator_sets
+          key: principal_cell
+          lines: "340-347"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Aqp2: 1
+      Aqp3: 1
+      Avpr2: 1
+      Scnn1a: 1
+      Scnn1b: 1
+      Scnn1g: 1
+      Fxyd4: 1
+    minimum_present: null
+
+  intercalated_cell_comparator_frozen:
+    description: "FROZEN intercalated-cell comparator set from the DCT subtype reference freeze."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.major_kidney_comparator_sets
+          key: intercalated_cell
+          lines: "348-354"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Atp6v1b1: 1
+      Atp6v0d2: 1
+      Slc4a1: 1
+      Slc26a4: 1
+      Foxi1: 1
+      Aqp6: 1
+    minimum_present: null
+
+  intercalated_cell_variance_3:
+    description: "Intercalated-cell markers used by the DCT variance diagnostic."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/analyze_dct_variance.py
+          symbol: MARKERS
+          key: Intercalated (IC)
+          lines: "19"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Atp6v1b1: 1
+      Slc4a1: 1
+      Slc26a4: 1
+    minimum_present: null
+
+  chen_atlas_segment_probe_14:
+    description: "Ad-hoc multi-segment marker probe used to inspect the Chen atlas object."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/explore_chen_atlas.R
+          symbol: markers
+          key: null
+          lines: "13-17"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a1: 1
+      Umod: 1
+      Slc12a3: 1
+      Pvalb: 1
+      Trpm6: 1
+      Calb1: 1
+      Aqp2: 1
+      Slc26a4: 1
+      Slc34a1: 1
+      Egf: 1
+      Pth1r: 1
+      Clcnkb: 1
+      Scnn1g: 1
+      Wnt4: 1
+    minimum_present: null
+
+  distal_canonical_override_r_12:
+    description: "Canonical distal-nephron override marker vector (hybrid reference, Experiment C)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution.R
+          symbol: canonical_distal
+          key: null
+          lines: "616-627"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Umod: 1
+      Slc12a1: 1
+      Slc12a3: 1
+      Pvalb: 1
+      Wnk4: 1
+      Calb1: 1
+      Trpm6: 1
+      Scnn1g: 1
+      Aqp2: 1
+      Krt8: 1
+      Krt18: 1
+      Atp6v1b1: 1
+    minimum_present: null
+
+  distal_canonical_override_r_10:
+    description: "Canonical distal-nephron override marker vector (legacy TMS-only pipeline, Experiment C)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/run_deconvolution.R
+          symbol: canonical_distal
+          key: null
+          lines: "567-572"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Umod: 1
+      Slc12a1: 1
+      Slc12a3: 1
+      Wnk4: 1
+      Pvalb: 1
+      Calb1: 1
+      Aqp2: 1
+      Krt8: 1
+      Krt18: 1
+      Atp6v1b1: 1
+    minimum_present: null
+
+  distal_canonical_override_r_6:
+    description: "Canonical distal-nephron override marker vector in the pseudobulk recovery test."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/run_pseudobulk_test.R
+          symbol: group.markers$Distal
+          key: null
+          lines: "332"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Umod: 1
+      Slc12a1: 1
+      Slc12a3: 1
+      Pvalb: 1
+      Calb1: 1
+      Aqp2: 1
+    minimum_present: null

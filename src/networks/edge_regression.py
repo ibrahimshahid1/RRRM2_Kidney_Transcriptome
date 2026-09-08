@@ -1,21 +1,5 @@
 # src/networks/edge_regression.py
-"""
-Phase 2 Step A2-A3: Edge-wise Regression + Predicted Networks.
-
-Fits limma edge-wise regression on LIONESS edge weights. In the primary
-pipeline the expression input has already been residualized for technical
-covariates, deconvolution, and selected SVs, so the edge model uses only
-Age × Arm × EnvGroup cell means. Nuisance covariates are allowed only when the
-edge weights were built from a non-residualized expression source.
-
-Outputs:
-  - Contrast effects (Δz) for rewiring analysis
-  - Predicted condition-specific networks (z_hat)
-  - limma topTable results per contrast
-
-Usage:
-    python -m src.networks.edge_regression
-"""
+"""Phase 2 A2-A3: limma edge regression on LIONESS weights; covariates only if unresidualized."""
 from __future__ import annotations
 
 import argparse
@@ -306,8 +290,7 @@ def main():
         ro.r("fit2 <- contrasts.fit(fit, cm)")
         ro.r("fit2 <- eBayes(fit2)")
         
-        # Save edge-weight contrast from fit2$coefficients (legacy filename
-        # keeps downstream compatibility).
+        # Save the fit2$coefficients edge contrast under the legacy filename for compatibility.
         coef = np.array(ro.r("fit2$coefficients"))[:, 0].astype(np.float32)  # E-length
         np.save(outdir / f"{name}_delta_z.npy", coef)
         np.save(outdir / f"{name}_delta_edge_weight.npy", coef)

@@ -1,7 +1,4 @@
-"""
-Script: src/preprocessing/deconvolution_sanity.py
-Purpose: Validate deconvolution (Phase 0) by correlating cell type fractions (CLR) with canonical marker expression (VST).
-"""
+"""Validate Phase 0 deconvolution by correlating CLR cell fractions with canonical marker VST."""
 import pandas as pd
 import numpy as np
 import scipy.stats

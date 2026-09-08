@@ -88,9 +88,7 @@ def test_exact_balanced_assignments_have_observed_first():
 def test_site_contrast_equal_weights_valid_plexes_despite_missingness():
     samples = _sample_metadata(n_per_plex=8)
     design = enumerate_balanced_labels(samples, mode="exact")
-    # Plex 1 has effect +2 with 4/4 observations.  Plex 2 has effect 0
-    # with 3/3 observations.  The frozen estimator is their equal mean (+1),
-    # not the missingness-weighted pooled OLS coefficient.
+    # Frozen estimator is the equal mean of per-plex effects (+1), not missingness-weighted pooled OLS.
     y = np.array(
         [
             [

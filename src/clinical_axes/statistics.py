@@ -1,21 +1,4 @@
-"""Statistical primitives for cross-mission renal tissue-axis analyses.
-
-This module deliberately contains no repository paths, cohort names, gene
-panels, or biological interpretation.  It provides the label-blind scoring
-and inferential operations used by the clinical-axis runner:
-
-* signed gene-wise z scores, with optional equal-weight subdomains;
-* Hedges' g within an exchangeability stratum;
-* inverse-variance fixed-effect pooling of strata within a mission;
-* REML random-effects pooling across missions with modified
-  Hartung--Knapp uncertainty and a prediction interval; and
-* whole-pipeline blocked label permutations with max-|T| family-wise error
-  control across a frozen set of axes.
-
-Positive scores and effects always mean movement in the direction encoded by
-the supplied gene signs.  The caller, not this module, owns that biological
-direction convention.
-"""
+"""Label-blind axis scoring and meta-inference primitives; the caller owns gene sign direction."""
 
 from __future__ import annotations
 
@@ -124,13 +107,7 @@ def genewise_z_scores(
     *,
     ddof: int = 1,
 ) -> pd.DataFrame:
-    """Z-standardize each gene across the supplied analysis samples.
-
-    Missing observations remain missing and are not converted to a neutral
-    value.  A gene with at least two finite observations but zero variance is
-    assigned zero for its finite observations.  A gene with fewer than two
-    finite values cannot be standardized and is left entirely missing.
-    """
+    """Z-standardize each gene across analysis samples; missing values stay missing, not neutral."""
 
     x = _validate_expression(expression)
     if genes is not None:
@@ -238,18 +215,7 @@ def score_signed_axis(
     min_genes_per_subdomain: int = 1,
     require_all_genes: bool = False,
 ) -> AxisScoreResult:
-    """Compute a signed, label-blind tissue-axis score for every sample.
-
-    Genes are z-standardized separately across the samples in ``expression``
-    before their frozen +/- direction is applied.  Without ``subdomains``, all
-    observable genes receive equal weight.  With ``subdomains``, genes are
-    first aggregated inside each subdomain and the subdomain scores are then
-    averaged, ensuring (for example) that a large ECM list cannot outweigh a
-    smaller maladaptive-repair list simply because it contains more genes.
-
-    ``method='median'`` changes the within-domain gene aggregation; equal
-    subdomain weighting remains an arithmetic mean across domains.
-    """
+    """Signed label-blind per-sample axis score, equal-weighting subdomains before averaging."""
 
     if min_genes_per_subdomain < 1:
         raise ValueError("min_genes_per_subdomain must be at least one")
@@ -310,13 +276,7 @@ def hedges_g(
     *,
     alpha: float = 0.05,
 ) -> HedgesGResult:
-    """Return Hedges' g and its conventional sampling variance.
-
-    The small-sample correction is ``J = 1 - 3/(4*df - 1)`` and the sampling
-    variance is ``(n1+n0)/(n1*n0) + g^2/(2*df)``.  Non-finite observations are
-    rejected rather than silently removed because exchangeability-block sample
-    counts are part of the frozen design.
-    """
+    """Return Hedges' g and its sampling variance; non-finite values are rejected, not dropped."""
 
     xt = np.asarray(treatment, dtype=float)
     xc = np.asarray(control, dtype=float)
@@ -451,14 +411,7 @@ def random_effects_reml_mkh(
     *,
     alpha: float = 0.05,
 ) -> RandomEffectsResult:
-    """REML random-effects meta-analysis with modified HK uncertainty.
-
-    The Hartung--Knapp scale is floored at one (the modified HK rule), so a
-    very homogeneous small set of missions cannot yield a standard error below
-    the conventional random-effects standard error.  The prediction interval
-    uses ``t_(k-2) * sqrt(tau^2 + SE_mKH^2)`` and is reported only for at least
-    three missions.
-    """
+    """REML pooling with modified Hartung-Knapp scale floored at one; PI only for k >= 3."""
 
     y, v = _validated_effects(effects, variances, min_k=2)
     if not 0 < alpha < 1:
@@ -757,19 +710,7 @@ def blocked_meta_permutation(
     seed: int = 0,
     chunk_size: int = 1_024,
 ) -> MetaPermutationResult:
-    """Run a whole-pipeline, exchangeability-blocked max-|T| permutation.
-
-    Treatment labels are shuffled independently inside each mission/stratum
-    block while retaining its observed treatment count.  Every allocation is
-    transformed into stratum-level Hedges g, fixed-effect mission estimates,
-    and a cross-mission REML/mKH t statistic.  The maximum absolute t statistic
-    across the supplied axes controls the single frozen axis family.
-
-    The plus-one Monte Carlo correction is used for both unadjusted and max-T
-    p-values.  Gene standardization and scoring must be completed before this
-    function; because they are label-blind, they need not be recalculated under
-    each permutation.
-    """
+    """Whole-pipeline blocked max-|T| permutation over the frozen axis family, plus-one p-values."""
 
     if n_permutations < 1:
         raise ValueError("n_permutations must be positive")

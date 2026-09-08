@@ -1,13 +1,5 @@
 # src/common.py
-"""
-Shared utilities for the RRRM-2 pipeline.
-
-Centralizes functions that were previously copy-pasted across multiple modules:
-  - REPO_ROOT: repository root path
-  - find_sample_col: detect sample identifier column in metadata
-  - normalize_labels: canonical Age/Arm/EnvGroup label normalization
-  - bh_fdr: Benjamini-Hochberg FDR correction
-"""
+"""Shared RRRM-2 helpers: repo root, sample-column detection, label normalization, BH-FDR."""
 
 from __future__ import annotations
 
@@ -22,11 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def find_sample_col(meta: pd.DataFrame) -> str:
-    """Find the sample identifier column in metadata.
-
-    Checks for common column names used across OSD-771 metadata files.
-    Falls back to the first column if none match.
-    """
+    """Find the OSD-771 sample identifier column in metadata, falling back to the first column."""
     for col in ["Sample Name (raw_counts_colname)", "Sample Name", "sample"]:
         if col in meta.columns:
             return col
@@ -34,18 +22,7 @@ def find_sample_col(meta: pd.DataFrame) -> str:
 
 
 def normalize_labels(meta: pd.DataFrame) -> pd.DataFrame:
-    """Normalize Age, Arm, and EnvGroup labels to canonical forms.
-
-    Canonical forms:
-        Age:      YNG, OLD
-        Arm:      ISS-T, LAR
-        EnvGroup: FLT, GC, VIV, BSL
-
-    This is the single authoritative normalization used across all pipeline
-    phases.  Previous versions in full_regression.py applied .str.upper()
-    before replacement, which caused HGC to remain unmapped — that bug is
-    fixed here.
-    """
+    """Normalize to canonical Age (YNG/OLD), Arm (ISS-T/LAR), EnvGroup (FLT/GC/VIV/BSL) labels."""
     meta = meta.copy()
 
     if "Age" in meta.columns:
@@ -72,16 +49,7 @@ def normalize_labels(meta: pd.DataFrame) -> pd.DataFrame:
 
 
 def bh_fdr(p: np.ndarray) -> np.ndarray:
-    """Benjamini-Hochberg FDR correction.
-
-    Parameters
-    ----------
-    p : array-like of raw p-values
-
-    Returns
-    -------
-    q : ndarray of adjusted p-values (same shape as input), clipped to [0, 1]
-    """
+    """Benjamini-Hochberg FDR correction; returns q-values clipped to [0, 1], shaped like input."""
     p = np.asarray(p, dtype=float)
     n = p.size
     order = np.argsort(p)
@@ -163,11 +131,7 @@ def resolve_configured_genes(
     id_map_path: str | Path,
     panel_genes: set[str] | None = None,
 ) -> pd.DataFrame:
-    """Resolve configured gene symbols/IDs to Ensembl IDs and panel status.
-
-    No observed rewiring statistic is consulted here.  Ambiguous symbols are kept
-    as separate resolved rows; callers can decide whether ambiguity is acceptable.
-    """
+    """Resolve configured symbols/IDs to Ensembl IDs and panel status; no rewiring stat is used."""
     ens_to_symbol, symbol_to_ens = id_map_lookup(id_map_path)
     panel = set(panel_genes) if panel_genes is not None else None
     rows: list[dict[str, object]] = []

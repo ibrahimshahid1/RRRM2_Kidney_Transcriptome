@@ -1,14 +1,5 @@
 # scripts/run_phase1_networks.py
-"""
-Phase 1 Network Analysis Pipeline
-
-Runs LIONESS on Phase 1 residualized expression data and computes
-group-level networks and rewiring metrics.
-
-Usage:
-    python scripts/run_phase1_networks.py
-    python scripts/run_phase1_networks.py --max_genes 1000 --compare "EnvGroup:FLT-vs-GC"
-"""
+"""Run LIONESS on Phase 1 residualized expression; emit group networks and rewiring metrics."""
 from __future__ import annotations
 
 import argparse

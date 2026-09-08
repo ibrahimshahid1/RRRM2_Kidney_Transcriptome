@@ -1,33 +1,5 @@
 #!/usr/bin/env python3
-"""Intensity-confound audit of the v13 continuous phosphosite enrichment.
-
-Motivation
-----------
-The v13 exact run standardises every parent gene against its own balanced-label
-null, which controls gene-specific *variance* but not a systematic
-*intensity-dependent shift* in the observed effects. This script measures that
-shift directly and re-tests every frozen gene set against an
-intensity-stratified competitive null.
-
-It consumes only emitted artefacts of
-``run_20260729_v13_continuous_phospho_exact_final`` -- it does not refit the
-phosphosite models -- so it is cheap, deterministic, and auditable.
-
-Outputs
--------
-``intensity_decile_gradient.tsv``
-    Mean gene-level Z by decile of median phosphopeptide signal, per profile.
-``intensity_stratified_set_enrichment.tsv``
-    Per gene set and profile: raw competitive statistic, statistic after
-    within-stratum centring, and an intensity-stratified gene-label
-    permutation p-value.
-``manifest.json``
-    Inputs, digests, parameters, seed.
-
-Usage
------
-    venv/bin/python scripts/v13/intensity_confound_audit.py
-"""
+"""Re-test frozen v13 gene sets against an intensity-stratified null; reads emitted artefacts, refits no models."""
 
 from __future__ import annotations
 
@@ -223,9 +195,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     centred, centred_total, n_total, idx
                 )
                 need = collections.Counter(stratum[idx].tolist())
-                # Vectorised stratified sampling without replacement: the
-                # competitive statistic is a linear function of the sampled
-                # sum, so only the per-permutation sum is required.
+                # Vectorised stratified sampling: the statistic is linear in the sampled sum.
                 sampled_sum = np.zeros(args.permutations)
                 for s, c in need.items():
                     pool = z[by_stratum[s]]

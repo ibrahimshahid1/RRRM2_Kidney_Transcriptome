@@ -1,0 +1,92 @@
+schema_version: 1
+
+id: osd462-stage0
+title: OSD-462 Stage 0 assay-provenance audit
+workflow: B
+status: complete
+lock_date: 2026-07-28
+
+question: >-
+  Does the OSD-462 mass-spectrometry design and phosphoform provenance support
+  attributing a phosphorylation change to flight, and does an isolated,
+  assay-qualified canonical NCC/SPAK phosphoform exist in the workbook?
+
+conclusion: >-
+  No, on three counts. (1) The detailed protocol specifies TMTpro (+304.207 Da)
+  while a legacy metadata field says iTRAQ. (2) Condition is perfectly aliased
+  with reporter-tag block in both 15-plexes with no cross-plex label swap, so a
+  flight coefficient is inseparable from a systematic tag-position effect.
+  (3) Zero isolated qualification-passing canonical NCC/SPAK phosphoforms exist:
+  the NCC T53-indexed feature is a T53/Y65 co-modified peptide, the SPAK S383
+  feature is S382/S383 co-modified, and NCC positions 65/68 are tyrosines.
+  This audit retracted the project's own v11/v12 headline.
+
+spec_config: null
+docs:
+  - docs/OSD462_STAGE0_PROVENANCE_AUDIT_2026-07-28.md
+  - docs/OSD462_STAGE0_MANUSCRIPT_REPORTING_2026-07-29.md
+  - docs/STAGE0_GO_NO_GO_2026-07-29.md
+  - docs/osd462_data_manifest.md
+
+results_root: data/results/osd462-stage0
+reference_run: data/results/run_20260728_osd462_stage0
+figures_root: figures/v13
+
+requires:
+  data:
+    - data/external
+  r: false
+
+stages:
+  - id: protocol-inventory
+    title: Inventory the OSD-462 protocol and metadata assay fields
+    needs: []
+    runner: python
+    entry: scripts/stage0/protocol_inventory.py
+    args: ["--out", "{run_dir}/protocol_inventory"]
+    optional: false
+    outputs: []
+
+  - id: audit
+    title: Sample, plex, reporter-tag design and phosphoform qualification
+    needs: [protocol-inventory]
+    runner: python
+    entry: scripts/osd462/08_stage0_provenance_audit.py
+    args: ["--out-dir", "{run_dir}"]
+    optional: false
+    outputs:
+      - reporting/
+
+  - id: reporting
+    title: Manuscript-facing sample/channel and phosphoform tables and figures
+    needs: [audit]
+    runner: python
+    entry: scripts/osd462/09_stage0_manuscript_reporting.py
+    args:
+      - "--stage0-dir"
+      - "{run_dir}"
+      - "--reporting-dir"
+      - "{run_dir}/reporting"
+      - "--figure-dir"
+      - "{figures_root}"
+    optional: false
+    outputs:
+      - reporting/
+
+  - id: coverage-gate
+    title: Coverage and confounding gate
+    needs: [audit]
+    runner: python
+    entry: scripts/stage0/coverage_confounding_gate.py
+    args: ["--out", "{run_dir}/coverage_confounding_gate"]
+    optional: true
+    outputs: []
+
+  - id: effect-size-anchor
+    title: Axis effect-size anchoring
+    needs: [audit]
+    runner: python
+    entry: scripts/stage0/axis_effect_size_anchor.py
+    args: ["--out", "{run_dir}/axis_effect_size_anchor"]
+    optional: true
+    outputs: []

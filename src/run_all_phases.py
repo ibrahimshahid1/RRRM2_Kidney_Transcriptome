@@ -34,17 +34,7 @@ def _find_latest_run_dir() -> Path | None:
 
 
 def find_artifact(relpath: str, phase_subdir: str | None = None) -> Path | None:
-    """Resolve an artifact from the current run or the most recent prior run.
-
-    Search order:
-      1. Current run's results dir  (data/results/<current_run>/<relpath>)
-      2. Most recent prior run       (data/results/<latest_run>/<relpath>)
-      3. Legacy global location      (data/processed/<relpath>)
-
-    *phase_subdir* is unused but kept for future sub-folder logic.
-
-    Returns the first existing Path, or None.
-    """
+    """Resolve an artifact from the current run, the latest prior run, then the legacy path."""
     candidates: list[Path] = []
 
     # 1. Current run
@@ -68,19 +58,7 @@ def find_artifact(relpath: str, phase_subdir: str | None = None) -> Path | None:
 
 def init_run(run_id: str, max_genes: int, topk: int, num_seeds: int, 
              phases: list, skip_r: bool) -> tuple:
-    """Initialize versioned output directories and save run metadata.
-
-    All pipeline outputs live under a single run directory:
-        data/results/<run_id>/
-            deconvolution/     ← Phase 0
-            phase1_residuals/  ← Phase 1
-            dct_markers/       ← Phase 1.5
-            networks/          ← Phase 2
-            phase3_embeddings/ ← Phase 3
-            phase3_rewiring/   ← Phase 3
-            ...                ← Phase 5-9
-            run_metadata.json
-    """
+    """Create the versioned data/results/<run_id>/ phase directories and write run_metadata.json."""
     global RUN_ID, RESULTS_DIR, NETWORKS_DIR
     
     RUN_ID = run_id
@@ -167,12 +145,7 @@ def run_rscript(script: str, args: list = None, dry_run: bool = False) -> bool:
 
 
 def build_id_map_if_needed(dry_run: bool = False) -> None:
-    """Build/rebuild the Ensembl→Symbol ID map if needed.
-
-    Uses the full Rtech gene list (all expressed genes) to ensure pathway
-    genes outside the network skeleton are still mappable.  Also auto-resolves
-    curated gene symbols from config/gene_sets.yaml.
-    """
+    """Build or rebuild the Ensembl->Symbol id map over all expressed genes and curated sets."""
     import gzip, csv
 
     map_path = REPO_ROOT / "data/processed/resources" / "id_map.tsv"
@@ -875,11 +848,7 @@ def phase_external_validation_wgcna(
     k_perm: int = 5000,
     studies: str = "auto",
 ) -> bool:
-    """WGCNA module-projection external validation in OSD cohorts.
-
-    Projects RRRM-2 WGCNA module gene sets into external cohorts and tests
-    FLT vs GC module score shifts via permutation.
-    """
+    """Project RRRM-2 WGCNA modules into external OSD cohorts; permutation-test FLT vs GC."""
     log(f"EXTERNAL VALIDATION [WGCNA]: module projection in OSD cohorts ({studies})")
 
     results_dir = os.environ.get("RRRM_RESULTS_DIR")
@@ -1004,13 +973,7 @@ def phase_8(dry_run: bool = False, max_genes: int = 2500, topk: int = 80,
 
 def phase_8b(dry_run: bool = False, max_genes: int = 2500, topk: int = 80,
              lioness_transform: str = "raw_ranknorm") -> bool:
-    """Phase 8b: Enhanced Predictive Validation
-
-    Three improvements over Phase 8:
-      1. Stratum-specific LOO-CV (n=10 per stratum, 5 FLT + 5 GC)
-      2. Expression-based classification as control baseline
-      3. Permutation null distribution (1,000 shuffles) with p-values
-    """
+    """Phase 8b: stratum-specific LOO-CV with an expression-only baseline and a shuffle null."""
     log("PHASE 8b: Enhanced Predictive Validation")
 
     results_dir = os.environ.get("RRRM_RESULTS_DIR")

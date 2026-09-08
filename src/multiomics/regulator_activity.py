@@ -29,13 +29,7 @@ def _site_key(gene: str, position: object) -> str:
 
 
 def load_kinase_substrate_net(path: str) -> pd.DataFrame:
-    """Load a kinase-substrate table.
-
-    Required columns: ``kinase``, ``substrate_gene``, ``substrate_site``.
-    Optional columns (e.g. ``evidence``) are preserved. A PhosphoSitePlus
-    ``Kinase_Substrate_Dataset`` export can be remapped to these column names
-    upstream; the curated core panel ships in this format directly.
-    """
+    """Load a kinase-substrate table; requires kinase, substrate_gene, substrate_site columns."""
     net = pd.read_csv(path, sep="\t")
     required = {"kinase", "substrate_gene", "substrate_site"}
     missing = required - set(net.columns)
@@ -57,16 +51,7 @@ def ksea(
     site_col: str = "site_position",
     min_substrates: int = 3,
 ) -> pd.DataFrame:
-    """Kinase-substrate enrichment analysis (Casado et al. 2013 z-score).
-
-    For kinase ``k`` with quantified substrate-site set ``S``::
-
-        z = (mean(effect_S) - mean(effect_all)) * sqrt(|S|) / sd(effect_all)
-
-    and a two-sided normal p-value. Positive ``z`` => substrates collectively
-    *more* phosphorylated in flight (inferred higher kinase activity); negative
-    ``z`` => collectively *less* (inferred lower activity).
-    """
+    """Casado (2013) KSEA z-score; positive z = substrates more phosphorylated in flight."""
     s = sites[[gene_col, site_col, effect_col]].copy()
     s = s.replace([np.inf, -np.inf], np.nan).dropna(subset=[effect_col])
     s["__key__"] = [_site_key(g, p) for g, p in zip(s[gene_col], s[site_col])]
@@ -118,12 +103,7 @@ def ksea(
 
 
 def ksea_positive_control_passes(ksea_table: pd.DataFrame, *, control_kinases: Sequence[str]) -> bool:
-    """Evaluate a predeclared down-direction control *after* site qualification.
-
-    This helper does not establish substrate identity. The caller must first
-    enforce residue and phosphoform provenance; an unscored or under-covered
-    control correctly returns ``False``.
-    """
+    """Evaluate a predeclared down-direction control; the caller must first enforce provenance."""
     sub = ksea_table[ksea_table["kinase"].isin(list(control_kinases))]
     sub = sub[sub["status"].eq("scored")]
     if sub.empty:
@@ -139,16 +119,7 @@ def run_ulm_activity(
     *,
     tmin: int = 5,
 ) -> pd.DataFrame:
-    """Univariate-linear-model activity inference via decoupler.
-
-    ``gene_effects``: contrasts x genes matrix (one row per cohort contrast,
-    columns are gene identifiers, values are flight-effect statistics).
-    ``net``: long-format prior with columns ``source``, ``target``, ``weight``
-    (PROGENy or DoRothEA/CollecTRI as returned by ``decoupler.op``).
-
-    Returns a tidy table: contrast, source (TF/pathway), activity score, p, q.
-    decoupler is imported lazily so this module is usable without it installed.
-    """
+    """decoupler ULM activity from a contrasts x genes matrix and source/target/weight prior."""
     import decoupler as dc  # lazy import
 
     res = dc.mt.ulm(data=gene_effects, net=net, tmin=tmin)
@@ -178,11 +149,7 @@ def run_ulm_activity(
 
 
 def recurrence_class(activity_by_cohort: Mapping[str, float], *, threshold: float = 1.0) -> str:
-    """Classify a regulator's cross-cohort recurrence from per-cohort activity.
-
-    ``threshold`` is on the absolute activity score (decoupler ULM scores are
-    approximately z-scaled). Recurrence requires a consistent sign.
-    """
+    """Classify cross-cohort recurrence from per-cohort activity; requires a consistent sign."""
     vals = np.array([v for v in activity_by_cohort.values() if np.isfinite(v)], dtype=float)
     if len(vals) < 2:
         return "insufficient_cohorts"

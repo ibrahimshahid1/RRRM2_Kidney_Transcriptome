@@ -1,0 +1,355 @@
+# Versioned gene-panel registry — immune_vascular
+#
+# Immune, macrophage, and endothelial/vascular panels.
+#
+# Extracted 2026-08-28 by an inventory pass over src/**, scripts/**, tests/**.
+# Membership and ordering are reproduced EXACTLY as they appear in the source
+# literal. Nothing was added, dropped, corrected, or reordered.
+#
+# provenance.frozen: true marks a panel that belongs to a locked analysis
+# (config/clinical_renal_axes_cross_mission.yaml,
+#  config/dct_asdn_phospho_reanalysis.yaml,
+#  config/dct_subtype_reference_freeze_v1.yaml).  Those entries must never be
+# edited; see docs/GENE_PANEL_INVENTORY.md section 4.
+#
+# See docs/GENE_PANEL_INVENTORY.md for the duplication/drift analysis.
+
+schema_version: 1
+panels:
+  macrophage_immune_composition_8:
+    description: "Macrophage/immune composition-reference panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/multiomics/celltype_panels.py
+          symbol: KIDNEY_PANELS
+          key: macrophage_immune
+          lines: "25-26"
+      literature:
+        - "Chen et al. 2021 (GSE150338) — src/multiomics/celltype_panels.py:9"
+      frozen: false
+      in_test: false
+    genes:
+      Lyz2: 1
+      C1qa: 1
+      C1qb: 1
+      Cd68: 1
+      Ptprc: 1
+      Adgre1: 1
+      Itgam: 1
+      Csf1r: 1
+    minimum_present: null
+
+  tlr_innate_macrophage_14:
+    description: "TLR4 innate / macrophage target panel for the tubulointerstitial state module."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/networks/tubulointerstitial_state.py
+          symbol: TARGET_GENE_PANELS
+          key: TLR_innate_macrophage
+          lines: "32-35"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Tril: 1
+      Tlr4: 1
+      Ly96: 1
+      Cd14: 1
+      Myd88: 1
+      Ticam1: 1
+      Ccl2: 1
+      Tnf: 1
+      Il1b: 1
+      Adgre1: 1
+      Aif1: 1
+      Lyz2: 1
+      Csf1r: 1
+      Cd68: 1
+    minimum_present: null
+
+  immune_niche_6:
+    description: "Immune-enriched niche marker set for spatial-reference projection."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/spatial_reference_projection.py
+          symbol: NICHE_MARKERS
+          key: immune_enriched
+          lines: "47"
+        - file: scripts/v11/04_spatial_reference_projection.py
+          symbol: NICHE_MARKERS
+          key: immune_enriched
+          lines: "47"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Ptprc: 1
+      Lyz2: 1
+      Adgre1: 1
+      C1qa: 1
+      Itgam: 1
+      Cd68: 1
+    minimum_present: null
+
+  immune_comparator_frozen_6:
+    description: "FROZEN immune comparator set from the DCT subtype reference freeze."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.major_kidney_comparator_sets
+          key: immune
+          lines: "376-382"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Ptprc: 1
+      Lyz2: 1
+      Cd68: 1
+      Tyrobp: 1
+      Cd3d: 1
+      Ms4a1: 1
+    minimum_present: null
+
+  immune_bulk_validation_r_14:
+    description: "Bulk immune-marker validation vector in the hybrid-reference R deconvolution pipeline."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution.R
+          symbol: immune_markers
+          key: null
+          lines: "1846-1847"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Ptprc: 1
+      Lyz2: 1
+      Tyrobp: 1
+      Ctss: 1
+      Fcer1g: 1
+      Cd68: 1
+      Cd3d: 1
+      Cd3e: 1
+      Ms4a1: 1
+      Lst1: 1
+      Itgam: 1
+      Adgre1: 1
+      Csf1r: 1
+      H2-Aa: 1
+    minimum_present: null
+
+  immune_bulk_validation_r_10:
+    description: "Bulk immune-marker validation vector in the legacy TMS-only R pipeline."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/run_deconvolution.R
+          symbol: immune_markers
+          key: null
+          lines: "1585"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Ptprc: 1
+      Lyz2: 1
+      Tyrobp: 1
+      Ctss: 1
+      Fcer1g: 1
+      Cd68: 1
+      Cd3d: 1
+      Cd3e: 1
+      Ms4a1: 1
+      Lst1: 1
+    minimum_present: null
+
+  macrophage_deconvolution_2:
+    description: "Two-gene macrophage marker set for the deconvolution sanity check."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution_sanity.py
+          symbol: MARKERS
+          key: Macrophage
+          lines: "21"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Adgre1: 1
+      Cd68: 1
+    minimum_present: null
+
+  endothelial_composition_6:
+    description: "Endothelial composition-reference panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/multiomics/celltype_panels.py
+          symbol: KIDNEY_PANELS
+          key: endothelial
+          lines: "22"
+      literature:
+        - "Chen et al. 2021 (GSE150338) — src/multiomics/celltype_panels.py:9"
+      frozen: false
+      in_test: false
+    genes:
+      Pecam1: 1
+      Kdr: 1
+      Emcn: 1
+      Flt1: 1
+      Ehd3: 1
+      Cdh5: 1
+    minimum_present: null
+
+  endothelial_vascular_audit_10:
+    description: "Endothelial/vascular clinical-axis panel used by the v13 adversarial audit."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v13/compartment_adversarial_audit.py
+          symbol: CLINICAL_AXIS_PANELS
+          key: endothelial_vascular
+          lines: "62-65"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Pecam1: 1
+      Cdh5: 1
+      Kdr: 1
+      Flt1: 1
+      Emcn: 1
+      Vwf: 1
+      Klf2: 1
+      Nos3: 1
+      Tek: 1
+      Robo4: 1
+    minimum_present: null
+
+  endothelial_niche_6:
+    description: "Endothelial-enriched niche marker set for spatial-reference projection."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/spatial_reference_projection.py
+          symbol: NICHE_MARKERS
+          key: endothelial_enriched
+          lines: "46"
+        - file: scripts/v11/04_spatial_reference_projection.py
+          symbol: NICHE_MARKERS
+          key: endothelial_enriched
+          lines: "46"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Pecam1: 1
+      Cdh5: 1
+      Kdr: 1
+      Flt1: 1
+      Emcn: 1
+      Klf2: 1
+    minimum_present: null
+
+  endothelial_comparator_frozen_6:
+    description: "FROZEN endothelial comparator set from the DCT subtype reference freeze."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.major_kidney_comparator_sets
+          key: endothelial
+          lines: "362-368"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Kdr: 1
+      Emcn: 1
+      Pecam1: 1
+      Cdh5: 1
+      Esam: 1
+      Klf2: 1
+    minimum_present: null
+
+  endothelial_signature_4:
+    description: "Endothelial signature used for single-cell scoring sanity checks."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/sample.py
+          symbol: sig
+          key: Endothelial
+          lines: "29"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Pecam1: 1
+      Kdr: 1
+      Emcn: 1
+      Robo4: 1
+    minimum_present: null
+
+  endothelial_deconvolution_2:
+    description: "Two-gene endothelial marker set for the deconvolution sanity check."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution_sanity.py
+          symbol: MARKERS
+          key: Endothelial
+          lines: "20"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Pecam1: 1
+      Kdr: 1
+    minimum_present: null
+
+  endothelial_transcription_factors_3:
+    description: "Endothelial transcription factors highlighted on the six-recurrence integration figure."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/integration/plot_sixrec_integration.py
+          symbol: endo
+          key: null
+          lines: "89"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Erg: 1
+      Gata2: 1
+      Ets1: 1
+    minimum_present: null
+
+  endothelial_transcription_factors_6:
+    description: "Endothelial transcription factors used to subset non-obvious regulator recurrence."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/regulator_activity/summarize_regulator_recurrence.py
+          symbol: endo
+          key: null
+          lines: "92"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Erg: 1
+      Ets1: 1
+      Gata2: 1
+      Fli1: 1
+      Sox17: 1
+      Sox18: 1
+    minimum_present: null

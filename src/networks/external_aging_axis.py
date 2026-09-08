@@ -114,13 +114,7 @@ def build_tms_kidney_female_aging_axis(
     sex_col: str = "sex",
     sex_value: str = "female",
 ) -> pd.DataFrame:
-    """Create the TMS kidney female old-vs-young aging-axis TSV.
-
-    Cells are first summed to donor-level pseudobulk counts, then converted to
-    log2(CPM + 1). The exported effect is the old-donor mean minus the young-
-    donor mean for each gene. Age ranges are inclusive when a two-value range is
-    supplied; a single-value list such as ``[3]`` selects exactly 3-month donors.
-    """
+    """Export the TMS kidney female old-minus-young donor-pseudobulk log2(CPM+1) aging axis."""
     try:
         import scanpy as sc
     except ImportError as exc:  # pragma: no cover - environment guard

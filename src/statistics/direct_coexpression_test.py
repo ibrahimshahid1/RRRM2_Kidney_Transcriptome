@@ -78,10 +78,7 @@ def permutation_null(X: np.ndarray, all_idx: np.ndarray,
                      n_flt: int, ei: np.ndarray, ej: np.ndarray,
                      n_genes: int, n_perms: int,
                      rng: np.random.Generator) -> np.ndarray:
-    """Build gene-score null distribution by shuffling FLT/GC labels.
-
-    Returns (n_perms, n_genes) array of null gene scores.
-    """
+    """Build the gene-score null by shuffling FLT/GC labels; returns an (n_perms, n_genes) array."""
     null_scores = np.empty((n_perms, n_genes), dtype=np.float64)
     for k in range(n_perms):
         perm = rng.permutation(all_idx)

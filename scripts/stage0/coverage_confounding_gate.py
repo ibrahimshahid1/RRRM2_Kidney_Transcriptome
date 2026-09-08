@@ -1,30 +1,5 @@
 #!/usr/bin/env python3
-"""Stage 0B: does transcript coverage differ between flight and control?
-
-The fatal-confounding gate. Lai Polo et al. (iScience 2020) showed that
-carcass preservation degrades 5' gene-body coverage while leaving RIN high, and
-that this distortion can exceed the biological flight effect and completely
-change the differential-expression landscape.
-
-The question that decides cohort eligibility is therefore not "is coverage
-degraded" -- it is degraded everywhere -- but **whether degradation differs
-between the groups being contrasted**. If flight and control samples within a
-cohort have systematically different 5'/3' coverage, that cohort's flight
-estimate is confounded at the measurement layer and no downstream modelling
-repairs it.
-
-Metric: ratio of RSeQC mean gene-body coverage in the 5-20% bin to the 80-95%
-bin, taken from GeneLab's published ``*_qc_metrics_*.csv``. A ratio near 1 is
-uniform; below 1 indicates 5' loss.
-
-Test: Welch t on the ratio between flight and ground-control samples, plus
-Hedges g, per cohort. Reported alongside the same contrast for RIN so the two
-can be compared -- RIN is expected to look fine.
-
-Usage
------
-    python3 scripts/stage0/coverage_confounding_gate.py
-"""
+"""Stage 0B gate: test whether 5'/3' coverage degradation differs between flight and control per cohort."""
 
 from __future__ import annotations
 

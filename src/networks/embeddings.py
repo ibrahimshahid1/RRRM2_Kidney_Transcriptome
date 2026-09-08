@@ -1,22 +1,5 @@
 # src/networks/embeddings.py
-"""
-Phase 3.2: PecanPy node2vec embeddings on predicted edge-weight networks.
-
-Builds biased random walks + trains embeddings using PecanPy for speed.
-
-Graph:
-  - fixed topology from Phase 2 skeleton (edge_i, edge_j)
-  - primary signed mode embeds positive and negative edge-weight channels
-    separately, then concatenates them per gene
-
-Targets:
-  - by default embed only FLT/GC predicted networks via --patterns
-  - multi-seed for robustness; saves embeddings per seed + stability stats
-
-Usage:
-  python -m src.networks.embeddings
-  python -m src.networks.embeddings --num_seeds 2 --num_walks 20 --walk_length 40  # quick test
-"""
+"""Phase 3.2: multi-seed PecanPy node2vec embeddings on Phase 2 predicted edge-weight networks."""
 from __future__ import annotations
 
 import os
@@ -38,11 +21,7 @@ def write_edgelist_weighted(
     node_names: list[str],
     w_min: float = 1e-8,
 ) -> None:
-    """
-    Write weighted edgelist expected by PecanPy:
-      node_u <tab> node_v <tab> weight
-    We use integer node IDs as strings to keep things compact.
-    """
+    """Write the tab-separated weighted edgelist PecanPy expects, using integer node IDs."""
     # PecanPy accepts node ids as strings; we'll use "0..N-1"
     # Filter extremely tiny weights to reduce I/O and walk noise.
     m = w_edge > w_min
@@ -56,10 +35,7 @@ def write_edgelist_weighted(
 
 
 def call_embed_version_safe(g, **kwargs):
-    """
-    Call PecanPy g.embed(...) but only with args supported by the installed version.
-    This prevents crashes like: unexpected keyword argument 'workers' or 'seed'.
-    """
+    """Call PecanPy ``g.embed`` with only the keyword arguments the installed version supports."""
     sig = inspect.signature(g.embed)
     allowed = set(sig.parameters.keys())
     safe = {k: v for k, v in kwargs.items() if k in allowed}

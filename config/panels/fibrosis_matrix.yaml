@@ -1,0 +1,417 @@
+# Versioned gene-panel registry — fibrosis_matrix
+#
+# Fibrosis, extracellular-matrix, and stromal/fibroblast panels.
+#
+# Extracted 2026-08-28 by an inventory pass over src/**, scripts/**, tests/**.
+# Membership and ordering are reproduced EXACTLY as they appear in the source
+# literal. Nothing was added, dropped, corrected, or reordered.
+#
+# provenance.frozen: true marks a panel that belongs to a locked analysis
+# (config/clinical_renal_axes_cross_mission.yaml,
+#  config/dct_asdn_phospho_reanalysis.yaml,
+#  config/dct_subtype_reference_freeze_v1.yaml).  Those entries must never be
+# edited; see docs/GENE_PANEL_INVENTORY.md section 4.
+#
+# See docs/GENE_PANEL_INVENTORY.md for the duplication/drift analysis.
+
+schema_version: 1
+panels:
+  fibrosis_remodeling_audit_18:
+    description: "Combined fibrosis/remodeling clinical-axis panel used by the v13 adversarial audit."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v13/compartment_adversarial_audit.py
+          symbol: CLINICAL_AXIS_PANELS
+          key: fibrosis_remodeling
+          lines: "57-61"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Tgfb1: 1
+      Tgfb2: 1
+      Tgfbr1: 1
+      Tgfbr2: 1
+      Col1a1: 1
+      Col1a2: 1
+      Col3a1: 1
+      Fn1: 1
+      Postn: 1
+      Mmp7: 1
+      Dkk3: 1
+      Egf: 1
+      Col6a3: 1
+      Pdgfra: 1
+      Pdgfrb: 1
+      Acta2: 1
+      Dcn: 1
+      Lum: 1
+    minimum_present: null
+
+  maladaptive_repair_frozen_5:
+    description: "FROZEN maladaptive-repair subdomain of the cross-mission clinical renal axes lock (Egf carries the -1 weight)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/clinical_renal_axes_cross_mission.yaml
+          symbol: primary_family.fibrosis_maladaptive_remodeling.subdomains
+          key: maladaptive_repair
+          lines: "62-69"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Dkk3: 1
+      Mmp7: 1
+      Timp1: 1
+      Ccl2: 1
+      Egf: -1
+    minimum_present: 4
+
+  extracellular_matrix_deposition_frozen_8:
+    description: "FROZEN ECM-deposition subdomain of the cross-mission clinical renal axes lock."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/clinical_renal_axes_cross_mission.yaml
+          symbol: primary_family.fibrosis_maladaptive_remodeling.subdomains
+          key: extracellular_matrix_deposition
+          lines: "70-80"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Col1a1: 1
+      Col1a2: 1
+      Col3a1: 1
+      Col6a1: 1
+      Col6a2: 1
+      Col6a3: 1
+      Fn1: 1
+      Postn: 1
+    minimum_present: 6
+
+  ecm_adhesion_proteolysis_14:
+    description: "ECM/adhesion/proteolysis target panel for the tubulointerstitial state module."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/networks/tubulointerstitial_state.py
+          symbol: TARGET_GENE_PANELS
+          key: ECM_adhesion_proteolysis
+          lines: "28-31"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Fbn1: 1
+      Itga9: 1
+      Cdh11: 1
+      Adam12: 1
+      Mmp14: 1
+      Col1a1: 1
+      Col1a2: 1
+      Col3a1: 1
+      Col4a1: 1
+      Fn1: 1
+      Sparc: 1
+      Lox: 1
+      Postn: 1
+      Tnc: 1
+    minimum_present: null
+
+  ecm_remodeling_mouse_24:
+    description: "Mouse-cased ECM-remodeling feature set used by the external OSD validation module."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/validation/osd_external_validation.py
+          symbol: FEATURE_SYMBOLS
+          key: ECM_remodeling
+          lines: "40-45"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Col1a1: 1
+      Col1a2: 1
+      Col3a1: 1
+      Col4a1: 1
+      Col4a2: 1
+      Col5a1: 1
+      Col6a1: 1
+      Fn1: 1
+      Lama1: 1
+      Lama2: 1
+      Lamb1: 1
+      Lamb2: 1
+      Mmp2: 1
+      Mmp9: 1
+      Mmp14: 1
+      Timp1: 1
+      Timp2: 1
+      Lox: 1
+      Sparc: 1
+      Vwf: 1
+      Fbln5: 1
+      Itga1: 1
+      Itga5: 1
+      Itgb1: 1
+    minimum_present: null
+
+  emt_fibrosis_mouse_22:
+    description: "Mouse-cased EMT/fibrosis feature set used by the external OSD validation module."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/validation/osd_external_validation.py
+          symbol: FEATURE_SYMBOLS
+          key: EMT_fibrosis
+          lines: "46-51"
+      literature: []
+      frozen: false
+      in_test: false
+      note: "Ctgf is the deprecated symbol for Ccn2."
+    genes:
+      Tgfb1: 1
+      Tgfb2: 1
+      Tgfbr1: 1
+      Tgfbr2: 1
+      Smad2: 1
+      Smad3: 1
+      Smad4: 1
+      Smad7: 1
+      Acta2: 1
+      Vim: 1
+      Fn1: 1
+      Ctgf: 1
+      Lox: 1
+      Col1a1: 1
+      Col1a2: 1
+      Col3a1: 1
+      Serpine1: 1
+      Snai1: 1
+      Snai2: 1
+      Twist1: 1
+      Zeb1: 1
+      Zeb2: 1
+    minimum_present: null
+
+  tgf_beta_wnt_mouse_25:
+    description: "Mouse-cased TGF-beta / Wnt feature set used by the external OSD validation module."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/validation/osd_external_validation.py
+          symbol: FEATURE_SYMBOLS
+          key: TGF_beta_Wnt
+          lines: "59-64"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Tgfb1: 1
+      Tgfb2: 1
+      Tgfb3: 1
+      Tgfbr1: 1
+      Tgfbr2: 1
+      Smad2: 1
+      Smad3: 1
+      Smad4: 1
+      Smad7: 1
+      Wnt4: 1
+      Wnt5a: 1
+      Wnt7b: 1
+      Wnt9b: 1
+      Wnt11: 1
+      Fzd1: 1
+      Fzd2: 1
+      Fzd4: 1
+      Fzd7: 1
+      Lrp5: 1
+      Lrp6: 1
+      Dvl2: 1
+      Ctnnb1: 1
+      Axin2: 1
+      Lef1: 1
+      Tcf7l2: 1
+    minimum_present: null
+
+  fibroblast_interstitial_niche_7:
+    description: "Fibroblast/interstitial-enriched niche marker set for spatial-reference projection."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/spatial_reference_projection.py
+          symbol: NICHE_MARKERS
+          key: fibroblast_interstitial_enriched
+          lines: "45"
+        - file: scripts/v11/04_spatial_reference_projection.py
+          symbol: NICHE_MARKERS
+          key: fibroblast_interstitial_enriched
+          lines: "45"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Col1a1: 1
+      Col1a2: 1
+      Col3a1: 1
+      Dcn: 1
+      Pdgfra: 1
+      Fn1: 1
+      Sparc: 1
+    minimum_present: null
+
+  fibro_inflammatory_repair_niche_8:
+    description: "Fibro-inflammatory repair niche marker set for spatial-reference projection."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/spatial_reference_projection.py
+          symbol: NICHE_MARKERS
+          key: fibro_inflammatory_repair_enriched
+          lines: "49-58"
+        - file: scripts/v11/04_spatial_reference_projection.py
+          symbol: NICHE_MARKERS
+          key: fibro_inflammatory_repair_enriched
+          lines: "49-58"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Vcam1: 1
+      Ccl2: 1
+      Il34: 1
+      Serpine1: 1
+      Cd44: 1
+      Klf5: 1
+      Col1a1: 1
+      Lyz2: 1
+    minimum_present: null
+
+  stromal_fibroblast_composition_7:
+    description: "Stromal/fibroblast composition-reference panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/multiomics/celltype_panels.py
+          symbol: KIDNEY_PANELS
+          key: stromal_fibroblast
+          lines: "23-24"
+      literature:
+        - "Chen et al. 2021 (GSE150338) — src/multiomics/celltype_panels.py:9"
+      frozen: false
+      in_test: false
+    genes:
+      Pdgfrb: 1
+      Pdgfra: 1
+      Col1a1: 1
+      Col3a1: 1
+      Acta2: 1
+      Dcn: 1
+      Lum: 1
+    minimum_present: null
+
+  fibroblast_deconvolution_3:
+    description: "Three-gene fibroblast marker set for the deconvolution sanity check."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution_sanity.py
+          symbol: MARKERS
+          key: Fibroblast
+          lines: "22"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Col1a1: 1
+      Col3a1: 1
+      Pdgfra: 1
+    minimum_present: null
+
+  fibroblast_comparator_frozen_6:
+    description: "FROZEN fibroblast comparator set from the DCT subtype reference freeze."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.major_kidney_comparator_sets
+          key: fibroblast
+          lines: "369-375"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Col1a1: 1
+      Col1a2: 1
+      Col3a1: 1
+      Dcn: 1
+      Pdgfra: 1
+      Col6a1: 1
+    minimum_present: null
+
+  ecm_edge_probe_5:
+    description: "Five-gene ECM probe used to extract network edges."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/extract_ecm_edges.py
+          symbol: ecm_genes
+          key: null
+          lines: "14"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Col1a1: 1
+      Col3a1: 1
+      Col4a1: 1
+      Fn1: 1
+      Mmp2: 1
+    minimum_present: null
+
+  remodeling_up_classifier_20:
+    description: "Spaceflight-classifier matrix/vascular remodeling component, declared UP in flight; all weights are +1."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/spaceflight_kidney_classifier.py
+          symbol: REMODEL_UP
+          key: null
+          lines: "52-53"
+        - file: scripts/sf_classifier_negctrl_figure.py
+          symbol: REMODEL
+          key: null
+          lines: "28"
+        - file: scripts/sf_classifier_component_decomp.py
+          symbol: REMODEL
+          key: null
+          lines: "26"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Col1a1: 1
+      Col1a2: 1
+      Col3a1: 1
+      Col4a1: 1
+      Col5a2: 1
+      Fn1: 1
+      Sparc: 1
+      Lox: 1
+      Loxl1: 1
+      Timp1: 1
+      Vim: 1
+      Acta2: 1
+      Tgfb1: 1
+      Pecam1: 1
+      Cdh5: 1
+      Kdr: 1
+      Emcn: 1
+      Eng: 1
+      Tek: 1
+      Vwf: 1
+    minimum_present: null

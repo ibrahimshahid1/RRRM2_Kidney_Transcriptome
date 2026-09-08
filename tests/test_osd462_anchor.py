@@ -12,10 +12,7 @@ from src.multiomics.osd462_anchor import (TmtTable, _classify_header,
 
 
 def _synthetic_table(effects, n_per=3):
-    """Build a TmtTable where gene g has FL = GC + effects[g] (log2) in both plexes.
-
-    Scaled values are 2**(base + condition shift); BL is set equal to GC.
-    """
+    """Build a TmtTable where gene g has FL = GC + effects[g] in log2 in both plexes, with BL = GC."""
     plexes = ["Samp1-5", "Samp6-10"]
     conds = ["BL", "FL", "GC"]
     channels = []

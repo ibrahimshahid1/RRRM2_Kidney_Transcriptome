@@ -1,17 +1,5 @@
 # src/statistics/interaction_metrics.py
-"""
-Phase 5 (derived): interaction + persistence/recovery metrics from Phase 3.3 outputs.
-
-Inputs (from Phase 3.3):
-  data/results/phase3_rewiring/*_rewiring_agg.tsv
-
-Outputs:
-  data/results/phase5_derived/
-    ISS_T_interaction.tsv
-    LAR_interaction.tsv
-    ISS_minus_LAR_YNG_persistence.tsv
-    ISS_minus_LAR_OLD_persistence.tsv
-"""
+"""Phase 5 derived: interaction and persistence/recovery metrics from Phase 3.3 rewiring."""
 
 from __future__ import annotations
 import argparse

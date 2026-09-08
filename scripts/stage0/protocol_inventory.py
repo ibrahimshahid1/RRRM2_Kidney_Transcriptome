@@ -1,45 +1,5 @@
 #!/usr/bin/env python3
-"""Stage 0A/0C: protocol and transcript-integrity inventory for the OSDR kidney corpus.
-
-Purpose
--------
-Before any biological axis is tested, establish for each cohort:
-
-* how the animal was euthanised and where (on-orbit vs post-return);
-* whether tissue was dissected immediately or from an intact frozen carcass;
-* which library-preparation chemistry was used (polyA vs ribodepletion/total);
-* GeneLab processing pipeline version;
-* per-sample RNA integrity and, critically, gene-body coverage.
-
-Motivation is Lai Polo et al., iScience 2020 (doi:10.1016/j.isci.2020.101733),
-which showed that preservation method can exceed the flight effect in magnitude,
-that the distortion is amplified by polyA selection, and that RIN does **not**
-predict it -- 5' gene-body coverage does. Choi et al. 2016 (PLOS One
-doi:10.1371/journal.pone.0167391) separately found kidney RNA *quality* to be
-minimally affected by carcass freezing to 6-7 months, so the open question is
-coverage-level distortion, not RIN.
-
-GeneLab's consensus pipeline emits RSeQC gene-body coverage into the published
-``*_qc_metrics_*.csv``, so the key metric is downloadable rather than requiring
-realignment.
-
-Outputs
--------
-``cohort_protocol_inventory.tsv``   one row per cohort
-``sample_integrity_metrics.tsv``    one row per sample where QC is available
-``eligibility_summary.md``          strata and the frozen eligibility verdict
-
-Eligibility rule (frozen before inspection)
--------------------------------------------
-A cohort is *ineligible* if flight and control samples differ systematically in
-collection, preservation, or library preparation. Cohorts are then grouped into
-preservation x library strata. **If no stratum contains at least three cohorts,
-the confirmatory four-axis study does not proceed.**
-
-Usage
------
-    python3 scripts/stage0/protocol_inventory.py
-"""
+"""Stage 0A/0C: inventory cohort protocol and integrity metrics; strata under three cohorts block the study."""
 
 from __future__ import annotations
 

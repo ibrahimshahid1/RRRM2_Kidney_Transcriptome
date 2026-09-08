@@ -38,10 +38,7 @@ def compute_module_scores(
     samples: list[str],
     module_genes: dict[str, list[str]],
 ) -> pd.DataFrame:
-    """Compute module scores (mean z-scored expression) for each sample.
-
-    Returns DataFrame: modules × samples.
-    """
+    """Mean z-scored module expression per sample, returned as modules x samples."""
     available_genes = set(vst.index.astype(str))
     scores = {}
     coverage = {}

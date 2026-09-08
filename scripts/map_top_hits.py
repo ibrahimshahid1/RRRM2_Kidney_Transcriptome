@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Map top Ensembl IDs from Feb 19 regression results to gene symbols,
-and check DCT/NCC-WNK gene status in results."""
+"""Map top Ensembl IDs from the Feb 19 regression results to symbols and report DCT/NCC-WNK status."""
 
 import json
 import csv

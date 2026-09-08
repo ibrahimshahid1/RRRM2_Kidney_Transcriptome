@@ -1,16 +1,5 @@
 # scripts/run_phase3_pipeline.py
-"""
-Phase 3 Unified Pipeline: Node2vec Embedding
-
-Runs all Phase 3 steps in sequence:
-  1. Node rewiring from delta-z (fast)
-  2. Node2vec embeddings (multi-seed, topology fixed)
-  3. Procrustes alignment + cosine rewiring
-
-Usage:
-    python scripts/run_phase3_pipeline.py
-    python scripts/run_phase3_pipeline.py --num_seeds 2 --num_walks 20  # quick test
-"""
+"""Run Phase 3: node rewiring from delta-z, multi-seed node2vec embeddings, and Procrustes rewiring."""
 from __future__ import annotations
 
 import os

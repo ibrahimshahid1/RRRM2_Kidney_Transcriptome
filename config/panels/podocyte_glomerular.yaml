@@ -1,0 +1,241 @@
+# Versioned gene-panel registry — podocyte_glomerular
+#
+# Podocyte and glomerular-barrier panels.
+# Every literal collection of podocyte / slit-diaphragm / glomerular
+# marker symbols found in the project's Python and R source, plus the
+# frozen YAML variants they must be reconciled against.
+#
+# Extracted 2026-08-28 by an inventory pass over src/**, scripts/**, tests/**.
+# Membership and ordering are reproduced EXACTLY as they appear in the source
+# literal. Nothing was added, dropped, corrected, or reordered.
+#
+# provenance.frozen: true marks a panel that belongs to a locked analysis
+# (config/clinical_renal_axes_cross_mission.yaml,
+#  config/dct_asdn_phospho_reanalysis.yaml,
+#  config/dct_subtype_reference_freeze_v1.yaml).  Those entries must never be
+# edited; see docs/GENE_PANEL_INVENTORY.md section 4.
+#
+# See docs/GENE_PANEL_INVENTORY.md for the duplication/drift analysis.
+
+schema_version: 1
+panels:
+  podocyte_core_4:
+    description: "Minimal 4-gene podocyte composition-reference panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/multiomics/celltype_panels.py
+          symbol: KIDNEY_PANELS
+          key: podocyte
+          lines: "20"
+      literature:
+        - "Chen et al. 2021 (GSE150338) — named in the KIDNEY_PANELS source comment at src/multiomics/celltype_panels.py:9"
+      frozen: false
+      in_test: false
+    genes:
+      Nphs1: 1
+      Nphs2: 1
+      Podxl: 1
+      Wt1: 1
+    minimum_present: null
+
+  podocyte_slit_diaphragm_expanded_9:
+    description: "Nine-gene podocyte/slit-diaphragm panel used by the v13 clinical-axis adversarial audit."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v13/compartment_adversarial_audit.py
+          symbol: CLINICAL_AXIS_PANELS
+          key: glomerular_barrier_podocyte
+          lines: "48-51"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Nphs1: 1
+      Nphs2: 1
+      Podxl: 1
+      Wt1: 1
+      Synpo: 1
+      Magi2: 1
+      Actn4: 1
+      Cd2ap: 1
+      Plce1: 1
+    minimum_present: null
+
+  podocyte_barrier_core_frozen:
+    description: "FROZEN glomerular-barrier core subdomain of the cross-mission clinical renal axes lock. Negative weights: loss of barrier identity is the declared adverse direction."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/clinical_renal_axes_cross_mission.yaml
+          symbol: primary_family.glomerular_barrier_identity_loss.subdomains
+          key: barrier_core
+          lines: "31-39"
+        - file: scripts/clinical_axes/run_compartment_context.py
+          symbol: BARRIER_CORE_GENES
+          key: null
+          lines: "39-46"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Nphs1: -1
+      Nphs2: -1
+      Synpo: -1
+      Ptpro: -1
+      Magi2: -1
+      Wt1: -1
+    minimum_present: 4
+
+  podocyte_barrier_expanded_frozen:
+    description: "FROZEN barrier_core plus the two declared sensitivity additions (Podxl, Cd2ap)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/clinical_renal_axes_cross_mission.yaml
+          symbol: primary_family.glomerular_barrier_identity_loss.sensitivity_additions
+          key: barrier_expanded
+          lines: "40-43"
+        - file: scripts/clinical_axes/run_compartment_context.py
+          symbol: BARRIER_EXPANDED_GENES
+          key: null
+          lines: "47"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Nphs1: -1
+      Nphs2: -1
+      Synpo: -1
+      Ptpro: -1
+      Magi2: -1
+      Wt1: -1
+      Podxl: -1
+      Cd2ap: -1
+    minimum_present: null
+
+  podocyte_comparator_frozen_reference:
+    description: "FROZEN podocyte comparator set from the DCT subtype reference freeze."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.major_kidney_comparator_sets
+          key: podocyte
+          lines: "355-361"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Nphs1: 1
+      Nphs2: 1
+      Podxl: 1
+      Synpo: 1
+      Magi2: 1
+      Ptpro: 1
+    minimum_present: null
+
+  podocyte_signature_5:
+    description: "Five-gene podocyte signature used for single-cell scoring sanity checks."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/sample.py
+          symbol: sig
+          key: Podocyte
+          lines: "28"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Nphs1: 1
+      Nphs2: 1
+      Wt1: 1
+      Synpo: 1
+      Podxl: 1
+    minimum_present: null
+
+  podocyte_deconvolution_3:
+    description: "Three-gene podocyte marker set used by the deconvolution sanity check."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution_sanity.py
+          symbol: MARKERS
+          key: Podocyte
+          lines: "19"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Nphs1: 1
+      Nphs2: 1
+      Wt1: 1
+    minimum_present: null
+
+  podocyte_podxl_nid1_forced:
+    description: "Two genes force-included by the podocyte PODXL/NID1 specificity sensitivity analysis."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/clinical_axes/run_podocyte_podxl_nid1_sensitivity.py
+          symbol: FORCED_GENES
+          key: null
+          lines: "54"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Podxl: 1
+      Nid1: 1
+    minimum_present: null
+
+  podocyte_high_specificity_test_fixture:
+    description: "Test fixture extending barrier_expanded with atlas high-specificity podocyte/GBM genes."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: tests/test_clinical_axes_integration.py
+          symbol: test_disjoint_podocyte_variants_leave_source_set_unchanged.source_genes
+          key: null
+          lines: "59-72"
+      literature: []
+      frozen: false
+      in_test: true
+    genes:
+      Nphs1: 1
+      Nphs2: 1
+      Synpo: 1
+      Ptpro: 1
+      Magi2: 1
+      Wt1: 1
+      Podxl: 1
+      Cd2ap: 1
+      Nid1: 1
+      Col4a3: 1
+      Col4a4: 1
+      Kirrel1: 1
+      Myh9: 1
+      Actn4: 1
+      Inf2: 1
+      Nck1: 1
+    minimum_present: 8
+
+  mesangial_pericyte_3:
+    description: "Mesangial/pericyte signature used for single-cell scoring sanity checks."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/sample.py
+          symbol: sig
+          key: Mesangial_Pericyte
+          lines: "30"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Pdgfrb: 1
+      Rgs5: 1
+      Des: 1
+    minimum_present: null

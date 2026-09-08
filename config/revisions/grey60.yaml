@@ -1,0 +1,78 @@
+schema_version: 1
+
+id: grey60
+title: Grey60 module adversarial reanalysis
+workflow: A
+status: blocked
+lock_date: 2026-07-29
+
+question: >-
+  Does the Grey60 WGCNA module survive an adversarial reanalysis strong enough
+  to carry a publication claim, internally and across external cohorts?
+
+conclusion: >-
+  No-go. Recorded in docs/GREY60_GO_NO_GO_REPORT_2026-07-29.md; a Grey60
+  rescue is explicitly retired in docs/POST_V13_DIRECTION_DECISION_2026-08-11.md
+  section 9.
+
+spec_config: config/grey60_adversarial_reanalysis.yaml
+docs:
+  - docs/GREY60_ADVERSARIAL_REANALYSIS_PLAN_2026-07-29.md
+  - docs/GREY60_GO_NO_GO_REPORT_2026-07-29.md
+  - docs/NEXT_PAPER_DIRECTION_AFTER_GREY60_2026-07-29.md
+  - docs/PUBLICATION_STRATEGY_AFTER_GREY60_NOGO_2026-07-29.md
+
+results_root: data/results/grey60
+reference_run: data/results/run_20260729_grey60_adversarial
+figures_root: null
+
+requires:
+  data:
+    - data/results/run_20260505_remediated_2500g
+  r: true
+
+stages:
+  - id: internal
+    title: Locked internal Grey60 adversarial tests
+    needs: []
+    runner: python
+    entry: scripts/grey60/01_run_internal.py
+    args: ["--config", "{spec_config}", "--outdir", "{run_dir}"]
+    optional: false
+    outputs: []
+
+  - id: flight-blind-grid
+    title: Flight-blind WGCNA recovery grid
+    needs: [internal]
+    runner: rscript
+    entry: scripts/grey60/02_run_flight_blind_wgcna_grid.R
+    args: ["--config", "{spec_config}", "--outdir", "{run_dir}"]
+    optional: false
+    outputs: []
+
+  - id: summarize-grid
+    title: Summarize flight-blind recovery and projected Grey60 effects
+    needs: [flight-blind-grid]
+    runner: python
+    entry: scripts/grey60/03_summarize_flight_blind_grid.py
+    args: ["--config", "{spec_config}", "--outdir", "{run_dir}"]
+    optional: false
+    outputs: []
+
+  - id: external
+    title: Cohort-level recurrence and random-effects synthesis
+    needs: [summarize-grid]
+    runner: python
+    entry: scripts/grey60/04_run_external.py
+    args: ["--config", "{spec_config}", "--outdir", "{run_dir}"]
+    optional: false
+    outputs: []
+
+  - id: report
+    title: Locked decision object and decision-dashboard figure
+    needs: [external]
+    runner: python
+    entry: scripts/grey60/05_compile_report.py
+    args: ["--config", "{spec_config}", "--outdir", "{run_dir}"]
+    optional: false
+    outputs: []

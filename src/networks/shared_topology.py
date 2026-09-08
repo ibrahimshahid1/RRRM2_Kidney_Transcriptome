@@ -1,21 +1,5 @@
 # src/networks/shared_topology.py
-"""
-Phase 2 Step 2.1-2.3: Build Shared Sparse Skeleton E
-
-Cell-standardize expression within each (Age × Arm × EnvGroup) cell,
-then build a sparse partial correlation network using Ledoit-Wolf
-shrinkage and top-k neighbors per gene.
-
-The skeleton E is fixed for all downstream sample-specific weighting.
-
-Usage:
-    python -m src.networks.shared_topology --max_genes 2500 --topk 80
-
-With biotype filtering (recommended):
-    python -m src.networks.shared_topology --max_genes 2500 --topk 80 \\
-        --id_map data/processed/resources/id_map.tsv \\
-        --biotype_filter protein_coding
-"""
+"""Phase 2.1-2.3: build the shared sparse skeleton E by Ledoit-Wolf top-k partial correlation."""
 from __future__ import annotations
 
 import argparse
@@ -42,10 +26,7 @@ def load_meta(path: str) -> pd.DataFrame:
 
 
 def load_biotype_map(id_map_path: str) -> pd.DataFrame:
-    """Load Ensembl biotype annotations from id_map.tsv.
-
-    Returns DataFrame with columns: ensembl_gene_id, mgi_symbol, biotype
-    """
+    """Load ensembl_gene_id, mgi_symbol, biotype from id_map.tsv."""
     df = pd.read_csv(id_map_path, sep="\t", comment="#")
     cols = ["ensembl_gene_id", "mgi_symbol", "biotype"]
     for c in cols:
@@ -127,23 +108,7 @@ def pick_genes(
     allowed_biotypes: list[str] | None = None,
     exclude_noise_symbols: bool = True,
 ) -> list[str]:
-    """Select top genes by variance, with biotype filtering and force-include.
-
-    Pipeline:
-        1. Drop ERCC spike-ins
-        2. (Optional) Filter to allowed biotypes via id_map.tsv
-        3. (Optional) Exclude Gm-prefix and other noise symbols
-        4. Force-include genes get priority slots
-        5. HVGs fill remaining slots so total ≤ max_genes
-
-    Args:
-        rtech: Expression matrix (genes x samples), index = Ensembl IDs
-        max_genes: Maximum total genes in panel
-        force_include: Ensembl IDs to force-include (bypass biotype filter)
-        biotype_map: DataFrame with ensembl_gene_id, mgi_symbol, biotype
-        allowed_biotypes: List of allowed biotypes (e.g. ["protein_coding"])
-        exclude_noise_symbols: If True, drop Gm\\d+, Rik, etc. from HVG pool
-    """
+    """Select up to ``max_genes`` HVGs after biotype/noise filtering, force-included genes first."""
     keep = ~rtech.index.str.upper().str.startswith("ERCC")
     r = rtech.loc[keep]
     n_before = len(r)
@@ -216,19 +181,7 @@ def cell_standardize(
     eps: float = 1e-8,
     sd_floor: float = 1e-3,
 ) -> np.ndarray:
-    """
-    Standardize within each experimental cell (defined by cell_cols).
-    
-    Args:
-        rtech_gxs: genes x samples DataFrame
-        meta: metadata with index = sample IDs
-        cell_cols: columns defining experimental cells
-        eps: small constant for numerical stability
-        sd_floor: minimum SD to avoid division issues
-    
-    Returns:
-        Z: (n_samples x n_genes) cell-standardized matrix
-    """
+    """Standardize expression within each experimental cell; returns n_samples x n_genes."""
     samples = rtech_gxs.columns.tolist()
     meta_aligned = meta.loc[samples]
     cell_key = meta_aligned[cell_cols].astype(str).agg("|".join, axis=1)
@@ -261,11 +214,7 @@ def partial_corr_from_precision(P: np.ndarray) -> np.ndarray:
 
 
 def topk_skeleton(pc: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Build skeleton by taking top-k neighbors per gene.
-    
-    The union of all top-k neighbors gives ~G*k edges (not G*k/2).
-    """
+    """Build the skeleton from the union of each gene's top-k neighbors (~G*k edges, not G*k/2)."""
     G = pc.shape[0]
     abs_pc = np.abs(pc)
     # Fix: guard against k > G-1

@@ -190,9 +190,7 @@ def main() -> int:
         "condition": cond,
         "rna_dct_transport_score": rna_score_full.reindex(common),
         "comodified_canonical_index_feature_score": context_score.reindex(common),
-        # Backward-compatible fail-closed field: no isolated canonical feature
-        # qualifies, so legacy activity analyses receive NA rather than the
-        # co-modified context score.
+        # Fail-closed legacy field: no isolated canonical feature qualifies, so emit NA, not the context score.
         "ncc_activity_score_regulatory": np.nan,
         "ncc_activity_score_nonregulatory_control": ctrl_score.reindex(common),
     }).reset_index(names="animal")

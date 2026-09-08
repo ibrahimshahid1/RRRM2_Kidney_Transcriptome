@@ -1,0 +1,92 @@
+schema_version: 1
+
+id: v11-core
+title: v11 DCT1 phospho mediation and layer specificity
+workflow: '-'
+status: retired
+lock_date: 2026-06-07
+
+question: >-
+  Does flight-associated phosphorylation suppression on the DCT1/NCC axis
+  mediate a downstream transcriptional layer effect, and is that effect
+  layer-specific?
+
+conclusion: >-
+  Superseded and retracted. The v11/v12 headline rested on OSD-462 phosphosite
+  features that the osd462-stage0 audit later showed to be co-modified peptides
+  with no isolated qualification-passing canonical NCC/SPAK phosphoform, in a
+  design where condition is perfectly aliased with reporter-tag block. Kept for
+  historical reproduction only; do not cite its outputs as current results.
+
+spec_config: null
+docs:
+  - docs/v11_execution_research_plan.md
+  - docs/v11_execution_results.md
+  - docs/v11_layer_specificity_execution_summary_2026-06-07.md
+  - docs/v11_gate0_negative_control_search_2026-06-07.md
+  - docs/v11_dct2_score_hardening_2026-07-10.md
+  - docs/MANUSCRIPT_V1_V12_CROSS_VERSION_AUDIT_2026-07-29.md
+
+results_root: data/results/v11-core
+reference_run: data/results/run_20260526_v11_dct1_phospho_mediation
+figures_root: null
+
+requires:
+  data:
+    - data/external
+  r: true
+
+stages:
+  - id: dct-prior
+    title: Build the GSE228367 DCT prior
+    needs: []
+    runner: rscript
+    entry: scripts/v11/01_build_gse228367_dct_prior.R
+    args: []
+    optional: false
+    outputs: []
+
+  - id: core
+    title: Core DCT1 / phosphoproteome / mediation analyses
+    needs: [dct-prior]
+    runner: python
+    entry: scripts/v11/02_run_v11_core_analysis.py
+    args: ["--run-root", "{run_dir}"]
+    optional: false
+    outputs: []
+
+  - id: composition-aware
+    title: H2 composition-aware phospho robustness
+    needs: [core]
+    runner: python
+    entry: scripts/v11/03_h2_composition_aware_phospho.py
+    args: ["--run-root", "{run_dir}"]
+    optional: false
+    outputs: []
+
+  - id: spatial
+    title: Spatial reference projection
+    needs: [core]
+    runner: python
+    entry: scripts/v11/04_spatial_reference_projection.py
+    args: []
+    optional: true
+    outputs: []
+
+  - id: propagation
+    title: RNA-to-protein propagation against a 10,000-draw null
+    needs: [core]
+    runner: python
+    entry: scripts/v11/05_rna_protein_propagation.py
+    args: ["--run-root", "{run_dir}", "--n-null", "10000", "--seed", "20260606"]
+    optional: false
+    outputs: []
+
+  - id: observability
+    title: Layer-specificity observability audit
+    needs: [propagation]
+    runner: python
+    entry: scripts/v11/06_observability_audit.py
+    args: ["--run-root", "{run_dir}", "--n-null", "10000", "--seed", "20260607"]
+    optional: false
+    outputs: []

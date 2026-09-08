@@ -115,12 +115,7 @@ def resolve_gene_sets(
     deoverlap_gene_ids: set[str] | None = None,
     protected_symbols: set[str] | None = None,
 ) -> tuple[dict[str, GeneSetResolution], pd.DataFrame]:
-    """Resolve symbol/Ensembl YAML sets to scored Ensembl IDs.
-
-    ``deoverlap_gene_ids`` is used for candidate-upstream mechanism scores so
-    axis-defining genes can be reported and removed.  Symbols listed in a set's
-    ``protected_genes`` field remain scored even if they overlap the axis.
-    """
+    """Resolve symbol/Ensembl YAML sets to scored Ensembl IDs, keeping ``protected_genes``."""
     id_map = load_id_map(id_map_path)
     symbol_to_ids: dict[str, set[str]] = {}
     id_to_symbol: dict[str, str] = {}

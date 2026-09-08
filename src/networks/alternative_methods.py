@@ -1,15 +1,5 @@
 # src/networks/alternative_methods.py
-"""
-Alternative sample-specific network methods for Phase 8 sensitivity.
-
-Implemented:
-  * SSN-style leave-one-sample perturbation of edge correlations.
-
-Guarded wrappers:
-  * CSN and scLink are exposed as explicit modes but require external
-    implementations/dependencies; the benchmark records them as unavailable
-    rather than silently substituting LIONESS.
-"""
+"""Phase 8 sensitivity networks: SSN perturbation; CSN/scLink report unavailable, not LIONESS."""
 
 from __future__ import annotations
 

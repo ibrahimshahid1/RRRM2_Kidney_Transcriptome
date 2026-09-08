@@ -1,35 +1,5 @@
 # src/statistics/full_regression.py
-"""
-Phase 6: Edge-level regression using ALL 80 samples (full factorial model).
-
-Fits a FULL 2×2×2 factorial model per edge to properly control for all
-structure (Age, Arm, Flight) and extract clean effect estimates.
-
-Model per edge (FLT vs GC only):
-  w_e ~ Age + Arm + Flight + Age:Flight + Arm:Flight + Age:Arm + Age:Arm:Flight
-
-Key outputs:
-  - Flight main effect (FLT vs GC, controlling for Age and Arm)
-  - Age×Flight interaction (does flight effect differ by age?)
-  - Arm×Flight interaction (does flight effect differ by arm?)
-  - Age×Arm×Flight (3-way interaction)
-
-Then aggregate incident edge t-statistics into signed gene-level statistics and
-calibrate them by within-Age×Arm label permutation. Stouffer/Brown-style
-combination is not used for primary inference because unsigned edge p-values
-discard direction and edge dependence is substantial on a shared skeleton.
-
-Inputs:
-  - data/processed/networks/phase2/lioness_edges.npy (N × E edge weights)
-  - data/processed/networks/phase2/edge_i.npy, edge_j.npy
-  - data/processed/networks/phase2/phase2_genes.txt
-  - data/processed/networks/phase2/lioness_samples.txt
-  - data/processed/phase1_residuals/meta_phase1.tsv.gz
-
-Outputs:
-  - data/results/phase6_regression/gene_<effect>.tsv for each effect
-  - data/results/phase6_regression/edge_regression_stats.tsv (optional)
-"""
+"""Phase 6: 2x2x2 factorial edge regression; signed gene stats by permutation, not Stouffer."""
 
 from __future__ import annotations
 import argparse
@@ -194,17 +164,7 @@ def empirical_signed_gene_pvalues(
 
 
 def fit_edge_regression(W: np.ndarray, X: np.ndarray, term_indices: dict) -> dict:
-    """
-    Fit OLS regression for all edges simultaneously.
-    
-    Args:
-        W: Edge weight matrix (N_samples × E_edges)
-        X: Design matrix (N_samples × P_terms)
-        term_indices: Dict mapping term names to column indices in X
-    
-    Returns:
-        Dict with keys like 'p_flight', 'p_age_flight', 'beta_flight', etc.
-    """
+    """Fit OLS across all edges at once; returns per-term beta/p arrays keyed like 'p_flight'."""
     N, E = W.shape
     P = X.shape[1]
     

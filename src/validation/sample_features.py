@@ -32,19 +32,7 @@ def node_strength(
     n_genes: int,
     genes: List[str] = None
 ) -> np.ndarray:
-    """
-    Compute node strength (sum of incident edge weights) per sample.
-    
-    Args:
-        lioness_z: LIONESS weights (samples x edges)
-        edge_i: Source gene indices for each edge
-        edge_j: Target gene indices for each edge
-        n_genes: Total number of genes
-        genes: Optional gene list for column names
-        
-    Returns:
-        Node strength matrix (samples x genes)
-    """
+    """Node strength (sum of incident edge weights) per sample, returned as samples x genes."""
     n_samples = lioness_z.shape[0]
     strength = np.zeros((n_samples, n_genes), dtype=np.float32)
     
@@ -64,20 +52,7 @@ def pathway_edge_summary(
     pathway_genes: List[str],
     agg_func: str = 'mean'
 ) -> np.ndarray:
-    """
-    Compute summary statistics for edges within a pathway.
-    
-    Args:
-        lioness_z: LIONESS weights (samples x edges)
-        edge_i: Source gene indices
-        edge_j: Target gene indices
-        genes: Full gene list
-        pathway_genes: Genes in the pathway of interest
-        agg_func: Aggregation function ('mean', 'median', 'sum', 'std')
-        
-    Returns:
-        Pathway summary per sample (n_samples,)
-    """
+    """Aggregate within-pathway edge weights to one summary value per sample."""
     gene_to_idx = {g: i for i, g in enumerate(genes)}
     pathway_idx = set(gene_to_idx.get(g, -1) for g in pathway_genes)
     pathway_idx.discard(-1)
@@ -113,22 +88,7 @@ def shifter_connectivity(
     shifter_genes: List[str],
     topk_neighbors: int = 10
 ) -> np.ndarray:
-    """
-    Compute shifter-centered connectivity scores.
-    
-    For each silent shifter, aggregate weights to its top neighbors.
-    
-    Args:
-        lioness_z: LIONESS weights (samples x edges)
-        edge_i: Source gene indices
-        edge_j: Target gene indices
-        genes: Full gene list
-        shifter_genes: Silent shifter genes
-        topk_neighbors: Number of top neighbors to consider
-        
-    Returns:
-        Shifter connectivity features (samples x len(shifter_genes))
-    """
+    """Aggregate each silent shifter's top-k neighbor weights into samples x shifters features."""
     gene_to_idx = {g: i for i, g in enumerate(genes)}
     n_samples = lioness_z.shape[0]
     
@@ -165,17 +125,7 @@ def edge_pca_features(
     n_components: int = 10,
     stable_edge_idx: np.ndarray = None
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Extract PC features from LIONESS edge weights.
-    
-    Args:
-        lioness_z: LIONESS weights (samples x edges)
-        n_components: Number of PCs to extract
-        stable_edge_idx: Optional subset of stable edges to use
-        
-    Returns:
-        Tuple of (PC scores, explained variance ratios)
-    """
+    """PCA of LIONESS edge weights; returns (PC scores, explained variance ratios)."""
     from sklearn.decomposition import PCA
     
     if stable_edge_idx is not None:
@@ -201,22 +151,7 @@ def extract_all_features(
     shifter_genes: List[str] = None,
     n_pcs: int = 10
 ) -> SampleFeatures:
-    """
-    Extract comprehensive sample-level features.
-    
-    Args:
-        lioness_z: LIONESS weights (samples x edges)
-        sample_ids: Sample identifiers
-        genes: Gene list
-        edge_i: Source gene indices
-        edge_j: Target gene indices
-        pathway_dict: Dictionary of pathway name -> gene list
-        shifter_genes: Silent shifter genes
-        n_pcs: Number of PCs to extract
-        
-    Returns:
-        SampleFeatures container
-    """
+    """Assemble node-strength, pathway, shifter and PC features into ``SampleFeatures``."""
     all_features = []
     all_names = []
     

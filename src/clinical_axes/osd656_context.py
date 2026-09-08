@@ -1,11 +1,4 @@
-"""Descriptive OSD-656 urine context for the frozen renal tissue axes.
-
-OSD-656 contains post-flight urine measurements from four Inspiration4 crew
-members.  This module intersects that assay with the *already frozen* mouse
-kidney tissue-axis genes and preserves subjects and recovery timepoints.  It
-does not perform a hypothesis test and its outputs must not be used as
-validation or added to the mouse cross-mission meta-analysis.
-"""
+"""Descriptive OSD-656 urine context for frozen renal axes; never validation or meta-analysis."""
 
 from __future__ import annotations
 
@@ -23,10 +16,7 @@ def normalize_analyte(value: object) -> str:
 
 
 def frozen_axis_gene_catalog(config: Mapping[str, object]) -> pd.DataFrame:
-    """Flatten only the frozen primary-family subdomain genes.
-
-    Sensitivity additions and secondary markers are intentionally excluded.
-    """
+    """Flatten frozen primary-family subdomain genes only; no sensitivity or secondary markers."""
 
     family = config.get("primary_family", {})
     if not isinstance(family, Mapping) or not family:
@@ -126,12 +116,7 @@ def paired_recovery_changes(
     long: pd.DataFrame,
     coverage: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Pair each recovery value to that subject's mean preflight baseline.
-
-    Multiple preflight collections are first averaged within subject and
-    analyte.  Recovery timepoints remain separate; they are never pooled or
-    treated as independent subjects.
-    """
+    """Pair recovery values to the subject's mean preflight baseline; timepoints never pooled."""
 
     required = {
         "analyte",

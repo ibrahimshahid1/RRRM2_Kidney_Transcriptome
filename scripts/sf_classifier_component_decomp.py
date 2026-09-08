@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Component decomposition of the cross-cohort signature score.
-
-Which part of the a-priori signature actually generalizes across cohorts:
-the remodeling(up) axis, the DCT/NCC-WNK transport(down) axis, or the
-DCT2/aldosterone(down) axis? Each scored in its flight-predicting direction,
-with a within-cohort label-permutation null. No supervised fitting -> no overfit.
-"""
+"""Decompose the a-priori signature into its three axes with a permutation null; no supervised fitting."""
 import os, json, warnings
 import numpy as np, pandas as pd
 from sklearn.metrics import roc_auc_score

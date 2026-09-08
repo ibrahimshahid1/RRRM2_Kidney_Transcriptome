@@ -1,15 +1,4 @@
-"""Reproducible Stage 0 provenance checks for the OSD-462 MS assays.
-
-This module deliberately separates three objects that were previously mixed in
-the analysis narrative:
-
-* biological samples and their reporter channels;
-* multiplex-level raw LC-MS acquisitions (which are not sample-specific);
-* workbook phosphosite features and their residue identities.
-
-The functions read the source workbooks and ISA metadata directly.  They do
-not use manuscript tables or previously generated analysis outputs.
-"""
+"""Stage 0 OSD-462 provenance from source workbooks and ISA metadata, never analysis outputs."""
 from __future__ import annotations
 
 import hashlib
@@ -254,15 +243,7 @@ def _read_isa_metadata() -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
 
 
 def build_sample_design() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Build the exact sample design and multiplex-level raw inventory.
-
-    Returns
-    -------
-    design
-        One row per biological sample per MS modality (60 rows).
-    raw_inventory
-        One row per multiplex-level raw LC-MS acquisition (96 rows).
-    """
+    """Build the 60-row sample/modality design and the 96-row multiplex raw-acquisition table."""
     modality_workbooks = {
         "protein": PROTEIN_WORKBOOK,
         "phosphoprotein": PHOSPHO_WORKBOOK,
@@ -335,8 +316,7 @@ def build_sample_design() -> tuple[pd.DataFrame, pd.DataFrame]:
         design["analysis_primary_flight_vs_ground"] = design["condition_code"].isin(
             ["FL", "GC"]
         )
-        # Preserve protocol evidence and contradictory legacy metadata as
-        # separate fields; do not collapse them into one ambiguous assay label.
+        # Keep protocol evidence and legacy metadata separate; never collapse into one label.
         design["resolved_assay_name"] = "TMTpro isobaric-tag proteomics"
         design["detailed_protocol_labeling_reagent"] = "TMTpro"
         design["detailed_protocol_chemistry_evidence"] = (
@@ -486,14 +466,7 @@ def map_sequence_phosphoform(
     motif_value: object,
     sequence_value: object,
 ) -> dict[str, object]:
-    """Map every ``#`` in a workbook peptide sequence to an absolute site.
-
-    The workbook encodes phosphorylation by placing ``#`` after the modified
-    residue.  A 13-aa localization motif anchors its center to the reported
-    position.  Longest-overlap alignment between each motif and the peptide
-    determines the peptide's absolute start; independent component anchors
-    must agree.
-    """
+    """Map every ``#`` in a workbook peptide sequence to an absolute site by 13-aa motif anchor."""
     components = derive_site_components(site_position, motif_value)
     sequence = str(sequence_value).strip().upper()
     split = sequence.split(".")
@@ -1071,12 +1044,7 @@ def build_stage0_qc(
 def isolated_canonical_assay_features(
     phosphosite_audit: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Return assay rows qualified as isolated canonical-site features.
-
-    The filter requires a strict residue-aware literature match, a single-site
-    rollup, and exactly one ``#`` phosphomodification in the reported peptide
-    sequence.  It is intentionally empty for the current OSD-462 workbook.
-    """
+    """Isolated canonical-site assay rows; intentionally empty for the current OSD-462 workbook."""
     required = {
         "all_components_strict_canonical",
         "site_feature_kind",

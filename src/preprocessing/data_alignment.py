@@ -23,11 +23,7 @@ OUTPUT_DIR = REPO_ROOT / "data/processed/aligned_outputs"
 
 # --- Helper Functions ---
 def read_counts_csv(path: Path) -> pd.DataFrame:
-    """
-    Reads a GeneLab counts CSV shaped like:
-      gene_id, sample1, sample2, ...
-    Returns a DataFrame indexed by gene_id with sample columns.
-    """
+    """Read a GeneLab counts CSV into a DataFrame indexed by gene_id with sample columns."""
     if not path.exists():
         raise FileNotFoundError(f"Count file not found: {path}")
     
@@ -59,10 +55,7 @@ def read_metadata_txt(path: Path) -> pd.DataFrame:
 
 
 def align_metadata_to_samples(meta: pd.DataFrame, canonical_samples: list[str]) -> pd.DataFrame:
-    """
-    Align metadata to the canonical sample ordering.
-    Raises error if any samples are missing from metadata.
-    """
+    """Align metadata to the canonical sample ordering, raising if any sample is missing."""
     missing = [s for s in canonical_samples if s not in meta.index]
     if missing:
         raise ValueError(f"Metadata missing {len(missing)} canonical samples. Example: {missing[:5]}")
@@ -72,10 +65,7 @@ def align_metadata_to_samples(meta: pd.DataFrame, canonical_samples: list[str]) 
 
 
 def align_counts_to_samples(counts: pd.DataFrame, canonical_samples: list[str], name: str) -> pd.DataFrame:
-    """
-    Align count matrix columns to the canonical sample ordering.
-    Raises error if any samples are missing from count matrix.
-    """
+    """Align count-matrix columns to the canonical sample order, raising if any is missing."""
     missing = [s for s in canonical_samples if s not in counts.columns]
     if missing:
         raise ValueError(f"{name} counts missing {len(missing)} canonical samples. Example: {missing[:5]}")
@@ -87,12 +77,7 @@ def align_counts_to_samples(counts: pd.DataFrame, canonical_samples: list[str], 
 
 
 def parse_design_from_sample_name(sample_name: str) -> dict:
-    """
-    Optional: extract simple design factors from the RRRM2 sample name.
-    Example: RRRM2_R-KDN_BSL_ISS-T_YNG_BY1
-    
-    Returns dict with keys: EnvGroup, Arm, Age, AnimalCode
-    """
+    """Parse EnvGroup, Arm, Age, AnimalCode out of an RRRM2 sample name."""
     parts = sample_name.split("_")
     env_levels = {"FLT", "HGC", "VIV", "BSL", "GC", "VGC"}
     arm_levels = {"ISS-T", "LAR"}

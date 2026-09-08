@@ -1,9 +1,4 @@
-"""Load and harmonize the frozen cross-mission kidney RNA contrasts.
-
-All public functions in this module are label-transparent: sample membership is
-derived only from the frozen configuration and repository metadata.  No effect
-estimate is used to select a sample or gene.
-"""
+"""Load frozen cross-mission kidney RNA contrasts; no effect estimate selects any sample or gene."""
 
 from __future__ import annotations
 
@@ -74,9 +69,7 @@ def load_symbol_map(path: Path, annotation_fallback: Path | None = None) -> dict
         fallback["ENSEMBL"] = _strip_ensembl_version(
             pd.Index(fallback["ENSEMBL"])
         )
-        # The OSDR differential-expression table supplies annotations for genes
-        # outside the historical 14k repository universe.  The curated map
-        # remains authoritative when both sources contain an ID.
+        # OSDR DE-table annotations extend the 14k universe; the curated map wins on ID collisions.
         for ens, symbol in zip(fallback["ENSEMBL"], fallback["SYMBOL"]):
             mapping.setdefault(ens, symbol)
     return mapping

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rrrm2"
+version = "1.0.0"
+description = "Experiment registry and runner for the RRRM-2 kidney spaceflight reanalysis"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+    "pandas>=1.5",
+    "numpy>=1.23",
+]
+
+[project.optional-dependencies]
+api = ["requests>=2.28"]
+
+[project.scripts]
+rrrm2 = "rrrm2.cli:main"
+
+[tool.setuptools]
+packages = ["rrrm2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

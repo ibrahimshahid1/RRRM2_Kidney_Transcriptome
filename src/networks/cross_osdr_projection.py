@@ -124,15 +124,7 @@ def permutation_cosine_alignment(
     rng: np.random.Generator,
     contrast: str,
 ) -> tuple[pd.DataFrame, PermutationAlignmentResult]:
-    """Build a FLT/GC label-permutation null for cosine alignment.
-
-    ``external_vector_builder(None)`` must return the observed external
-    flight vector. ``external_vector_builder(permuted_labels)`` must rebuild
-    the external vector after assigning the provided permuted FLT/GC labels to
-    the same samples. The reference vector is held fixed because the question
-    is whether the external FLT/GC contrast aligns with the RRRM-2 direction
-    more than expected under exchangeable external labels.
-    """
+    """FLT/GC label-permutation null for cosine alignment; the reference vector is held fixed."""
     point = cosine_alignment(external_vector_builder(None), reference_vector)
     label_values = np.asarray(list(labels), dtype=object)
     rows: list[dict[str, float | int]] = []

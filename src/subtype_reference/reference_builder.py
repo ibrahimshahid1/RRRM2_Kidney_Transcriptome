@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-"""Build frozen distal-nephron signatures without consulting flight results.
-
-The module consumes reference-only differential-expression and whole-kidney
-expression summaries.  It deliberately has no dependency on the OSD-462
-phosphoproteomic code.  Final data-derived signatures are emitted only when
-both the independent distal-nephron validation and whole-kidney specificity
-inputs are present; otherwise the output records a non-evaluable gate rather
-than silently promoting discovery-only genes.
-"""
+"""Build frozen distal-nephron signatures from reference-only inputs; gates non-evaluable."""
 
 from __future__ import annotations
 
@@ -136,14 +128,7 @@ def _read_table(path: Path | None, required: set[str]) -> pd.DataFrame | None:
 def _broad_expression_table(
     atlas: pd.DataFrame | None, config: dict[str, Any]
 ) -> pd.DataFrame:
-    """Separate true expression breadth from the signature-specificity filter.
-
-    ``broadly_expressed`` requires expression in the distal target and in the
-    configured number of unrelated compartments. The compatibility column
-    ``non_distal_specific_or_broad`` additionally captures a single unrelated
-    compartment whose expression is comparable with the distal target; frozen
-    DCT signature construction continues to use that stricter flag.
-    """
+    """Split expression breadth from the stricter distal-specificity flag frozen DCT sets use."""
 
     columns = [
         "gene_symbol",
@@ -493,13 +478,7 @@ def _external_validation_signature(
     broad: pd.DataFrame,
     config: dict[str, Any],
 ) -> pd.DataFrame:
-    """Derive a GSE150338-only DCT2/CNT signature without GSE228367 membership.
-
-    The fine-subtype and microdissected-segment inputs are both from
-    GSE150338. The whole-kidney atlas is used only as the predeclared combined
-    distal-specificity/breadth exclusion. No discovery-table membership is
-    consulted.
-    """
+    """GSE150338-only DCT2/CNT signature; no GSE228367 or discovery membership is consulted."""
 
     columns = [
         "gene_symbol",

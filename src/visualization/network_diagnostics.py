@@ -1,17 +1,5 @@
 # scripts/plot_skeleton_diagnostics.py
-"""
-Phase 2 Skeleton Diagnostics and Visualization
-
-Generates publication-quality figures for the network skeleton:
-1. Partial correlation distribution (edge weight histogram)
-2. Degree distribution (edges per gene)
-3. Top hub genes table
-4. Network graph visualization (top genes by degree)
-5. LIONESS z-score statistics
-
-Usage:
-    python scripts/plot_skeleton_diagnostics.py
-"""
+"""Phase 2 skeleton diagnostics: edge-weight and degree distributions, hubs, graph, z stats."""
 from __future__ import annotations
 
 import argparse

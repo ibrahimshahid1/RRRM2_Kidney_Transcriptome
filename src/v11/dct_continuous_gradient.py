@@ -46,13 +46,7 @@ def _aligned(coord, outcome, covariates=None):
 
 
 def fit_linear_gradient(coord, outcome, covariates=None, min_n: int = MIN_PARENT_GENES) -> dict:
-    """OLS slope of ``outcome`` on ``coord`` (+ optional covariates).
-
-    The slope is reported in the units of ``coord`` as passed in: standardize
-    ``coord`` before calling for a per-SD slope. A planted positive trend is
-    recovered as a positive slope (sign-faithful), which is what the unit test
-    checks.
-    """
+    """OLS slope of ``outcome`` on ``coord`` plus optional covariates, in the units of ``coord``."""
     try:
         import statsmodels.api as sm
     except Exception as exc:  # pragma: no cover - optional dependency
@@ -133,14 +127,7 @@ def spearman_gradient(coord, outcome, min_n: int = MIN_PARENT_GENES) -> dict:
 def fit_spline_gradient(
     coord, outcome, covariates=None, df_spline: int = 4, min_n: int = MIN_PARENT_GENES
 ) -> dict:
-    """Natural-cubic-spline non-linearity test (nested F vs the linear contrast).
-
-    Fits a reduced model (const + coord [+ covars]) and a full model
-    (const + natural-cubic-spline(coord, df) [+ covars]). The natural cubic
-    spline space contains all linear functions, so the reduced model is nested
-    in the full one and a standard partial F-test is valid. A small ``f_p``
-    means the gradient departs from a straight line (non-monotone or curved).
-    """
+    """Natural-cubic-spline non-linearity test: nested partial F of spline(coord) vs linear."""
     try:
         import patsy
         import statsmodels.api as sm

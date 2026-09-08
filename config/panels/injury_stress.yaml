@@ -1,0 +1,488 @@
+# Versioned gene-panel registry — injury_stress
+#
+# Tubular injury, inflammation, oxidative/preservation stress and
+# metabolic-context panels.
+#
+# Extracted 2026-08-28 by an inventory pass over src/**, scripts/**, tests/**.
+# Membership and ordering are reproduced EXACTLY as they appear in the source
+# literal. Nothing was added, dropped, corrected, or reordered.
+#
+# provenance.frozen: true marks a panel that belongs to a locked analysis
+# (config/clinical_renal_axes_cross_mission.yaml,
+#  config/dct_asdn_phospho_reanalysis.yaml,
+#  config/dct_subtype_reference_freeze_v1.yaml).  Those entries must never be
+# edited; see docs/GENE_PANEL_INVENTORY.md section 4.
+#
+# See docs/GENE_PANEL_INVENTORY.md for the duplication/drift analysis.
+
+schema_version: 1
+panels:
+  proximal_injury_stress_8:
+    description: "Proximal-tubule injury/stress clinical-axis panel used by the v13 adversarial audit."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v13/compartment_adversarial_audit.py
+          symbol: CLINICAL_AXIS_PANELS
+          key: proximal_injury_stress
+          lines: "52-54"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Havcr1: 1
+      Lcn2: 1
+      Fabp1: 1
+      B2m: 1
+      Cst3: 1
+      Spp1: 1
+      Lrp2: 1
+      Cubn: 1
+    minimum_present: null
+
+  tubular_injury_core_frozen_2:
+    description: "FROZEN two-gene tubular epithelial injury core; the lock requires both genes observable and reported separately."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/clinical_renal_axes_cross_mission.yaml
+          symbol: primary_family.tubular_epithelial_injury_induction.subdomains
+          key: injury_core
+          lines: "48-53"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Havcr1: 1
+      Lcn2: 1
+    minimum_present: 2
+
+  tubular_injury_secondary_frozen_1:
+    description: "FROZEN secondary injury marker of the tubular injury axis."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/clinical_renal_axes_cross_mission.yaml
+          symbol: primary_family.tubular_epithelial_injury_induction
+          key: secondary_markers
+          lines: "55-56"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Il18: 1
+    minimum_present: null
+
+  timp2_igfbp7_stress_2:
+    description: "Cell-cycle-arrest stress pair (tissue transcripts, NOT the urinary NephroCheck assay)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v13/compartment_adversarial_audit.py
+          symbol: CLINICAL_AXIS_PANELS
+          key: TIMP2_IGFBP7_stress
+          lines: "55"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Timp2: 1
+      Igfbp7: 1
+    minimum_present: null
+
+  inflammatory_injury_7:
+    description: "Inflammatory injury clinical-axis panel used by the v13 adversarial audit."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v13/compartment_adversarial_audit.py
+          symbol: CLINICAL_AXIS_PANELS
+          key: inflammatory_injury
+          lines: "56"
+      literature: []
+      frozen: false
+      in_test: false
+      note: "Ccl14 has no 1:1 mouse ortholog; see docs/GENE_PANEL_INVENTORY.md section 5."
+    genes:
+      Il18: 1
+      Ccl2: 1
+      Ccl14: 1
+      Lcn2: 1
+      Tnf: 1
+      Il6: 1
+      Nfkb1: 1
+    minimum_present: null
+
+  injured_tubule_niche_6:
+    description: "Injured-tubule-enriched niche marker set for spatial-reference projection."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/spatial_reference_projection.py
+          symbol: NICHE_MARKERS
+          key: injured_tubule_enriched
+          lines: "44"
+        - file: scripts/v11/04_spatial_reference_projection.py
+          symbol: NICHE_MARKERS
+          key: injured_tubule_enriched
+          lines: "44"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Havcr1: 1
+      Vcam1: 1
+      Krt8: 1
+      Krt18: 1
+      Lcn2: 1
+      Sox9: 1
+    minimum_present: null
+
+  kidney_stress_continuous_target_5:
+    description: "Default kidney-stress marker set used as a continuous classification target."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/validation/continuous_target.py
+          symbol: DEFAULT_MARKERS
+          key: null
+          lines: "26"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Havcr1: 1
+      Lcn2: 1
+      Spp1: 1
+      Timp1: 1
+      Vcam1: 1
+    minimum_present: null
+
+  preservation_stress_response_12:
+    description: "RBM3 / immediate-early preservation-stress panel for the LAR reversal analysis."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/networks/lar_reversal.py
+          symbol: RBM3_PRESERVATION_GENES
+          key: null
+          lines: "65-68"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Rbm3: 1
+      Cirbp: 1
+      Ddit3: 1
+      Hspa1a: 1
+      Hspa1b: 1
+      Hsp90aa1: 1
+      Fos: 1
+      Jun: 1
+      Egr1: 1
+      Atf3: 1
+      Ier2: 1
+      Btg2: 1
+    minimum_present: null
+
+  oxidative_stress_mouse_19:
+    description: "Mouse-cased oxidative-stress feature set used by the external OSD validation module."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/validation/osd_external_validation.py
+          symbol: FEATURE_SYMBOLS
+          key: oxidative_stress
+          lines: "65-69"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Sod1: 1
+      Sod2: 1
+      Sod3: 1
+      Cat: 1
+      Gpx1: 1
+      Gpx3: 1
+      Gpx4: 1
+      Prdx1: 1
+      Prdx2: 1
+      Prdx3: 1
+      Nqo1: 1
+      Nfe2l2: 1
+      Hmox1: 1
+      Keap1: 1
+      Txn1: 1
+      Txnrd1: 1
+      Gsr: 1
+      Gclc: 1
+      Gclm: 1
+    minimum_present: null
+
+  ppar_signaling_mouse_38:
+    description: "Mouse-cased PPAR-signaling feature set used by the external OSD validation module."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/validation/osd_external_validation.py
+          symbol: PPAR_SYMBOLS
+          key: null
+          lines: "22-30"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Ppara: 1
+      Ppard: 1
+      Pparg: 1
+      Rxra: 1
+      Rxrb: 1
+      Rxrg: 1
+      Acox1: 1
+      Acox2: 1
+      Cpt1a: 1
+      Cpt1b: 1
+      Ehhadh: 1
+      Acaa1a: 1
+      Acaa1b: 1
+      Acadl: 1
+      Acadm: 1
+      Acsl1: 1
+      Acsl3: 1
+      Acsl4: 1
+      Acsl5: 1
+      Fabp1: 1
+      Fabp2: 1
+      Fabp3: 1
+      Fabp4: 1
+      Fabp5: 1
+      Cd36: 1
+      Scd1: 1
+      Hmgcs2: 1
+      Angptl4: 1
+      Plin2: 1
+      Lpl: 1
+      Adipoq: 1
+      Slc27a1: 1
+      Slc27a2: 1
+      Slc27a5: 1
+      Cyp4a10: 1
+      Cyp4a12a: 1
+      Cyp4a12b: 1
+      Cyp4a14: 1
+    minimum_present: null
+
+  cholesterol_biosynthesis_mouse_24:
+    description: "Mouse-cased cholesterol-biosynthesis feature set used by the external OSD validation module."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/validation/osd_external_validation.py
+          symbol: FEATURE_SYMBOLS
+          key: cholesterol_biosynthesis
+          lines: "34-39"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Hmgcr: 1
+      Hmgcs1: 1
+      Hmgcs2: 1
+      Mvk: 1
+      Pmvk: 1
+      Mvd: 1
+      Idi1: 1
+      Idi2: 1
+      Fdps: 1
+      Fdft1: 1
+      Sqle: 1
+      Lss: 1
+      Cyp51: 1
+      Msmo1: 1
+      Nsdhl: 1
+      Hsd17b7: 1
+      Ebp: 1
+      Sc5d: 1
+      Dhcr7: 1
+      Dhcr24: 1
+      Srebf1: 1
+      Srebf2: 1
+      Insig1: 1
+      Insig2: 1
+    minimum_present: null
+
+  tubular_metabolic_priority_15:
+    description: "Tubular metabolic-priority target panel for the tubulointerstitial state module."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/networks/tubulointerstitial_state.py
+          symbol: TARGET_GENE_PANELS
+          key: Tubular_metabolic_priority
+          lines: "40-44"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Rbm3: 1
+      Cyp4a14: 1
+      Bhmt: 1
+      Per2: 1
+      Hmgcr: 1
+      Hacl1: 1
+      Gpt: 1
+      Prodh: 1
+      Slc22a6: 1
+      Ugt1a10: 1
+      Plin5: 1
+      Lpin1: 1
+      Foxo3: 1
+      Herpud1: 1
+      Car4: 1
+    minimum_present: null
+
+  retinol_metabolism_11:
+    description: "Retinol/xenobiotic metabolism genes plotted in the WGCNA publication figures."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/visualization/publication_figures.py
+          symbol: RETINOL_GENES
+          key: null
+          lines: "48-51"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Aldh1a7: 1
+      Aldh1a2: 1
+      Cyp26b1: 1
+      Cyp2a5: 1
+      Cyp4a12b: 1
+      Cyp4a31: 1
+      Retsat: 1
+      Ugt1a10: 1
+      Ugt1a2: 1
+      Ugt1a7c: 1
+      Bco2: 1
+    minimum_present: null
+
+  circadian_clock_core_15:
+    description: "Core circadian-clock panel for the LAR reversal analysis."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/networks/lar_reversal.py
+          symbol: CORE_CLOCK_GENES
+          key: null
+          lines: "45-48"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Arntl: 1
+      Clock: 1
+      Npas2: 1
+      Per1: 1
+      Per2: 1
+      Per3: 1
+      Cry1: 1
+      Cry2: 1
+      Nr1d1: 1
+      Nr1d2: 1
+      Rora: 1
+      Rorc: 1
+      Dbp: 1
+      Tef: 1
+      Hlf: 1
+    minimum_present: null
+
+  circadian_per_cry_5:
+    description: "PER/CRY repressor-arm subset of the circadian clock panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/networks/lar_reversal.py
+          symbol: PER_CRY_GENES
+          key: null
+          lines: "50"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Per1: 1
+      Per2: 1
+      Per3: 1
+      Cry1: 1
+      Cry2: 1
+    minimum_present: null
+
+  circadian_bmal_clock_3:
+    description: "BMAL/CLOCK activator-arm subset of the circadian clock panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/networks/lar_reversal.py
+          symbol: BMAL_CLOCK_GENES
+          key: null
+          lines: "51"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Arntl: 1
+      Clock: 1
+      Npas2: 1
+    minimum_present: null
+
+  s1p_axis_13:
+    description: "Sphingosine-1-phosphate axis panel for the LAR reversal analysis."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/networks/lar_reversal.py
+          symbol: S1P_AXIS_GENES
+          key: null
+          lines: "60-63"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Sphk1: 1
+      Sphk2: 1
+      Sgpl1: 1
+      Sgpp1: 1
+      Sgpp2: 1
+      S1pr1: 1
+      S1pr2: 1
+      S1pr3: 1
+      S1pr4: 1
+      S1pr5: 1
+      Spns2: 1
+      Lpar1: 1
+      Lpar2: 1
+    minimum_present: null
+
+  lar_single_gene_features_5:
+    description: "Single-gene features tracked individually by the LAR reversal dashboard."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/networks/lar_reversal.py
+          symbol: SINGLE_GENE_FEATURES
+          key: null
+          lines: "80"
+        - file: scripts/plot_lar_reversal_dashboard.py
+          symbol: symbol loop
+          key: null
+          lines: "84"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Rbm3: 1
+      Per2: 1
+      S1pr3: 1
+      Slc12a3: 1
+      Wnk4: 1
+    minimum_present: null

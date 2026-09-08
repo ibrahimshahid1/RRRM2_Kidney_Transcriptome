@@ -1,16 +1,5 @@
 # scripts/run_phase2_pipeline.py
-"""
-Phase 2 Unified Pipeline: Cell-Standardized Shared Skeleton Construction
-
-Runs all Phase 2 steps in sequence:
-  1. Build skeleton E (cell-standardized partial correlation)
-  2. Compute raw/rank-normalized LIONESS weights on E
-  3. Edge-wise regression + predicted networks (requires rpy2/limma)
-
-Usage:
-    python scripts/run_phase2_pipeline.py
-    python scripts/run_phase2_pipeline.py --max_genes 2500 --topk 80 --skip_regression
-"""
+"""Run Phase 2: cell-standardized skeleton, LIONESS edge weights, and edge-wise regression."""
 from __future__ import annotations
 
 import argparse

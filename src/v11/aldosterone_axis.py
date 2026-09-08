@@ -33,14 +33,7 @@ def panel_signs(panel: pd.DataFrame) -> pd.Series:
 
 
 def score_axis_in_cohort(gene_stats: pd.Series, signs: pd.Series) -> dict:
-    """Direction-corrected mean of a directional panel within one cohort.
-
-    ``gene_stats``: Series gene -> flight-effect statistic (z-like).
-    ``signs``: Series gene -> {+1, -1, 0}; only nonzero-sign genes contribute.
-    Returns the signed axis effect (positive = aldosterone program up), the
-    unsigned mean for transparency, a within-panel Wilcoxon p vs 0, and the
-    list of contributing genes.
-    """
+    """Direction-corrected mean of a signed panel in one cohort, with a Wilcoxon p vs 0."""
     directional = signs[signs != 0.0]
     present = [g for g in directional.index if g in gene_stats.index and np.isfinite(gene_stats.get(g, np.nan))]
     if not present:
@@ -69,14 +62,7 @@ def competitive_permutation(
     gene_stats: pd.Series, present_genes: list[str], present_signs: np.ndarray,
     n_perm: int = N_PERM, seed: int = PERM_SEED,
 ) -> dict:
-    """Gene-label permutation null for the direction-corrected panel mean.
-
-    Draws ``n_perm`` random gene sets of the same size from the cohort's gene
-    universe, assigns them the observed panel sign vector, and recomputes the
-    direction-corrected mean. Returns a two-sided competitive p and a one-sided
-    *suppression* p (observed <= null), the relevant tail for the manuscript's
-    distal-nephron suppression prediction.
-    """
+    """Gene-label permutation null for the panel mean; two-sided and one-sided suppression p."""
     universe = gene_stats.dropna().astype(float)
     k = len(present_genes)
     if k == 0 or len(universe) <= k:
@@ -97,12 +83,7 @@ def competitive_permutation(
 
 
 def meta_axis(per_cohort: dict[str, float], threshold: float = RECURRENCE_THRESHOLD) -> dict:
-    """Pool per-cohort axis effects into a cross-cohort verdict.
-
-    Reuses ``signed_stouffer_z`` for a combined Z/p and ``recurrence_class`` for
-    the up/down/mixed label, and adds a directional sign-test (how many cohorts
-    are negative, i.e. consistent with predicted suppression).
-    """
+    """Pool per-cohort axis effects into a Stouffer Z, recurrence class, and sign test."""
     items = {k: float(v) for k, v in per_cohort.items() if np.isfinite(v)}
     n = len(items)
     if n == 0:

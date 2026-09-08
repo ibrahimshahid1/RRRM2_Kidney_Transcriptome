@@ -1,22 +1,5 @@
 # src/validation/cross_validation.py
-"""
-Phase 8: Leakage-Safe Predictive Validation
-
-Implements the validation framework described in Section 5 of the methodology:
-  - Stratified K-fold CV (FLT vs GC, stratified within Age×Arm)
-  - Fold-wise: residualization fit on train only, skeleton E built on train only,
-    LIONESS computed for train and test relative to training pool
-  - Sample-level features extracted via src.validation.sample_features
-  - Classification with LogisticRegression (L2) and RandomForest
-  - Reports per-fold accuracy, AUC, and confusion matrix
-
-Usage:
-    python -m src.validation.cross_validation \\
-        --phase2_dir data/results/<run>/networks \\
-        --meta data/results/<run>/phase1_residuals/meta_phase1.tsv.gz \\
-        --rtech data/results/<run>/phase1_residuals/Rtech.tsv.gz \\
-        --outdir data/results/<run>/phase8_validation
-"""
+"""Phase 8 leakage-safe CV: residualization, skeleton E and LIONESS are rebuilt inside each fold."""
 from __future__ import annotations
 
 import argparse
@@ -45,12 +28,7 @@ def build_skeleton_on_fold(
     genes: list[str],
     topk: int = DEFAULT_TOPK,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Build skeleton E using only training-fold data.
-
-    Performs cell-standardization within Age×Arm×EnvGroup cells (training only),
-    then computes Ledoit-Wolf shrinkage covariance, inverts, and keeps top-k
-    neighbors per gene.  Returns edge_i, edge_j arrays.
-    """
+    """Build skeleton E from training-fold data only, by Ledoit-Wolf shrinkage and top-k."""
     from sklearn.covariance import LedoitWolf
 
     X = rtech_train.copy()  # genes × train_samples
@@ -103,17 +81,7 @@ def lioness_on_fold(
     edge_i: np.ndarray,
     edge_j: np.ndarray,
 ) -> np.ndarray:
-    """Compute raw LIONESS correlation contributions for samples in sample_mask.
-
-    The pooled network is computed from ALL samples indicated by sample_mask
-    (the training set).  For each sample s, the leave-one-out network is
-    computed by dropping s from the pool.
-
-    For test samples, we compute their LIONESS relative to the training pool
-    (the test sample influences only its own network, not the pool).
-
-    Returns raw LIONESS contributions of shape (len(sample_mask), n_edges).
-    """
+    """Raw LIONESS contributions relative to the training pool; test samples never join it."""
     idx_pool = np.where(sample_mask)[0]
     weights, _ = compute_lioness_weights(rtech[:, idx_pool], edge_i, edge_j, transform="raw")
     return weights

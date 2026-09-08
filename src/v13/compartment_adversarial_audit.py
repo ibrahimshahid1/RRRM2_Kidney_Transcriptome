@@ -1,16 +1,4 @@
-"""Post-hoc adversarial closure audit for OSD-462 kidney compartments.
-
-This module deliberately separates reference-only set construction from
-effect-aware post-processing.  ``prepare`` may be run before the exact label
-permutation because it reads only the external kidney atlas and the frozen
-KEGG structural-control source.  ``postprocess`` consumes the emitted exact
-run and writes the artifact, contributor, observability, Grey60, clinical-axis,
-and decision summaries.
-
-The output object is parent-protein annotation enrichment in whole kidney.
-Nothing here identifies a phosphosite's cell of origin or repairs the perfect
-condition-to-reporter-block alias in OSD-462.
-"""
+"""Post-hoc OSD-462 compartment audit of parent-protein annotation enrichment; no cell of origin."""
 
 from __future__ import annotations
 

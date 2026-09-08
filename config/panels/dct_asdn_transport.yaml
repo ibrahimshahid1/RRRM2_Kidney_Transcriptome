@@ -1,0 +1,1428 @@
+# Versioned gene-panel registry — dct_asdn_transport
+#
+# Distal convoluted tubule, DCT2/CNT, and aldosterone-sensitive distal
+# nephron transport panels, including the NCC/WNK-SPAK anchor sets.
+#
+# Extracted 2026-08-28 by an inventory pass over src/**, scripts/**, tests/**.
+# Membership and ordering are reproduced EXACTLY as they appear in the source
+# literal. Nothing was added, dropped, corrected, or reordered.
+#
+# provenance.frozen: true marks a panel that belongs to a locked analysis
+# (config/clinical_renal_axes_cross_mission.yaml,
+#  config/dct_asdn_phospho_reanalysis.yaml,
+#  config/dct_subtype_reference_freeze_v1.yaml).  Those entries must never be
+# edited; see docs/GENE_PANEL_INVENTORY.md section 4.
+#
+# See docs/GENE_PANEL_INVENTORY.md for the duplication/drift analysis.
+
+schema_version: 1
+panels:
+  dct_identity_markers_6:
+    description: "DCT identity (vs transport) marker panel used by the celltype decomposition memo split."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/multiomics/celltype_panels.py
+          symbol: KIDNEY_PANELS
+          key: dct_identity
+          lines: "12"
+      literature:
+        - "Chen et al. 2021 (GSE150338) — src/multiomics/celltype_panels.py:9"
+      frozen: false
+      in_test: false
+    genes:
+      Pvalb: 1
+      Trpm6: 1
+      Calb1: 1
+      Egf: 1
+      Tmem52b: 1
+      Klhl3: 1
+    minimum_present: null
+
+  dct_transport_program_9:
+    description: "DCT transport-program panel used by the celltype decomposition memo split."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/multiomics/celltype_panels.py
+          symbol: KIDNEY_PANELS
+          key: dct_transport
+          lines: "13-14"
+      literature:
+        - "Chen et al. 2021 (GSE150338) — src/multiomics/celltype_panels.py:9"
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Wnk1: 1
+      Wnk4: 1
+      Stk39: 1
+      Oxsr1: 1
+      Sgk1: 1
+      Nedd4l: 1
+      Kcnj10: 1
+      Kcnj16: 1
+    minimum_present: null
+
+  dct_ncc_wnk_core_12:
+    description: "Twelve-gene DCT/NCC-WNK expression panel. Identical membership and ordering in four independent source locations."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/networks/lar_reversal.py
+          symbol: DCT_WNK_GENES
+          key: null
+          lines: "53-56"
+        - file: scripts/regulator_activity/run_phenotype_anchor.py
+          symbol: DCT_GENES
+          key: null
+          lines: "38-39"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Wnk1: 1
+      Wnk4: 1
+      Stk39: 1
+      Oxsr1: 1
+      Klhl3: 1
+      Cul3: 1
+      Calb1: 1
+      Kcnj10: 1
+      Kcnj16: 1
+      Sgk1: 1
+      Nedd4l: 1
+    minimum_present: null
+
+  dct_ncc_wnk_core_12_reordered:
+    description: "Same twelve DCT/NCC-WNK genes as dct_ncc_wnk_core_12 but with Nedd4l and Sgk1 transposed in the source literal."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/networks/tubulointerstitial_state.py
+          symbol: TARGET_GENE_PANELS
+          key: DCT_NCC_WNK_transport
+          lines: "36-39"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Wnk1: 1
+      Wnk4: 1
+      Stk39: 1
+      Oxsr1: 1
+      Klhl3: 1
+      Cul3: 1
+      Calb1: 1
+      Kcnj10: 1
+      Kcnj16: 1
+      Nedd4l: 1
+      Sgk1: 1
+    minimum_present: null
+
+  ncc_spak_anchor_5:
+    description: "Five-gene NCC/WNK-SPAK canonical anchor set."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/core_analysis.py
+          symbol: ANCHOR_GENES
+          key: null
+          lines: "33"
+        - file: scripts/v11/02_run_v11_core_analysis.py
+          symbol: ANCHOR_GENES
+          key: null
+          lines: "28"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Stk39: 1
+      Oxsr1: 1
+      Wnk1: 1
+      Wnk4: 1
+    minimum_present: null
+
+  dct_transport_targets_14:
+    description: "Fourteen-gene DCT transport target list for the v11 core analysis."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/core_analysis.py
+          symbol: TRANSPORT_TARGETS
+          key: null
+          lines: "34-49"
+        - file: scripts/v11/02_run_v11_core_analysis.py
+          symbol: TRANSPORT_TARGETS
+          key: null
+          lines: "29-44"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Stk39: 1
+      Oxsr1: 1
+      Wnk1: 1
+      Wnk4: 1
+      Klhl3: 1
+      Cul3: 1
+      Nedd4l: 1
+      Sgk1: 1
+      Kcnj10: 1
+      Kcnj16: 1
+      Trpm6: 1
+      Pvalb: 1
+      Calb1: 1
+    minimum_present: null
+
+  dct_phospho_target_genes_14_klhl3:
+    description: "Fourteen-gene DCT phospho target list (occupancy-normalized H2 module)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/h2_occupancy_normalized_phospho.py
+          symbol: TARGET_GENES
+          key: null
+          lines: "19-34"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Stk39: 1
+      Oxsr1: 1
+      Wnk1: 1
+      Wnk4: 1
+      Klhl3: 1
+      Cul3: 1
+      Kcnj10: 1
+      Kcnj16: 1
+      Clcnkb: 1
+      Bsnd: 1
+      Ppp1ca: 1
+      Ppp1r1a: 1
+      Calb1: 1
+    minimum_present: null
+
+  dct_perturbation_target_genes_14:
+    description: "Fourteen-gene DCT target list for the GSE228367 low-K perturbation check (same members as dct_phospho_target_genes_14_klhl3, different ordering)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/perturbation_gse228367_lowk.py
+          symbol: TARGET_GENES
+          key: null
+          lines: "30-45"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Stk39: 1
+      Oxsr1: 1
+      Wnk1: 1
+      Wnk4: 1
+      Kcnj10: 1
+      Kcnj16: 1
+      Clcnkb: 1
+      Bsnd: 1
+      Klhl3: 1
+      Cul3: 1
+      Ppp1ca: 1
+      Ppp1r1a: 1
+      Calb1: 1
+    minimum_present: null
+
+  dct_transport_spatial_check_10:
+    description: "Ten-gene DCT transport panel for the spatial transport check."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/spatial_dct_transport_check.py
+          symbol: DCT_TRANSPORT_GENES
+          key: null
+          lines: "25"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Stk39: 1
+      Wnk1: 1
+      Wnk4: 1
+      Oxsr1: 1
+      Kcnj10: 1
+      Kcnj16: 1
+      Clcnkb: 1
+      Bsnd: 1
+      Calb1: 1
+    minimum_present: null
+
+  dct_enriched_niche_6:
+    description: "DCT-enriched niche marker set for spatial-reference projection."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/spatial_reference_projection.py
+          symbol: NICHE_MARKERS
+          key: dct_enriched
+          lines: "48"
+        - file: scripts/v11/04_spatial_reference_projection.py
+          symbol: NICHE_MARKERS
+          key: dct_enriched
+          lines: "48"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Pvalb: 1
+      Trpm6: 1
+      Wnk4: 1
+      Stk39: 1
+      Klhl3: 1
+    minimum_present: null
+
+  dct_asdn_transport_audit_16:
+    description: "Combined DCT/ASDN transport panel used by the v13 clinical-axis adversarial audit."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v13/compartment_adversarial_audit.py
+          symbol: CLINICAL_AXIS_PANELS
+          key: DCT_ASDN_transport
+          lines: "70-74"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Wnk1: 1
+      Wnk4: 1
+      Stk39: 1
+      Oxsr1: 1
+      Nedd4l: 1
+      Sgk1: 1
+      Nr3c2: 1
+      Hsd11b2: 1
+      Scnn1a: 1
+      Scnn1b: 1
+      Scnn1g: 1
+      Aqp2: 1
+      Trpv5: 1
+      Calb1: 1
+      Slc8a1: 1
+    minimum_present: null
+
+  dct_identity_frozen:
+    description: "FROZEN distal-transport identity subdomain of the cross-mission clinical renal axes lock (negative = loss of identity)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/clinical_renal_axes_cross_mission.yaml
+          symbol: primary_family.distal_transport_identity_loss.subdomains
+          key: dct_identity
+          lines: "87-95"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Slc12a3: -1
+      Pvalb: -1
+      Trpm6: -1
+      Kcnj10: -1
+      Kcnj16: -1
+      Clcnkb: -1
+    minimum_present: 5
+
+  asdn_identity_frozen:
+    description: "FROZEN aldosterone-sensitive distal nephron identity subdomain of the cross-mission clinical renal axes lock (negative = loss of identity)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/clinical_renal_axes_cross_mission.yaml
+          symbol: primary_family.distal_transport_identity_loss.subdomains
+          key: asdn_identity
+          lines: "96-105"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Hsd11b2: -1
+      Nr3c2: -1
+      Sgk1: -1
+      Nedd4l: -1
+      Scnn1a: -1
+      Scnn1b: -1
+      Scnn1g: -1
+    minimum_present: 6
+
+  asdn_gene_set_frozen_29:
+    description: "FROZEN 29-gene ASDN literature set for the OSD-462 DCT/ASDN phosphoproteomic reanalysis."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_asdn_phospho_reanalysis.yaml
+          symbol: asdn_gene_set
+          key: genes
+          lines: "100-129"
+      literature:
+        - "source_status: literature_frozen_before_new_permutation_results"
+      frozen: true
+      in_test: false
+    genes:
+      Nr3c2: 1
+      Hsd11b2: 1
+      Sgk1: 1
+      Nedd4l: 1
+      Scnn1a: 1
+      Scnn1b: 1
+      Scnn1g: 1
+      Wnk1: 1
+      Wnk4: 1
+      Klhl3: 1
+      Cul3: 1
+      Stk39: 1
+      Oxsr1: 1
+      Slc12a3: 1
+      Kcnj1: 1
+      Kcnj10: 1
+      Kcnj16: 1
+      Kcnq1: 1
+      Kcne1: 1
+      Clcnkb: 1
+      Bsnd: 1
+      Trpv5: 1
+      Calb1: 1
+      S100g: 1
+      Slc8a1: 1
+      Atp2b1: 1
+      Pth1r: 1
+      Vdr: 1
+      Fxyd4: 1
+    minimum_present: null
+
+  asdn_mineralocorticoid_sensing_frozen:
+    description: "FROZEN ASDN mineralocorticoid-sensing curated subset."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.curated_sets.ASDN
+          key: mineralocorticoid_sensing
+          lines: "272-276"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Nr3c2: 1
+      Hsd11b2: 1
+      Sgk1: 1
+      Nedd4l: 1
+    minimum_present: null
+
+  asdn_enac_frozen:
+    description: "FROZEN ENaC subunit curated subset."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.curated_sets.ASDN
+          key: ENaC
+          lines: "277-280"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Scnn1a: 1
+      Scnn1b: 1
+      Scnn1g: 1
+    minimum_present: null
+
+  asdn_wnk_ncc_regulation_frozen:
+    description: "FROZEN WNK-NCC regulation curated subset."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.curated_sets.ASDN
+          key: WNK_NCC_regulation
+          lines: "281-288"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Wnk1: 1
+      Wnk4: 1
+      Klhl3: 1
+      Cul3: 1
+      Stk39: 1
+      Oxsr1: 1
+      Slc12a3: 1
+    minimum_present: null
+
+  asdn_potassium_chloride_transport_frozen:
+    description: "FROZEN potassium/chloride transport curated subset."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.curated_sets.ASDN
+          key: potassium_chloride_transport
+          lines: "289-296"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Kcnj1: 1
+      Kcnj10: 1
+      Kcnj16: 1
+      Kcnq1: 1
+      Kcne1: 1
+      Clcnkb: 1
+      Bsnd: 1
+    minimum_present: null
+
+  asdn_late_distal_calcium_frozen:
+    description: "FROZEN late-distal calcium-handling curated subset."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.curated_sets.ASDN
+          key: late_distal_calcium
+          lines: "297-304"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Trpv5: 1
+      Calb1: 1
+      S100g: 1
+      Slc8a1: 1
+      Atp2b1: 1
+      Pth1r: 1
+      Vdr: 1
+    minimum_present: null
+
+  asdn_aldosterone_responsive_transport_frozen:
+    description: "FROZEN single-gene aldosterone-responsive transport curated subset."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.curated_sets.ASDN
+          key: aldosterone_responsive_transport
+          lines: "305-306"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Fxyd4: 1
+    minimum_present: null
+
+  dct1_qc_marker_frozen_5:
+    description: "FROZEN DCT1 QC marker panel from the DCT subtype reference freeze."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.qc_marker_panels
+          key: DCT1
+          lines: "250-255"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Pvalb: 1
+      Trpm6: 1
+      Kcnj10: 1
+      Kcnj16: 1
+    minimum_present: null
+
+  dct2_cnt_qc_marker_frozen_7:
+    description: "FROZEN DCT2/CNT QC marker panel from the DCT subtype reference freeze."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.qc_marker_panels
+          key: DCT2_CNT
+          lines: "256-263"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Trpv5: 1
+      Calb1: 1
+      S100g: 1
+      Scnn1b: 1
+      Scnn1g: 1
+      Hsd11b2: 1
+    minimum_present: null
+
+  asdn_qc_marker_frozen_4:
+    description: "FROZEN ASDN QC marker panel from the DCT subtype reference freeze."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.qc_marker_panels
+          key: ASDN
+          lines: "264-268"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Nr3c2: 1
+      Sgk1: 1
+      Nedd4l: 1
+      Scnn1a: 1
+    minimum_present: null
+
+  dct1_comparator_frozen_6:
+    description: "FROZEN DCT1 comparator set from the DCT subtype reference freeze."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.major_kidney_comparator_sets
+          key: DCT1
+          lines: "323-329"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Pvalb: 1
+      Trpm6: 1
+      Kcnj10: 1
+      Kcnj16: 1
+      Fxyd2: 1
+    minimum_present: null
+
+  dct2_cnt_transition_comparator_frozen_9:
+    description: "FROZEN DCT2/CNT transition curated-context comparator set."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_subtype_reference_freeze_v1.yaml
+          symbol: reference_builder.major_kidney_comparator_sets
+          key: DCT2_CNT_transition_curated_context
+          lines: "330-339"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Trpv5: 1
+      Calb1: 1
+      S100g: 1
+      Slc8a1: 1
+      Atp2b1: 1
+      Scnn1b: 1
+      Scnn1g: 1
+      Hsd11b2: 1
+    minimum_present: null
+
+  ncc_canonical_exclusion_primary_4:
+    description: "FROZEN primary canonical-anchor exclusion set for the phospho set tests."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_asdn_phospho_reanalysis.yaml
+          symbol: canonical_exclusions
+          key: primary
+          lines: "85-89"
+        - file: scripts/v13/intensity_confound_audit.py
+          symbol: PRIMARY_CANONICAL_EXCLUSION
+          key: null
+          lines: "53"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Stk39: 1
+      Oxsr1: 1
+      Wnk4: 1
+    minimum_present: null
+
+  ncc_canonical_exclusion_strict_5:
+    description: "FROZEN strict canonical-anchor exclusion set (primary plus Wnk1)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: config/dct_asdn_phospho_reanalysis.yaml
+          symbol: canonical_exclusions
+          key: strict
+          lines: "90-95"
+      literature: []
+      frozen: true
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Stk39: 1
+      Oxsr1: 1
+      Wnk4: 1
+      Wnk1: 1
+    minimum_present: null
+
+  dct_phospho_axis_10:
+    description: "Ten-gene DCT phospho axis for the OSD-462 Stage-2 phospho analysis."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/osd462/02_phospho_axis.py
+          symbol: AXIS_GENES
+          key: null
+          lines: "24-25"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Stk39: 1
+      Oxsr1: 1
+      Wnk1: 1
+      Wnk4: 1
+      Klhl3: 1
+      Cul3: 1
+      Nedd4l: 1
+      Sgk1: 1
+      Calb1: 1
+    minimum_present: null
+
+  ncc_spak_osr1_gate_3:
+    description: "NCC + SPAK + OSR1 gate/focus genes."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/osd462/02_phospho_axis.py
+          symbol: GATE_GENES
+          key: null
+          lines: "27"
+        - file: scripts/osd462/05_plot_dashboard.py
+          symbol: show
+          key: null
+          lines: "110"
+        - file: scripts/osd462/07_build_compendium.py
+          symbol: foc
+          key: null
+          lines: "128"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Stk39: 1
+      Oxsr1: 1
+    minimum_present: null
+
+  dct_protein_abundance_panel_10:
+    description: "DCT/NCC/WNK protein-abundance bar panel for the OSD-462 dashboard."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/osd462/05_plot_dashboard.py
+          symbol: dct_genes
+          key: null
+          lines: "94-95"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Wnk1: 1
+      Wnk4: 1
+      Stk39: 1
+      Oxsr1: 1
+      Calb1: 1
+      Nedd4l: 1
+      Cul3: 1
+      Kcnj10: 1
+      Kcnj16: 1
+    minimum_present: null
+
+  dct_detection_compendium_12:
+    description: "DCT transport plus matrix genes shown in the compendium detection table."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/osd462/07_build_compendium.py
+          symbol: det_genes
+          key: null
+          lines: "168-169"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Wnk1: 1
+      Wnk4: 1
+      Stk39: 1
+      Oxsr1: 1
+      Calb1: 1
+      Nedd4l: 1
+      Cul3: 1
+      Fn1: 1
+      Col1a1: 1
+      Col3a1: 1
+      Fbn1: 1
+    minimum_present: null
+
+  klhl3_cul3_coverage_9:
+    description: "Nine-gene KLHL3/CUL3 site-coverage check list."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/core_analysis.py
+          symbol: run_klhl3_check.genes
+          key: null
+          lines: "1718"
+        - file: scripts/v11/02_run_v11_core_analysis.py
+          symbol: run_klhl3_check.genes
+          key: null
+          lines: "652"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Klhl3: 1
+      Cul3: 1
+      Wnk1: 1
+      Wnk4: 1
+      Stk39: 1
+      Oxsr1: 1
+      Slc12a3: 1
+      Nedd4l: 1
+      Sgk1: 1
+    minimum_present: null
+
+  dct_prior_anchor_positions_10:
+    description: "Anchor genes for the GSE228367 DCT-prior position report; built inline as ANCHOR_GENES union a five-gene literal (recorded here sorted, as the source sorts it)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/core_analysis.py
+          symbol: anchor_genes (inline literal)
+          key: null
+          lines: "812"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Calb1: 1
+      Klhl3: 1
+      Oxsr1: 1
+      Pvalb: 1
+      Slc12a3: 1
+      Stk39: 1
+      Trpm6: 1
+      Trpv5: 1
+      Wnk1: 1
+      Wnk4: 1
+    minimum_present: null
+
+  gse228367_dct_marker_qc_16:
+    description: "Sixteen-gene marker QC list for the GSE228367 DCT prior builder."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/v11/build_gse228367_dct_prior.R
+          symbol: markers
+          key: null
+          lines: "135-139"
+        - file: scripts/v11/01_build_gse228367_dct_prior.R
+          symbol: markers
+          key: null
+          lines: "135-139"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Pvalb: 1
+      Trpm6: 1
+      Klhl3: 1
+      Scnn1a: 1
+      Trpv5: 1
+      Calb1: 1
+      Wnk1: 1
+      Wnk4: 1
+      Stk39: 1
+      Oxsr1: 1
+      Cul3: 1
+      Nedd4l: 1
+      Sgk1: 1
+      Kcnj10: 1
+      Kcnj16: 1
+    minimum_present: null
+
+  dct_universe_check_14:
+    description: "DCT/NCC-WNK genes checked against the Phase-2 network universe."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/check_dct_universe.py
+          symbol: dct
+          key: null
+          lines: "11-12"
+        - file: scripts/map_top_hits.py
+          symbol: dct_symbols
+          key: null
+          lines: "66-69"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Wnk1: 1
+      Wnk4: 1
+      Stk39: 1
+      Oxsr1: 1
+      Slc12a3: 1
+      Kcnj10: 1
+      Kcnj16: 1
+      Scnn1a: 1
+      Scnn1b: 1
+      Scnn1g: 1
+      Nedd4l: 1
+      Sgk1: 1
+      Klhl3: 1
+      Cul3: 1
+    minimum_present: null
+
+  dct_extra_calcium_markers_7:
+    description: "Extra DCT/calcium markers appended to the id-map lookup task."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/map_top_hits.py
+          symbol: extra_dct
+          key: null
+          lines: "71"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Trpm6: 1
+      Calb1: 1
+      Pvalb: 1
+      Trpv5: 1
+      Slc8a1: 1
+      Atp2b1: 1
+      Atp2b4: 1
+    minimum_present: null
+
+  aldosterone_enac_6:
+    description: "Aldosterone/ENaC expression panel for the LAR reversal analysis."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/networks/lar_reversal.py
+          symbol: ALDOSTERONE_ENAC_GENES
+          key: null
+          lines: "58"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Scnn1a: 1
+      Scnn1b: 1
+      Scnn1g: 1
+      Nr3c2: 1
+      Hsd11b2: 1
+      Sgk1: 1
+    minimum_present: null
+
+  dct_canonical_r_dct1_14:
+    description: "Canonical DCT1 marker vector in the hybrid-reference R deconvolution pipeline (repeated verbatim as dct1_markers at line 1752)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution.R
+          symbol: canon_dct1
+          key: null
+          lines: "558-559"
+        - file: src/preprocessing/deconvolution.R
+          symbol: dct1_markers
+          key: null
+          lines: "1752-1753"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Pvalb: 1
+      Wnk4: 1
+      Trpv5: 1
+      Kl: 1
+      Wnk1: 1
+      Clcnkb: 1
+      Egf: 1
+      Fxyd2: 1
+      Calb1: 1
+      Slc8a1: 1
+      Trpm6: 1
+      Pth1r: 1
+      Cldn8: 1
+    minimum_present: null
+
+  dct_canonical_r_dct_merged_15:
+    description: "Union DCT marker vector (canon_dct1 plus S100g) used after the DCT1+DCT2 merge validation."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution.R
+          symbol: dct_markers
+          key: null
+          lines: "1737-1739"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Pvalb: 1
+      Wnk4: 1
+      Trpv5: 1
+      Kl: 1
+      Wnk1: 1
+      Clcnkb: 1
+      Egf: 1
+      Fxyd2: 1
+      Calb1: 1
+      Slc8a1: 1
+      Trpm6: 1
+      Pth1r: 1
+      Cldn8: 1
+      S100g: 1
+    minimum_present: null
+
+  dct_canonical_r_dct2_10:
+    description: "Canonical DCT2 marker vector in the hybrid-reference R deconvolution pipeline (repeated verbatim as dct2_markers at line 1766)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution.R
+          symbol: canon_dct2
+          key: null
+          lines: "566-567"
+        - file: src/preprocessing/deconvolution.R
+          symbol: dct2_markers
+          key: null
+          lines: "1766-1767"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Calb1: 1
+      Trpm6: 1
+      Slc8a1: 1
+      S100g: 1
+      Trpv5: 1
+      Slc12a3: 1
+      Fxyd2: 1
+      Aqp2: 1
+      Scnn1b: 1
+      Scnn1g: 1
+    minimum_present: null
+
+  cnt_canonical_r_10:
+    description: "Canonical connecting-tubule marker vector in the hybrid-reference R deconvolution pipeline (repeated verbatim as cnt_markers at line 1780)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution.R
+          symbol: canon_cnt
+          key: null
+          lines: "574-575"
+        - file: src/preprocessing/deconvolution.R
+          symbol: cnt_markers
+          key: null
+          lines: "1780-1781"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Calb1: 1
+      Scnn1g: 1
+      Scnn1b: 1
+      Aqp2: 1
+      Slc8a1: 1
+      Trpv5: 1
+      S100g: 1
+      Fxyd4: 1
+      Hsd11b2: 1
+      Avpr2: 1
+    minimum_present: null
+
+  dct_early_canonical_r_4:
+    description: "Canonical DCT_early marker vector in the legacy TMS-only R pipeline."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/run_deconvolution.R
+          symbol: canon_dct_early
+          key: null
+          lines: "522"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Wnk4: 1
+      Trpv5: 1
+      Kl: 1
+    minimum_present: null
+
+  dct_early_validation_r_3:
+    description: "DCT_early validation marker vector in the legacy TMS-only R pipeline."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/run_deconvolution.R
+          symbol: early_markers
+          key: null
+          lines: "1546"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Wnk4: 1
+      Trpv5: 1
+    minimum_present: null
+
+  dct_late_canonical_r_2:
+    description: "Canonical DCT_late marker vector in the legacy TMS-only R pipeline (repeated verbatim as late_markers at line 1557)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/run_deconvolution.R
+          symbol: canon_dct_late
+          key: null
+          lines: "528"
+        - file: scripts/run_deconvolution.R
+          symbol: late_markers
+          key: null
+          lines: "1557"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Pvalb: 1
+      Calb1: 1
+    minimum_present: null
+
+  dct_pseudobulk_r_6:
+    description: "Merged DCT marker vector in the pseudobulk recovery test."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/run_pseudobulk_test.R
+          symbol: mk_dct_final
+          key: null
+          lines: "326"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Pvalb: 1
+      Calb1: 1
+      Trpv5: 1
+      Kl: 1
+      Wnk4: 1
+    minimum_present: null
+
+  dct_deconvolution_3:
+    description: "Three-gene DCT marker set for the deconvolution sanity check."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/preprocessing/deconvolution_sanity.py
+          symbol: MARKERS
+          key: DCT
+          lines: "17"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Pvalb: 1
+      Calb1: 1
+    minimum_present: null
+
+  dct1_sanity_2:
+    description: "DCT1 panel from the R sanity marker panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/sanity_marker_panel.R
+          symbol: panel
+          key: DCT1
+          lines: "20"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Pvalb: 1
+    minimum_present: null
+
+  dct2_cnt_sanity_4:
+    description: "DCT2/CNT panel from the R sanity marker panel."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/sanity_marker_panel.R
+          symbol: panel
+          key: DCT2CNT
+          lines: "21"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Calb1: 1
+      Trpv5: 1
+      Slc8a1: 1
+      Klk1: 1
+    minimum_present: null
+
+  dct_signature_5:
+    description: "DCT signature used for single-cell scoring sanity checks."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/sample.py
+          symbol: sig
+          key: DCT
+          lines: "27"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Pvalb: 1
+      Calb1: 1
+      Trpv5: 1
+      Fxyd2: 1
+    minimum_present: null
+
+  dct1_debug_phase0_4:
+    description: "DCT1 symbols used by the Phase-0 deconvolution debug script."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/debug_deconvolution_phase0.py
+          symbol: dct1_syms
+          key: null
+          lines: "151"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Wnk1: 1
+      Wnk4: 1
+      Hsd11b2: 1
+    minimum_present: null
+
+  dct2_debug_phase0_2:
+    description: "DCT2 symbols used by the Phase-0 deconvolution debug script."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/debug_deconvolution_phase0.py
+          symbol: dct2_syms
+          key: null
+          lines: "152"
+        - file: scripts/analyze_dct_variance.py
+          symbol: MARKERS
+          key: DCT2/CNT
+          lines: "17"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Pvalb: 1
+      Calb1: 1
+    minimum_present: null
+
+  ncc_single_gene_variance_1:
+    description: "Single-gene NCC marker in the DCT variance diagnostic."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/analyze_dct_variance.py
+          symbol: MARKERS
+          key: DCT1 (NCC)
+          lines: "16"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+    minimum_present: null
+
+  principal_cell_variance_1:
+    description: "Single-gene principal-cell marker in the DCT variance diagnostic."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/analyze_dct_variance.py
+          symbol: MARKERS
+          key: Principal (PC)
+          lines: "18"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Aqp2: 1
+    minimum_present: null
+
+  distal_nephron_ncc_wnk_hitlist_10:
+    description: "Annotated distal-nephron / NCC-WNK Ensembl->symbol hit list. Symbols in the source are decorated (e.g. 'Slc12a3 (NCC)'); recorded here as bare MGI symbols."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/pathway_presence.py
+          symbol: pathway_genes
+          key: null
+          lines: "8-19"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Wnk4: 1
+      Wnk1: 1
+      Sgk1: 1
+      Tsc22d3: 1
+      Stk39: 1
+      Oxsr1: 1
+      Klhl3: 1
+      Fbxo7: 1
+      Per1: 1
+    minimum_present: null
+
+  ncc_transport_down_classifier_16:
+    description: "Spaceflight-classifier transport component, declared DOWN in flight; all weights are -1."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/spaceflight_kidney_classifier.py
+          symbol: TRANSPORT_DOWN
+          key: null
+          lines: "48-49"
+        - file: scripts/sf_classifier_negctrl_figure.py
+          symbol: TRANSPORT
+          key: null
+          lines: "26"
+        - file: scripts/sf_classifier_component_decomp.py
+          symbol: TRANSPORT
+          key: null
+          lines: "24"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: -1
+      Stk39: -1
+      Oxsr1: -1
+      Wnk1: -1
+      Wnk4: -1
+      Wnk3: -1
+      Kcnj10: -1
+      Kcnj16: -1
+      Clcnkb: -1
+      Bsnd: -1
+      Klhl3: -1
+      Cul3: -1
+      Calb1: -1
+      Trpm6: -1
+      Pvalb: -1
+      Ppp1r1a: -1
+    minimum_present: null
+
+  dct2_aldosterone_down_classifier_12:
+    description: "Spaceflight-classifier DCT2/aldosterone component, declared DOWN in flight; all weights are -1."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/spaceflight_kidney_classifier.py
+          symbol: DCT2_ALDO_DOWN
+          key: null
+          lines: "50-51"
+        - file: scripts/sf_classifier_negctrl_figure.py
+          symbol: DCT2
+          key: null
+          lines: "27"
+        - file: scripts/sf_classifier_component_decomp.py
+          symbol: DCT2
+          key: null
+          lines: "26"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Trpv5: -1
+      Calb1: -1
+      Scnn1a: -1
+      Scnn1b: -1
+      Scnn1g: -1
+      Sgk1: -1
+      Nr3c2: -1
+      Hsd11b2: -1
+      Klf15: -1
+      Fxyd2: -1
+      Tsc22d3: -1
+      Per1: -1
+    minimum_present: null
+
+  ncc_spak_phosphosite_parent_genes_2:
+    description: "Parent genes of the literature-canonical NCC/SPAK phosphosite feature tuples. The source literals are (gene, site) pairs, not gene lists; only the gene membership is registered here."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/multiomics/phenotype_anchor.py
+          symbol: RENAL_AXIS_LITERATURE_CANONICAL_SITES
+          key: null
+          lines: "16-19"
+        - file: src/multiomics/phenotype_anchor.py
+          symbol: OSD462_COMODIFIED_CANONICAL_INDEX_FEATURES
+          key: null
+          lines: "28-31"
+        - file: src/multiomics/phenotype_anchor.py
+          symbol: OSD462_EXPLORATORY_NCC_SITE_FEATURES
+          key: null
+          lines: "41"
+        - file: src/multiomics/phenotype_anchor.py
+          symbol: NCC_NONREGULATORY_SITES
+          key: null
+          lines: "43-45"
+        - file: src/multiomics/osd462_stage0.py
+          symbol: STAGE0 site records
+          key: null
+          lines: "58-82"
+        - file: scripts/integration/plot_sixrec_integration.py
+          symbol: context / non
+          key: null
+          lines: "59-60"
+        - file: tests/test_osd462_stage0.py
+          symbol: expected site tuples
+          key: null
+          lines: "65-75"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a3: 1
+      Stk39: 1
+    minimum_present: null

@@ -1,32 +1,5 @@
 #!/usr/bin/env python3
-"""Within-block reporter-position diagnostic for OSD-462.
-
-Why this is the clean version
------------------------------
-Condition is perfectly aliased with reporter-tag block (baseline 126-128C,
-flight 129N-131N, ground 131C-133C, identical in both plexes), so a
-between-block comparison cannot separate biology from tag position.
-
-But *within* a block the five channels hold five biologically exchangeable
-animals of the same condition. Any systematic trend across channel position
-within a block is therefore a pure tag-position effect with no biological
-confound. Six independent estimates are available: 3 blocks x 2 plexes.
-
-If a within-block slope exists, extrapolating it across the block boundary
-bounds how much of the flight-minus-ground contrast reporter position alone
-could produce.
-
-Outputs
--------
-``within_block_position_slopes.tsv``  per block x plex slope and permutation p
-``position_effect_bound.tsv``         implied flight-vs-ground positional shift
-``channel_profile.tsv``               mean centred log2 signal per channel
-``manifest.json``
-
-Usage
------
-    python3 scripts/v13/reporter_position_diagnostic.py
-"""
+"""Bound OSD-462 tag-position effects from within-block slopes; condition is aliased with reporter block."""
 
 from __future__ import annotations
 

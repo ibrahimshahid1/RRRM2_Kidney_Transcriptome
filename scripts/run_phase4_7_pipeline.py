@@ -1,20 +1,5 @@
 # scripts/run_phase4_7_pipeline.py
-"""
-Master runner for Phases 4-7 of the kidney transcriptome network analysis.
-
-Executes in order:
-  1. Phase 5: Derived metrics (interaction + persistence)
-  2. Phase 4: Anchor QC report
-  3. Phase 6: Permutation + bootstrap uncertainty
-  4. Phase 7: Biological grounding
-  5. Phase 5: Silent shifters (with Phase 6 support)
-
-Usage:
-  python scripts/run_phase4_7_pipeline.py [--quick]
-
-Options:
-  --quick   Run Phase 6 with minimal iterations for testing (10 perm, 10 boot)
-"""
+"""Run Phases 4-7 in order: derived metrics, anchor QC, uncertainty, grounding, silent shifters."""
 
 from __future__ import annotations
 import argparse

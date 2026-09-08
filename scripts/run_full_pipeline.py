@@ -26,19 +26,7 @@ def load_config(config_path: str) -> dict:
 
 
 def run_full_pipeline(config: dict, data_path: str, output_dir: str):
-    """
-    Execute complete analysis pipeline.
-    
-    Pipeline Phases:
-        0. Preprocessing & Deconvolution
-        1. Global Residualization
-        2. Shared Topology Construction
-        3. LIONESS Sample-Specific Networks
-        4. Edge-Wise Regression
-        5. node2vec Embeddings & Alignment
-        6. Rewiring Quantification & Statistics
-        7. Leakage-Safe Validation
-    """
+    """Execute analysis phases 0-7, from deconvolution through leakage-safe validation."""
     logger.info("RRRM-2 Kidney Network Rewiring Analysis Pipeline")
     
     # Create output directories

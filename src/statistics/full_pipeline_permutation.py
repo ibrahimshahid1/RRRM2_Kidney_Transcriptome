@@ -1,16 +1,5 @@
 # src/statistics/full_pipeline_permutation.py
-"""
-Full-pipeline permutation manifest for selected top-hit genes.
-
-This is deliberately separate from src.statistics.permutation_bootstrap. The
-fast Phase 6 test calibrates edge-sum node rewiring; this driver is reserved for
-the expensive statistic that matches Phase 3 node2vec/Procrustes cosine-distance
-rewiring. It permutes labels, reruns the requested pipeline commands into
-isolated directories, and records a manifest for auditable execution.
-
-By default the module writes a reviewable manifest only. Use --execute after a
-pre-registered top-hit file and command template have been reviewed.
-"""
+"""Full-pipeline permutation manifest for pre-registered top hits; no run unless --execute."""
 
 from __future__ import annotations
 

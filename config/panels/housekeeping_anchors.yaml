@@ -1,0 +1,71 @@
+# Versioned gene-panel registry — housekeeping_anchors
+#
+# Reference/housekeeping genes and kinase-atlas label sets.
+# The pre-registered Procrustes alignment anchors remain in
+# config/anchor_genes.yaml and are NOT duplicated here.
+#
+# Extracted 2026-08-28 by an inventory pass over src/**, scripts/**, tests/**.
+# Membership and ordering are reproduced EXACTLY as they appear in the source
+# literal. Nothing was added, dropped, corrected, or reordered.
+#
+# provenance.frozen: true marks a panel that belongs to a locked analysis
+# (config/clinical_renal_axes_cross_mission.yaml,
+#  config/dct_asdn_phospho_reanalysis.yaml,
+#  config/dct_subtype_reference_freeze_v1.yaml).  Those entries must never be
+# edited; see docs/GENE_PANEL_INVENTORY.md section 4.
+#
+# See docs/GENE_PANEL_INVENTORY.md for the duplication/drift analysis.
+
+schema_version: 1
+panels:
+  reference_housekeeping_2:
+    description: "Two-gene reference/housekeeping group in the DCT variance diagnostic."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: scripts/analyze_dct_variance.py
+          symbol: MARKERS
+          key: Reference
+          lines: "20"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Actb: 1
+      Gapdh: 1
+    minimum_present: null
+
+  wnk_kinase_atlas_labels_3:
+    description: "Ser/Thr kinome-atlas labels for the WNK family (atlas labels are uppercase human-style, not mouse MGI symbols)."
+    species: human
+    provenance:
+      extracted_from:
+        - file: src/v11/kinome_atlas_ksea.py
+          symbol: WNK_KINASES
+          key: null
+          lines: "51"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      WNK1: 1
+      WNK3: 1
+      WNK4: 1
+    minimum_present: null
+
+  spak_osr1_kinase_atlas_labels_2:
+    description: "Ser/Thr kinome-atlas labels for SPAK/OSR1. STLK3 is the atlas alias for STK39 (SPAK); OSR1 is the atlas alias for OXSR1."
+    species: human
+    provenance:
+      extracted_from:
+        - file: src/v11/kinome_atlas_ksea.py
+          symbol: SPAK_OSR1_KINASES
+          key: null
+          lines: "50"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      STLK3: 1
+      OSR1: 1
+    minimum_present: null

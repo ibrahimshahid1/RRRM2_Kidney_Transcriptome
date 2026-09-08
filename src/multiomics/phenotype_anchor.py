@@ -10,29 +10,22 @@ from scipy import stats
 
 EPS = 1e-12
 
-# Literature definition.  This is deliberately separate from OSD-462 assay
-# qualification: the source workbook does not contain an isolated canonical
-# phosphoform for any of these positions.
+# Literature site definition only; OSD-462 has no isolated canonical phosphoform at these sites.
 RENAL_AXIS_LITERATURE_CANONICAL_SITES = (
     ("Slc12a3", "53"), ("Slc12a3", "58"), ("Slc12a3", "71"),
     ("Stk39", "243"), ("Stk39", "383"),
 )
 
-# No OSD-462 row qualifies as an isolated canonical-site measurement after
-# residue and peptide-phosphoform provenance are enforced.  The T53-indexed
-# sequence also contains pY65; the S383-indexed sequence also contains pS382.
+# No OSD-462 row is an isolated canonical site: T53 co-occurs with pY65, S383 with pS382.
 OSD462_ISOLATED_CANONICAL_ASSAY_FEATURES: tuple[tuple[str, str], ...] = ()
 
-# These rows may be shown as supportive, residue-indexed *co-modified*
-# features.  They must not be scored or labeled as isolated canonical sites.
+# Showable as residue-indexed co-modified features only; never scored as isolated canonical sites.
 OSD462_COMODIFIED_CANONICAL_INDEX_FEATURES = (
     ("Slc12a3", "53"),
     ("Stk39", "383"),
 )
 
-# Backward-compatible names intentionally resolve to the empty qualified set.
-# This makes legacy position-only code fail closed instead of silently treating
-# T53/Y65 or S382/S383 phosphoforms as isolated regulatory-site evidence.
+# Legacy position-only names resolve to the empty qualified set, so callers fail closed.
 NCC_REGULATORY_SITES = OSD462_ISOLATED_CANONICAL_ASSAY_FEATURES
 NCC_REGULATORY_SITES_SENS = OSD462_ISOLATED_CANONICAL_ASSAY_FEATURES
 
@@ -85,10 +78,7 @@ def zscore_rows(mat: pd.DataFrame) -> pd.DataFrame:
 
 
 def per_sample_score(values: pd.DataFrame, feature_keys: list[str]) -> pd.Series:
-    """Mean z-scored value across the requested features, per sample (column).
-
-    ``values``: features x samples. Missing features are skipped (logged by
-    caller via the returned coverage in n)."""
+    """Mean z-scored value per sample over the requested features; missing features skipped."""
     present = [k for k in feature_keys if k in values.index]
     if not present:
         return pd.Series(dtype=float)

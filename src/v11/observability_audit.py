@@ -27,12 +27,7 @@ def collapse_observability_to_gene(
     peptide_col: str = "n_peptides",
     abundance_col: str = "abundance_log2",
 ) -> pd.DataFrame:
-    """Peptide-weighted per-gene collapse of per-protein observability.
-
-    Inputs come from ``osd462_anchor/protein_effects_by_row.tsv`` which is
-    one row per protein with ``n_channels_used`` (count of finite scaled
-    S/N channels) and ``n_peptides``.  Output is one row per gene_symbol.
-    """
+    """Peptide-weighted collapse of per-protein observability to one row per gene symbol."""
     df = by_row.copy()
     df[gene_col] = df[gene_col].astype(str).str.strip()
     df = df[df[gene_col].ne("")]
@@ -89,15 +84,7 @@ def assign_observability_strata(
     n_abundance_bins: int = 5,
     n_peptide_bins: int = 4,
 ) -> pd.Series:
-    """Extended (abundance × peptide × missing-fraction) joint stratum label.
-
-    Falls back to the standard 5×4 strata if every row has the same
-    ``missing_fraction`` (most TMT 2-plex scaled-S/N pools).  In that case
-    the extra dimension is uninformative and the audit's Module-2 vs
-    Module-3 q-value comparison should show no difference — itself a
-    reportable finding ("the proteome has effectively zero missingness;
-    detectability bias cannot explain the mismatch").
-    """
+    """Joint abundance x peptide x missingness stratum; falls back to 5x4 if missingness is flat."""
     if missing_col not in pool.columns:
         raise KeyError(f"observability strata require '{missing_col}' column")
     miss = pd.to_numeric(pool[missing_col], errors="coerce").fillna(0.0)
@@ -126,15 +113,7 @@ def detectability_gradient(
     rna_col: str = "rrrm2_iss_t_rna_effect",
     n_bins: int = 5,
 ) -> pd.DataFrame:
-    """Per-RNA-effect-magnitude-decile fraction of genes also protein-quantified.
-
-    ``rna_table`` is the RNA universe (every gene with a finite RNA effect);
-    ``protein_pool`` is the subset additionally protein-quantified.
-
-    A monotone decline across bins would suggest large-RNA-effect genes
-    are systematically detection-limited at the protein level (a real
-    confounder).  A flat profile rules that out at the RNA-effect level.
-    """
+    """Fraction of genes also protein-quantified per RNA-effect-magnitude decile."""
     df = rna_table.dropna(subset=[rna_col]).copy()
     df["abs_rna_effect"] = df[rna_col].abs()
     df["rna_bin"] = pd.qcut(df["abs_rna_effect"].rank(method="first"),
@@ -160,13 +139,7 @@ def high_coverage_subset(
     peptide_col: str = "n_peptides",
     missing_col: str = "missing_fraction",
 ) -> pd.DataFrame:
-    """Restrict to high-confidence quantification.
-
-    Defaults (``min_peptides=3``, ``max_missing_fraction=0.2``) mirror the
-    informal "high-coverage subset" used by reviewer-prep audits in the
-    proteomics literature; both can be loosened or tightened for a
-    sensitivity sweep.
-    """
+    """Restrict to high-coverage rows (>= 3 peptides, <= 0.2 missing fraction by default)."""
     df = pool.copy()
     df[peptide_col] = pd.to_numeric(df[peptide_col], errors="coerce")
     if missing_col not in df.columns:
@@ -190,12 +163,7 @@ def propagation_with_strata(
     gene_col: str = "gene_upper",
     min_members: int = 3,
 ) -> pd.DataFrame:
-    """Per-pathway matched-null propagation test using ``pool[stratum_col]``.
-
-    Mirrors :func:`src.v11.rna_protein_propagation.compute_propagation_per_pathway`
-    but draws strata from an arbitrary column on ``pool`` (this is how
-    Module 3 swaps in the observability-extended stratum).
-    """
+    """Matched-null propagation per pathway drawing strata from an arbitrary ``pool`` column."""
     rng = np.random.default_rng(seed)
     pool = pool.reset_index(drop=True)
     if stratum_col != "match_stratum":
@@ -260,18 +228,7 @@ def ncc_site_observability(
     n_gc_col: str = "n_gc",
     effect_col: str = "phospho_effect",
 ) -> pd.DataFrame:
-    """Per-NCC/SPAK site: observability metrics + percentile vs the phosphoproteome.
-
-    For each residue-indexed co-modified context feature (and the
-    non-regulatory sentinels), report:
-      - n_fl + n_gc (channels with a finite, positive scaled S/N),
-      - missing_fraction percentile within the full phospho table,
-      - intensity (effect magnitude) percentile,
-      - an explicit role tag that does not imply isolated canonical occupancy.
-
-    This is an observability audit only. It cannot upgrade position-only effect
-    rows into isolated canonical-site evidence.
-    """
+    """NCC/SPAK site observability audit; never upgrades position-only rows to site evidence."""
     sites = phospho_all_sites.copy()
     sites["gene_upper"] = sites["gene_symbol"].astype(str).str.upper()
     sites[n_fl_col] = pd.to_numeric(sites[n_fl_col], errors="coerce")

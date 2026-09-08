@@ -345,15 +345,7 @@ def build_axis_concordance(table_summary: pd.DataFrame, figure_summary: pd.DataF
 
 
 def axis_level_concordance(axis: pd.DataFrame) -> pd.DataFrame:
-    """Collapse scored analytes to independent physiological axes.
-
-    The scored machine-readable + figure analytes are not statistically
-    independent: several index the same physiology (e.g. 24 h urine volume and
-    AQP2 both report water balance).  Treating each as its own Bernoulli trial
-    inflates the sign test, so we collapse scored rows to their axis and treat
-    each axis as a single trial.  An axis is concordant only if *every* scored
-    analyte on it is concordant.
-    """
+    """Collapse scored analytes to physiological axes; per-analyte trials inflate the sign test."""
     scored = axis[axis["scored"].astype(bool)].copy()
     rows: list[dict[str, object]] = []
     for axis_name, sub in scored.groupby("axis", sort=True):
@@ -426,12 +418,7 @@ def concordance_verdict(axis: pd.DataFrame, *, osd656_status: str = "not_inspect
 
 
 def parse_osd656_submitted(path: str | Path = OSD656_SUBMITTED) -> pd.DataFrame:
-    """Return long-format OSD-656 urine inflammation panel data.
-
-    The submitted workbook is an Inspiration4 urine Multiplex/NULISAseq-style
-    inflammation panel with preflight and recovery samples.  It is not treated as
-    inflight kidney proteomics.
-    """
+    """Long-format OSD-656 urine inflammation panel; not inflight kidney proteomics."""
     raw = pd.read_excel(path)
     required = {
         "Analyte",
@@ -549,11 +536,7 @@ def _find_osd656_submitted_file(root: Path) -> Path | None:
 
 
 def inspect_osd656(osd656_dir: str | Path = OSD656_DIR) -> tuple[pd.DataFrame, pd.DataFrame, str]:
-    """Catalog optional OSD-656 files and summarize detectable pre/recovery markers.
-
-    The submitted result workbook is summarized as recovery/inflammation context
-    only.  It never enters the primary Twins concordance sign test.
-    """
+    """Catalog OSD-656 files as recovery context only; never enters the Twins sign test."""
     root = Path(osd656_dir)
     if not root.exists():
         return pd.DataFrame(), pd.DataFrame(), "not_downloaded"

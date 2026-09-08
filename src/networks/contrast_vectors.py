@@ -44,15 +44,7 @@ def compute_decomposition(
     a_gc: np.ndarray,
     weights: np.ndarray | None = None,
 ) -> Decomposition:
-    """Compute beta, cos, rho, ||R|| for one (A_FLT, A_GC) pair.
-
-    Parameters
-    ----------
-    a_flt, a_gc : np.ndarray
-        Flight and ground-control aging vectors. Must share length.
-    weights : np.ndarray or None
-        Optional non-negative per-feature precision weights (Guardrail C).
-    """
+    """Compute beta, cos, rho and ||R|| for one (A_FLT, A_GC) pair, with optional weights."""
     a_flt = np.asarray(a_flt, dtype=float).ravel()
     a_gc = np.asarray(a_gc, dtype=float).ravel()
     if a_flt.shape != a_gc.shape:
@@ -100,12 +92,7 @@ def redirected_component(
     a_gc: np.ndarray,
     weights: np.ndarray | None = None,
 ) -> np.ndarray:
-    """Return the residual vector R = A_FLT - beta * A_GC.
-
-    Note: beta is computed in the (possibly weighted) inner product space, but
-    the residual is returned in the original coordinate basis so callers can
-    interpret per-feature R values directly.
-    """
+    """Return R = A_FLT - beta * A_GC in the original basis; beta is fit in the weighted space."""
     dec = compute_decomposition(a_flt, a_gc, weights=weights)
     if not np.isfinite(dec.beta):
         return np.asarray(a_flt, dtype=float).ravel().copy()
@@ -152,11 +139,7 @@ def categorize_bootstrap_distribution(
     redirect_abs_max: float = 0.10,
     redirect_rho_min: float = 0.50,
 ) -> dict:
-    """Return per-category fractions and the headline assignment if any.
-
-    The headline category is assigned only when its mass passes
-    ``headline_fraction`` of the bootstrap distribution (§4.4).
-    """
+    """Per-category bootstrap fractions; headline label only if it clears ``headline_fraction``."""
     betas = np.asarray(betas, dtype=float).ravel()
     rhos = np.asarray(rhos, dtype=float).ravel() if rhos is not None else None
     if rhos is not None and rhos.shape != betas.shape:
@@ -189,11 +172,7 @@ def categorize_bootstrap_distribution(
 
 
 def interpretation_label(summary: Mapping[str, object]) -> str:
-    """Return the manuscript-safe bootstrap category label (§4.4).
-
-    A single headline category is used only when the configured fraction
-    threshold is met. Otherwise the label explicitly reports the category mix.
-    """
+    """Manuscript-safe bootstrap category label; reports the mix unless one category dominates."""
     headline = summary.get("headline")
     fractions = summary.get("fractions", {})
     if headline:
@@ -210,11 +189,7 @@ def stratified_bootstrap_indices(
     strata: Sequence,
     rng: np.random.Generator,
 ) -> np.ndarray:
-    """Resample with replacement within each unique stratum value.
-
-    Returns an array of indices into the original sample table with the same
-    length as ``strata``.
-    """
+    """Resample indices with replacement within each unique stratum value."""
     strata = pd.Series(strata).reset_index(drop=True)
     indices = np.empty(len(strata), dtype=np.int64)
     for value in pd.unique(strata):
@@ -255,12 +230,7 @@ def build_aging_vectors(
     gc_label: str = "GC",
     flt_label: str = "FLT",
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return (A_GC, A_FLT) = (Old-Young) in GC and FLT subsets.
-
-    ``feature_matrix`` is samples x features. Aggregation is the within-cell
-    mean. The optional ``arm_mask`` restricts to a single arm before computing
-    the contrast.
-    """
+    """Return (A_GC, A_FLT) Old-minus-Young within-cell means, optionally restricted by arm."""
     feature_matrix = np.asarray(feature_matrix, dtype=float)
     age = np.asarray(age)
     env = np.asarray(env)
@@ -288,11 +258,7 @@ def precision_weights(
     bootstrap_vectors: np.ndarray,
     floor_percentile: float = 10.0,
 ) -> np.ndarray:
-    """Variance-based per-feature precision weights from bootstrap replicates.
-
-    bootstrap_vectors is (B, K). Returns length-K weight vector w_k = 1 / (var_k + eps)
-    where eps is the ``floor_percentile`` of the variance vector.
-    """
+    """Per-feature precision weights 1 / (var_k + eps) from (B, K) bootstrap vectors."""
     bootstrap_vectors = np.asarray(bootstrap_vectors, dtype=float)
     if bootstrap_vectors.ndim != 2:
         raise ValueError("bootstrap_vectors must be 2-D (B, K)")
@@ -326,13 +292,7 @@ def summarize_bootstrap_decomposition(
     alpha: float = 0.05,
     category_config: Mapping[str, float] | None = None,
 ) -> pd.DataFrame:
-    """Summarize a bootstrap decomposition distribution for output artifacts.
-
-    The returned table matches the pre-registered artifact shape in
-    agents_instruction.md §2.4: one row per statistic with point estimate,
-    bootstrap median and percentile interval, interpretation-category fractions,
-    and optional empirical permutation p-values.
-    """
+    """Summarize a bootstrap decomposition into the pre-registered per-statistic artifact table."""
     cfg = dict(category_config or {})
     category_summary = categorize_bootstrap_distribution(
         bootstrap.get("beta", pd.Series(dtype=float)).to_numpy(dtype=float),
@@ -382,12 +342,7 @@ def bootstrap_decomposition(
     weights: np.ndarray | None = None,
     rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
-    """Bootstrap the (beta, cos, rho) statistics.
-
-    ``vector_builder(indices)`` must return ``(A_GC, A_FLT)`` recomputed on the
-    resampled rows. ``strata`` is a per-sample stratum (e.g. concatenation of
-    Age, Arm, EnvGroup labels) governing the stratified resample.
-    """
+    """Bootstrap (beta, cos, rho); ``vector_builder(indices)`` rebuilds (A_GC, A_FLT) per draw."""
     if rng is None:
         rng = np.random.default_rng()
     rows: list[dict] = []
@@ -425,11 +380,7 @@ def permutation_decomposition(
     gc_label: str = "GC",
     flt_label: str = "FLT",
 ) -> pd.DataFrame:
-    """Permute Old/Young labels within supplied strata and recompute stats.
-
-    ``strata`` should exclude the permuted label itself. If omitted, the legacy
-    behavior stratifies by EnvGroup plus the supplied arm mask.
-    """
+    """Permute Old/Young within strata and recompute; ``strata`` must exclude the permuted label."""
     if rng is None:
         rng = np.random.default_rng()
     age = np.asarray(age)

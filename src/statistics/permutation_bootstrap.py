@@ -1,19 +1,5 @@
 # src/statistics/permutation_bootstrap.py
-"""
-Phase 6: fast uncertainty tests for edge-sum node rewiring.
-
-This module works in LIONESS edge-weight space.  For each FLT-control contrast
-it computes a per-edge mean difference, then a per-gene statistic equal to the
-sum of absolute incident edge differences.  These p-values are therefore
-edge-sum node-rewiring tests. They are not direct inference for the Phase 3
-node2vec/Procrustes cosine-distance rewiring statistic.
-
-Focused testing is limited to statistically valid pre-specified modes:
-  * --candidate-genes: BH only over an external, pre-registered candidate file.
-  * --hierarchical-fdr: Benjamini-Bogomolov-style two-stage FDR over configured
-    gene families/pathways. Overlapping families are additionally reported with
-    a BY column because dependence is not fully eliminated by this procedure.
-"""
+"""Phase 6: fast edge-sum node-rewiring tests; not inference for Phase 3 cosine rewiring."""
 
 from __future__ import annotations
 

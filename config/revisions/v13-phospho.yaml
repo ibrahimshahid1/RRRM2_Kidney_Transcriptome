@@ -1,0 +1,102 @@
+schema_version: 1
+
+id: v13-phospho
+title: Exact continuous phosphosite inference (OSD-462)
+workflow: C
+status: locked
+lock_date: 2026-07-28
+
+question: >-
+  After excluding the established NCC/DCT1 axis, is flight-associated
+  phosphosite suppression disproportionately concentrated in independently
+  defined DCT2/CNT-transition or ASDN programs?
+
+conclusion: >-
+  claim_tier = neither. DCT2/CNT non-evaluable (5 observable genes against a
+  frozen minimum of 8). ASDN nominally positive (0.718, exact p = maxT =
+  0.0291) but failed the selectivity gate: podocyte scored higher (1.112,
+  p = 2.36e-4) and the observability-matched ASDN test was null (p = 0.247).
+  Publication promotion blocked by the design/provenance gate.
+
+spec_config: config/dct_asdn_phospho_reanalysis.yaml
+docs:
+  - docs/DCT_ASDN_PHOSPHO_REANALYSIS_PLAN_2026-07-28.md
+  - docs/v13_continuous_phospho_inference.md
+  - docs/V13_FINAL_REANALYSIS_AND_MANUSCRIPT_DECISION_2026-07-29.md
+  - docs/v13_reporting.md
+
+results_root: data/results/v13-phospho
+reference_run: data/results/run_20260729_v13_continuous_phospho_exact_final
+figures_root: figures/v13
+
+requires:
+  data:
+    - data/external
+  r: false
+
+stages:
+  - id: infer
+    title: Exact inference over all 63,504 balanced label assignments
+    needs: []
+    runner: python
+    entry: scripts/v13/run_continuous_phospho_inference.py
+    args: ["--config", "{spec_config}", "--output-dir", "{run_dir}"]
+    optional: false
+    outputs:
+      - claim_tier.tsv
+      - claim_gates.tsv
+      - set_level_permutation_inference.tsv
+      - parent_gene_null_calibration.tsv
+      - leave_one_gene_out.tsv
+      - matched_observability_sensitivity.tsv
+      - fixed_universe_attrition.tsv
+      - manifest.json
+
+  - id: report
+    title: Read-only claim tables and publication figures
+    needs: [infer]
+    runner: python
+    entry: scripts/v13/build_inference_report.py
+    args: ["--input-dir", "{run_dir}"]
+    optional: false
+    outputs:
+      - reporting/claim_decision_summary.md
+      - reporting/primary_compartment_enrichment.pdf
+      - reporting/leading_parent_gene_matrix.pdf
+
+  - id: provenance
+    title: SHA-256 manifest over inputs, code state, and every output
+    needs: [report]
+    runner: python
+    entry: scripts/v13/finalize_inference_provenance.py
+    args: ["--run-dir", "{run_dir}"]
+    optional: false
+    outputs:
+      - provenance_manifest.json
+
+  - id: intensity-confound
+    title: Reporter-intensity confound audit
+    needs: [infer]
+    runner: python
+    entry: scripts/v13/intensity_confound_audit.py
+    args: ["--out", "{run_dir}/intensity_confound_audit"]
+    optional: true
+    outputs: []
+
+  - id: reporter-position
+    title: Within-block reporter-position slope diagnostic
+    needs: [infer]
+    runner: python
+    entry: scripts/v13/reporter_position_diagnostic.py
+    args: ["--out", "{run_dir}/reporter_position"]
+    optional: true
+    outputs: []
+
+  - id: layer-block-shift
+    title: Layer versus reporter-block shift comparison
+    needs: [infer]
+    runner: python
+    entry: scripts/v13/layer_block_shift_comparison.py
+    args: ["--out", "{run_dir}/layer_block_shift"]
+    optional: true
+    outputs: []

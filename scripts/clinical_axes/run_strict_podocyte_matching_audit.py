@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Strict atlas-selection-matched audit of the podocyte RNA program.
-
-This is a post-hoc adversarial sensitivity analysis. It replaces the original
-all-gene nearest-neighbour null with candidates selected by the *same frozen
-high-specificity atlas rule* as the podocyte target. Matching uses no flight
-labels or flight-effect estimates.
-"""
+"""Post-hoc adversarial audit: re-null the podocyte program against label-blind atlas-rule-matched candidates."""
 
 from __future__ import annotations
 

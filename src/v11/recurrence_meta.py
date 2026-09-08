@@ -50,12 +50,7 @@ MIN_COHORTS = 2      # genes must appear in >= this many cohorts to pool
 # #
 
 def resolve_design(columns: Sequence[str]) -> dict[str, str]:
-    """Map VST sample columns to ``flight`` / ``ground`` from GeneLab names.
-
-    Flight := ``_FLT_``; ground := hardware ground control ``_GC_``. Vivarium,
-    basal and the OSD-253 ``GCrerun`` batch are excluded (returned for neither
-    arm) so each cohort contributes one clean hardware-ground contrast.
-    """
+    """Map VST columns to flight/ground; vivarium, basal and OSD-253 GCrerun are excluded."""
     design: dict[str, str] = {}
     for col in columns:
         c = str(col).upper()
@@ -77,17 +72,7 @@ def per_cohort_effect(
     min_replicates: int = MIN_REPLICATES,
     moderate: bool = False,
 ) -> pd.DataFrame:
-    """Per-gene flight-vs-ground effect and SE on the VST scale (Welch).
-
-    ``vst`` is genes x samples (index = gene id). ``design`` maps a subset of
-    columns to ``flight`` / ``ground``. The effect is ``mean(flight) -
-    mean(ground)`` (positive = up in flight; sign-faithful), with Welch SE
-    ``sqrt(var_f/n_f + var_g/n_g)`` and a Welch-Satterthwaite df.
-
-    ``moderate=True`` adds an empirical-Bayes variance floor (the 10th-percentile
-    sampling variance across genes) to stabilise low-variance genes, a light
-    stand-in for limma's variance shrinkage.
-    """
+    """Per-gene flight-minus-ground VST effect, Welch SE/df; ``moderate`` adds a variance floor."""
     flight_cols = [c for c, g in design.items() if g == "flight" and c in vst.columns]
     ground_cols = [c for c, g in design.items() if g == "ground" and c in vst.columns]
     if len(flight_cols) < min_replicates or len(ground_cols) < min_replicates:
@@ -140,11 +125,7 @@ def per_cohort_effect(
 # #
 
 def _dersimonian_laird(y: np.ndarray, v: np.ndarray) -> dict[str, float]:
-    """DerSimonian-Laird random-effects pool for one gene.
-
-    ``y`` = per-cohort effects, ``v`` = per-cohort variances (se^2). Returns the
-    pooled effect, its SE, tau^2, Cochran's Q, I^2 and a two-sided Wald p.
-    """
+    """DerSimonian-Laird random-effects pool for one gene: effect, SE, tau^2, Q, I^2 and Wald p."""
     k = y.size
     w = 1.0 / v
     sw = w.sum()
@@ -187,13 +168,7 @@ def meta_random_effects(
     *,
     min_cohorts: int = MIN_COHORTS,
 ) -> pd.DataFrame:
-    """Per-gene DerSimonian-Laird meta across cohorts, with BH-FDR.
-
-    ``effects`` maps cohort -> per-gene table (output of :func:`per_cohort_effect`,
-    index = gene id, columns include ``effect`` and ``se``). Genes present in at
-    least ``min_cohorts`` cohorts are pooled. Adds a BH-FDR over the pooled
-    p-values and a Stouffer's-Z cross-check column.
-    """
+    """Per-gene DerSimonian-Laird meta across cohorts with BH-FDR and a Stouffer-Z cross-check."""
     eff = pd.concat({c: d["effect"] for c, d in effects.items()}, axis=1)
     sev = pd.concat({c: d["se"] for c, d in effects.items()}, axis=1)
 
@@ -227,12 +202,7 @@ def score_gene_set(
     genes: Sequence[str],
     symbol_to_ens: Mapping[str, set[str]],
 ) -> dict[str, object]:
-    """Aggregate the pooled per-gene statistic over a curated gene set.
-
-    Maps set symbols (case-insensitive) to Ensembl ids, intersects with the meta
-    table, and returns a precision-weighted set effect, a Stouffer combination of
-    the per-gene meta z, median I^2 and median per-gene FDR.
-    """
+    """Precision-weighted gene-set score over the meta table, with Stouffer Z, I^2 and FDR."""
     ens_ids: set[str] = set()
     for sym in genes:
         ens_ids |= set(symbol_to_ens.get(str(sym).lower(), set()))
@@ -276,11 +246,7 @@ def leave_one_cohort_out(
     *,
     min_cohorts: int = MIN_COHORTS,
 ) -> pd.DataFrame:
-    """Re-estimate each gene set's pooled score dropping one cohort at a time.
-
-    Returns one row per (dropped_cohort, gene_set) plus the ``__none__`` full-set
-    baseline, so stability of the set-level effect/FDR/I^2 is auditable.
-    """
+    """Re-pool each gene set dropping one cohort at a time, plus the ``__none__`` baseline."""
     cohorts = list(effects.keys())
     rows: list[dict[str, object]] = []
 

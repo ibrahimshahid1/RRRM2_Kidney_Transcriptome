@@ -1,23 +1,5 @@
 # src/enrichment/biological_grounding.py
-"""
-Phase 7: Fast biological grounding (poster-friendly).
-
-1) Test enrichment of pre-registered gene sets among high-Δ genes (top decile)
-   using Fisher's exact test.
-
-Optional:
-2) Cluster a reference embedding (k-means) and test cluster enrichment of high-Δ genes.
-
-Inputs:
-  - rewiring agg table (has gene + rewiring_mean)
-  - optional embedding npy for module clustering
-  - optional gene mapping TSV (Ensembl -> Symbol) for readability
-
-Outputs:
-  data/results/phase7_grounding/
-    gene_set_enrichment.tsv
-    cluster_enrichment.tsv (if embedding provided)
-"""
+"""Phase 7: Fisher enrichment of pre-registered gene sets among top-decile rewiring genes."""
 
 from __future__ import annotations
 import argparse

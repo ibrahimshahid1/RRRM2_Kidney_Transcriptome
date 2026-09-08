@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-WGCNA Manuscript Follow-up: Simple contrasts, hub genes, eigengene plots,
-GO/KEGG enrichment, and final integrated table.
-"""
+"""WGCNA follow-up: contrasts, hub genes, eigengene plots, GO/KEGG enrichment, integrated table."""
 from __future__ import annotations
 import json, os, warnings, gzip
 from pathlib import Path

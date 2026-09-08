@@ -1,15 +1,5 @@
 # scripts/phase3_node_rewiring_from_deltas.py
-"""
-Phase 3.1: Convert *_delta_z.npy to per-gene rewiring scores
-
-Simple, dependency-free node rewiring metrics:
-  - rewiring_abs: sum of abs(delta) over incident edges
-  - rewiring_signed: sum of delta over incident edges  
-  - degree: number of incident edges
-
-Usage:
-    python scripts/phase3_node_rewiring_from_deltas.py
-"""
+"""Convert Phase 3.1 delta-z edge arrays into per-gene rewiring_abs, rewiring_signed, and degree."""
 from __future__ import annotations
 
 import os
@@ -27,12 +17,7 @@ def node_rewiring_from_delta_edges(
     edge_j: np.ndarray, 
     genes: list[str]
 ) -> pd.DataFrame:
-    """
-    Simple, dependency-free node rewiring metrics:
-      - rewiring_abs: sum of abs(delta) over incident edges
-      - rewiring_signed: sum of delta over incident edges
-      - degree: number of incident edges counted (each edge contributes to both endpoints)
-    """
+    """Compute per-gene rewiring_abs, rewiring_signed, and degree over incident edges."""
     if delta.ndim != 1:
         raise ValueError(f"delta must be 1D, got shape {delta.shape}")
     if edge_i.shape[0] != delta.shape[0] or edge_j.shape[0] != delta.shape[0]:

@@ -107,14 +107,7 @@ def load_module_assignments() -> pd.DataFrame:
 
 
 def reframe_eigengene_contrasts() -> pd.DataFrame:
-    """Per-module ISS-T vs LAR flight-effect comparison from existing module_trait fits.
-
-    Coding: Age reference = Young, Arm reference = ISS-T, FlightStatus reference = Control.
-      ISS-T Young flight effect = Flight
-      LAR   Young flight effect = Flight + Flight:ArmLAR
-      ISS-T Old   flight effect = Flight + Flight:AgeOld
-      LAR   Old   flight effect = Flight + Flight:AgeOld + Flight:ArmLAR + Flight:AgeOld:ArmLAR
-    """
+    """Derive per-module ISS-T vs LAR flight effects from module_trait fits (refs: Young, ISS-T, Control)."""
     mt = pd.read_csv(WGCNA_RUN / "module_trait_association.csv")
     mt["term"] = mt["term"].str.strip('"')
     mt["module"] = mt["module"].str.strip('"')

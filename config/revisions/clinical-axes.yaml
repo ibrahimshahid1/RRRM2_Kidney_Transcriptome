@@ -1,0 +1,145 @@
+schema_version: 1
+
+id: clinical-axes
+title: Cross-mission clinically anchored renal axes
+workflow: D
+status: complete
+lock_date: 2026-08-11
+
+question: >-
+  Which clinically anchored renal tissue programs show directional engagement
+  during terminal spaceflight, and which recur across independent mouse
+  missions?
+
+conclusion: >-
+  Across 5 terminal missions and 83 animals, three of four frozen axes are
+  no-go. Glomerular barrier identity loss pools to g = -0.716 (mHK 95% CI
+  -1.361 to -0.072, maxT 0.0018, I2 = 0%) — the opposite direction to the
+  declared "identity loss", so that hypothesis is rejected with an
+  opposite-direction lead. In the 49-set compartment family only podocyte
+  high_specificity clears (g = 0.689, maxT 0.0189). The declared structural
+  negative control ranks 4th at g = 0.549, above podocyte tiers built by
+  removing structural genes; this remains the open question.
+
+spec_config: config/clinical_renal_axes_cross_mission.yaml
+docs:
+  - docs/CLINICAL_RENAL_AXES_CROSS_MISSION_PLAN_2026-08-11.md
+  - docs/CLINICAL_RENAL_AXES_DECISION_REPORT_2026-08-11.md
+  - docs/PODOCYTE_K1_K4_ADVERSARIAL_AUDIT_2026-08-11.md
+  - docs/PODOCYTE_STRICT_MATCHING_AUDIT_2026-08-11.md
+  - docs/PODOCYTE_CROSS_MISSION_PAPER_BLUEPRINT_2026-08-11.md
+
+results_root: data/results/clinical-axes
+reference_run: data/results/run_20260811_clinical_renal_axes_cross_mission
+figures_root: figures/clinical_renal_axes_cross_mission
+
+requires:
+  data:
+    - data/external/osdr
+  r: false
+
+stages:
+  - id: cross-mission
+    title: Primary four-axis random-effects meta-analysis under blocked permutation
+    needs: []
+    runner: python
+    entry: scripts/clinical_axes/run_cross_mission.py
+    args: ["--config", "{spec_config}", "--outdir", "{run_dir}"]
+    optional: false
+    outputs:
+      - primary_meta_results.tsv
+
+  - id: sensitivities
+    title: Leave-one-mission, leave-one-gene, signed-median, RNA-preparation checks
+    needs: [cross-mission]
+    runner: python
+    entry: scripts/clinical_axes/run_sensitivities.py
+    args: ["--config", "{spec_config}", "--results", "{run_dir}"]
+    optional: false
+    outputs: []
+
+  - id: compartment-context
+    title: Frozen 49-set compartment family at 100,000 permutations
+    needs: [cross-mission]
+    runner: python
+    entry: scripts/clinical_axes/run_compartment_context.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--results"
+      - "{run_dir}"
+      - "--permutations"
+      - "100000"
+    optional: false
+    outputs:
+      - compartment_context_meta_results.tsv
+
+  - id: podocyte-disjoint
+    title: Compartment family with disjoint podocyte tier variants
+    needs: [compartment-context]
+    runner: python
+    entry: scripts/clinical_axes/run_compartment_context.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--results"
+      - "{run_dir}"
+      - "--permutations"
+      - "100000"
+      - "--add-podocyte-disjoint-variants"
+    optional: false
+    outputs: []
+
+  - id: gene-coherence
+    title: Within-panel podocyte gene coherence
+    needs: [compartment-context]
+    runner: python
+    entry: scripts/clinical_axes/run_podocyte_gene_coherence.py
+    args: ["--config", "{spec_config}", "--results", "{run_dir}"]
+    optional: false
+    outputs: []
+
+  - id: matched-null
+    title: 10,000 observability-matched comparator panels
+    needs: [compartment-context]
+    runner: python
+    entry: scripts/clinical_axes/run_matched_panel_null.py
+    args: ["--config", "{spec_config}", "--results", "{run_dir}"]
+    optional: false
+    outputs: []
+
+  - id: strict-matching
+    title: Same-tier optimal (Hungarian) matched comparator audit
+    needs: [matched-null]
+    runner: python
+    entry: scripts/clinical_axes/run_strict_podocyte_matching_audit.py
+    args: ["--config", "{spec_config}", "--results", "{run_dir}"]
+    optional: false
+    outputs: []
+
+  - id: barrier-adjustment
+    title: Barrier-core score adjusted for the structural scaffold control
+    needs: [compartment-context]
+    runner: python
+    entry: scripts/clinical_axes/run_barrier_specificity_adjustment.py
+    args: ["--config", "{spec_config}", "--results", "{run_dir}"]
+    optional: false
+    outputs: []
+
+  - id: osd656-urine
+    title: OSD-656 human urine context (non-inferential by design)
+    needs: [cross-mission]
+    runner: python
+    entry: scripts/clinical_axes/run_osd656_urine_context.py
+    args: ["--config", "{spec_config}", "--output-dir", "{run_dir}/osd656_context"]
+    optional: true
+    outputs: []
+
+  - id: figures
+    title: Publication figures
+    needs: [compartment-context, sensitivities]
+    runner: python
+    entry: scripts/clinical_axes/plot_results.py
+    args: ["--results", "{run_dir}", "--figures", "{figures_root}"]
+    optional: false
+    outputs: []

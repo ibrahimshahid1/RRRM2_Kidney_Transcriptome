@@ -1,12 +1,5 @@
 # src/validation/continuous_target.py
-"""
-Fold-safe continuous-target validation for kidney stress/injury scores.
-
-Targets are built from independent markers such as Havcr1/KIM-1 and Lcn2/NGAL.
-Those marker genes are excluded from predictor features to avoid circularity.
-Network and expression baselines are evaluated inside cross-validation folds by
-Pearson and Spearman correlation.
-"""
+"""Fold-safe continuous kidney-injury validation; target marker genes excluded from predictors."""
 
 from __future__ import annotations
 

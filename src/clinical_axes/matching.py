@@ -56,14 +56,7 @@ def draw_balanced_unique_panels(
     balance_caliper: float,
     max_attempt_multiplier: int = 100,
 ) -> tuple[np.ndarray, int]:
-    """Draw unique matched panels and enforce aggregate covariate balance.
-
-    Each target draws from its ``pool_size`` closest candidates. Candidate
-    genes cannot repeat within a panel. A draw is retained only when the
-    absolute difference between every target and candidate panel-mean
-    covariate is no larger than ``balance_caliper``. Inputs should already be
-    standardized; no outcome or treatment label is used here.
-    """
+    """Draw unique matched panels within a balance caliper; no outcome or treatment label used."""
 
     distances = np.asarray(distance, dtype=float)
     target = np.asarray(target_covariates, dtype=float)

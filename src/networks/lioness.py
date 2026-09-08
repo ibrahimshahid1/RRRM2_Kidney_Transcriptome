@@ -1,17 +1,5 @@
 # src/networks/lioness.py
-"""
-Phase 2 Step A1: Compute LIONESS-style sample-specific edge weights on skeleton E.
-
-Uses the residualized, non-cell-standardized Rtech for sample-specific edge
-weights. The primary output is a raw LIONESS correlation contribution that is
-rank-normalized edge-wise across samples before regression. Fisher z is applied
-only to pooled/leave-one-out correlation estimates in the explicit
-``z_contribution`` sensitivity mode; sample-specific LIONESS weights are not
-treated as correlations and are not Fisher transformed in the default mode.
-
-Usage:
-    python -m src.networks.lioness --lioness-transform raw_ranknorm
-"""
+"""Phase 2 A1: LIONESS weights on skeleton E, rank-normalized rather than Fisher-z transformed."""
 from __future__ import annotations
 
 import argparse
@@ -47,11 +35,7 @@ def fisher_z_from_r(r: np.ndarray) -> np.ndarray:
 
 
 def rank_normalize_edges(weights: np.ndarray) -> np.ndarray:
-    """Rank-normalize each edge across samples to normal scores.
-
-    This is the default regression scale for LIONESS contributions because the
-    sample-specific values are linear contributions, not bounded correlations.
-    """
+    """Rank-normalize each edge across samples to normal scores, the default regression scale."""
     weights = np.asarray(weights, dtype=np.float64)
     n, e = weights.shape
     if n < 2:
@@ -92,13 +76,7 @@ def compute_lioness_weights(
     jj: np.ndarray,
     transform: str = "raw_ranknorm",
 ) -> tuple[np.ndarray, dict[str, object]]:
-    """Compute LIONESS edge weights for X (genes x samples).
-
-    ``raw*`` modes apply the LIONESS linear formula on Pearson correlations and
-    then optionally normalize sample-specific contributions. ``z_contribution``
-    applies the linear formula after Fisher-z-transforming the pooled and LOO
-    correlations; it is retained only as a sensitivity analysis.
-    """
+    """LIONESS edge weights for genes x samples; ``z_contribution`` is a sensitivity mode only."""
     G, N = X.shape
     E = len(ii)
     if N < 3:

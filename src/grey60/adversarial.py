@@ -1,8 +1,4 @@
-"""Core statistics for the frozen Grey60 adversarial reanalysis.
-
-The functions here contain no repository path logic.  The runner is
-responsible for loading the frozen inputs and writing manifests.
-"""
+"""Core statistics for the frozen Grey60 adversarial reanalysis; the runner owns all I/O."""
 
 from __future__ import annotations
 
@@ -81,11 +77,7 @@ def weighted_mean_z_score(
     genes: Sequence[str],
     weights: pd.Series,
 ) -> pd.Series:
-    """Return a fixed-weight mean gene-z score.
-
-    Weights retain their frozen sign and are normalized by the sum of their
-    absolute values, so an arbitrary scale change cannot alter the score.
-    """
+    """Fixed-weight mean gene-z score normalized by the sum of absolute weights (scale-free)."""
     present = [g for g in genes if g in expression.index and g in weights.index]
     if not present:
         raise ValueError("No weighted genes were present")
@@ -190,11 +182,7 @@ def stratified_bootstrap_iss_effect(
 
 
 def _contrast_matrix() -> tuple[list[str], np.ndarray]:
-    """Contrasts over eight cell means.
-
-    Cell order:
-    ISS-Y GC/F, ISS-O GC/F, LAR-Y GC/F, LAR-O GC/F.
-    """
+    """Contrasts over eight cell means ordered ISS-Y, ISS-O, LAR-Y, LAR-O, each as GC then FLT."""
     names = [
         "Flight",
         "Age",
@@ -289,12 +277,7 @@ def max_t_permutation(
     seed: int,
     chunk_size: int = 2048,
 ) -> np.ndarray:
-    """Generate a blocked max-|t| null across 11 contrasts x modules.
-
-    Labels are permuted independently inside the four 5/5 Age x Arm strata.
-    The implementation uses saturated cell means and a pooled 32-df residual
-    variance, exactly matching the historical factorial OLS model.
-    """
+    """Blocked max-|t| null over 11 contrasts x modules, permuted within four Age x Arm strata."""
     if module_responses.shape[1] != 20:
         raise ValueError(
             f"Selection family requires 20 non-grey modules; got {module_responses.shape[1]}"
@@ -379,13 +362,7 @@ def random_effects_reml_hk(
     *,
     modified: bool = False,
 ) -> RandomEffects:
-    """Random-effects REML synthesis with Hartung-Knapp uncertainty.
-
-    When ``modified`` is true, the Hartung-Knapp scale factor is floored at
-    one. This prevents unusually homogeneous small meta-analyses from
-    producing intervals narrower than the conventional random-effects
-    interval.
-    """
+    """REML synthesis with HK scale; ``modified`` floors it at one so CIs cannot narrow."""
     y = np.asarray(effects, dtype=float)
     v = np.asarray(variances, dtype=float)
     if len(y) < 2 or len(y) != len(v):

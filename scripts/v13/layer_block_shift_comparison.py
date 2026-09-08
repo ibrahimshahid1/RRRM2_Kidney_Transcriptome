@@ -1,45 +1,5 @@
 #!/usr/bin/env python3
-"""Is the flight-block signal dip phospho-specific, or shared with protein?
-
-Question
---------
-The OSD-462 channel profile shows a block-shaped dip across the flight
-reporter channels (129N-131) in both plexes, recovering immediately at 131C.
-A within-block positional slope cannot see a step of that shape, so two
-explanations remain:
-
-  (a) a block-level technical effect (sample handling, loading, labelling
-      batch) that happens to align with condition; or
-  (b) a genuine reduction in phosphopeptide signal in flight animals.
-
-Discriminator
--------------
-The protein workbook measures the *same animals* in the *same channel layout*
-but without Fe-NTA phosphopeptide enrichment. A handling/loading effect
-upstream of the phospho/protein split should appear in both layers at similar
-magnitude. Phospho-specific suppression should not.
-
-Two comparisons are made:
-
-1. **Marginal.** Flight-block minus ground-block mean centred log2 signal, per
-   layer and plex.
-2. **Paired by parent protein.** For every protein quantified in both layers,
-   the phosphosite flight-minus-ground effect minus the same protein's own
-   flight-minus-ground effect. This removes anything shared by the two layers
-   for that protein and is the comparison a "phosphorylation changes without
-   abundance changing" claim actually requires.
-
-Boundary
---------
-The two layers were labelled in separate reactions (tc882-883 phospho,
-tc884-885 protein), so a labelling-batch effect could in principle differ
-between them. This test discriminates shared upstream handling effects, not
-every possible technical explanation.
-
-Usage
------
-    python3 scripts/v13/layer_block_shift_comparison.py
-"""
+"""Test whether the flight-block signal dip is phospho-specific or shared with protein; handling effects only."""
 
 from __future__ import annotations
 

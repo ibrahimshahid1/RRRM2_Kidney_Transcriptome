@@ -1,0 +1,119 @@
+schema_version: 1
+
+id: subtype-reference
+title: Flight-blind DCT subtype and compartment reference build
+workflow: C
+status: locked
+lock_date: 2026-07-28
+
+question: >-
+  Can DCT2/CNT-transition, ASDN, and kidney-compartment marker sets be built
+  from independent expression references without reading any OSD-462 flight
+  effect or phosphoproteomic observability?
+
+conclusion: >-
+  Yes. GSE228367 raw integer counts were reconstructed from official 10x
+  matrices with DCT1/DCT2 summed by three biological replicates and a paired
+  edgeR pseudobulk model; GSE150338 supplied an independent fine-subtype and
+  microdissection check; the Mouse Kidney Atlas supplied whole-kidney
+  specificity and prespecified comparators. The frozen membership file has
+  SHA-256 ed64f0e20361d21ebc4d2483fce383f5f82e94bb7ec43b66156826c8eb86b945.
+  DCT2/CNT froze at 27 genes, ASDN at 29.
+
+spec_config: config/dct_subtype_reference_freeze_v1.yaml
+docs:
+  - docs/DCT_SUBTYPE_REFERENCE_REBUILD_2026-07-28.md
+
+results_root: data/results/subtype-reference
+reference_run: null
+figures_root: null
+
+requires:
+  data:
+    - data/external/single_cell_atlases
+  r: true
+
+stages:
+  - id: inventory
+    title: Inventory and hash the declared reference inputs
+    needs: []
+    runner: python
+    entry: scripts/subtype_reference/01_inventory_inputs.py
+    args: ["--config", "{spec_config}", "--output-dir", "{run_dir}/inventory"]
+    optional: false
+    outputs: []
+
+  - id: gse228367-pseudobulk
+    title: GSE228367 replicate-summed paired edgeR pseudobulk
+    needs: [inventory]
+    runner: rscript
+    entry: scripts/subtype_reference/02_gse228367_pseudobulk.R
+    args: ["--config", "{spec_config}", "--output-dir", "{run_dir}/gse228367"]
+    optional: false
+    outputs:
+      - gse228367_dct2_vs_dct1_paired_pseudobulk.tsv
+
+  - id: gse150338-segment
+    title: GSE150338 microdissected DCT-to-CNT retention check
+    needs: [inventory]
+    runner: rscript
+    entry: scripts/subtype_reference/02b_gse150338_segment_validation.R
+    args: ["--config", "{spec_config}", "--output-dir", "{run_dir}/gse150338"]
+    optional: false
+    outputs:
+      - gse150338_segment_transition_validation.tsv
+
+  - id: gse150338-fine
+    title: GSE150338 independent fine-subtype direction check
+    needs: [inventory]
+    runner: rscript
+    entry: scripts/subtype_reference/02c_gse150338_fine_subtype_pseudobulk.R
+    args: ["--config", "{spec_config}", "--output-dir", "{run_dir}/gse150338_fine"]
+    optional: false
+    outputs:
+      - gse150338_fine_subtype_validation.tsv
+
+  - id: atlas-pseudobulk
+    title: Mouse Kidney Atlas whole-kidney compartment expression
+    needs: [inventory]
+    runner: python
+    entry: scripts/subtype_reference/03_atlas_pseudobulk.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--input"
+      - "data/external/single_cell_atlases/mouse_kidney_atlas/mka.h5ad"
+      - "--output-dir"
+      - "{run_dir}/mouse_kidney_atlas"
+      - "--reference-label"
+      - "mouse_kidney_atlas"
+      - "--source-study-column"
+      - "Origin"
+      - "--cell-type-column"
+      - "Celltype_finest"
+      - "--fallback-cell-type-column"
+      - "Celltype"
+    optional: false
+    outputs:
+      - atlas_compartment_expression.tsv.gz
+
+  - id: freeze
+    title: Build and hash the frozen signature membership file
+    needs: [gse228367-pseudobulk, gse150338-segment, gse150338-fine, atlas-pseudobulk]
+    runner: python
+    entry: scripts/subtype_reference/04_build_frozen_signatures.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--output-dir"
+      - "{run_dir}"
+      - "--discovery"
+      - "{run_dir}/gse228367/gse228367_dct2_vs_dct1_paired_pseudobulk.tsv"
+      - "--validation"
+      - "{run_dir}/gse150338_fine/gse150338_fine_subtype_validation.tsv"
+      - "--segment-validation"
+      - "{run_dir}/gse150338/gse150338_segment_transition_validation.tsv"
+      - "--atlas"
+      - "{run_dir}/mouse_kidney_atlas/atlas_compartment_expression.tsv.gz"
+    optional: false
+    outputs: []

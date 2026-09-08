@@ -1,14 +1,5 @@
 # scripts/pick_anchors.py
-"""
-Select anchor genes for Procrustes alignment.
-
-Anchors are genes with minimal network rewiring between conditions,
-making them suitable reference points for embedding alignment.
-
-Usage:
-    python scripts/pick_anchors.py
-    python scripts/pick_anchors.py --groupA "YNG|ISS-T|FLT" --groupB "OLD|ISS-T|FLT" --k 150
-"""
+"""Select minimally rewired anchor genes for Procrustes embedding alignment."""
 from __future__ import annotations
 
 import argparse
@@ -40,18 +31,7 @@ def load_genes():
 
 
 def pick_anchors(groupA: str, groupB: str, k: int = 150, outname: str | None = None):
-    """
-    Select k anchor genes with minimal rewiring between two groups.
-    
-    Parameters
-    ----------
-    groupA, groupB : str
-        Group keys (e.g., "YNG|ISS-T|FLT")
-    k : int
-        Number of anchors to select
-    outname : str, optional
-        Output filename (default: auto-generated)
-    """
+    """Select the k least-rewired genes between two group keys and write them to outname."""
     means = np.load(OUTDIR / "group_mean_edges.npz")
     index = load_index()
     genes = load_genes()

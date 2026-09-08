@@ -1,0 +1,321 @@
+# Versioned gene-panel registry — external_validation
+#
+# Panels used only for external-cohort validation or grounding, plus
+# gene literals that live in test fixtures (in_test: true).
+#
+# Extracted 2026-08-28 by an inventory pass over src/**, scripts/**, tests/**.
+# Membership and ordering are reproduced EXACTLY as they appear in the source
+# literal. Nothing was added, dropped, corrected, or reordered.
+#
+# provenance.frozen: true marks a panel that belongs to a locked analysis
+# (config/clinical_renal_axes_cross_mission.yaml,
+#  config/dct_asdn_phospho_reanalysis.yaml,
+#  config/dct_subtype_reference_freeze_v1.yaml).  Those entries must never be
+# edited; see docs/GENE_PANEL_INVENTORY.md section 4.
+#
+# See docs/GENE_PANEL_INVENTORY.md for the duplication/drift analysis.
+
+schema_version: 1
+panels:
+  tubular_ion_transport_mouse_30:
+    description: "Mouse-cased broad tubular ion-transport feature set used by the external OSD validation module."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: src/validation/osd_external_validation.py
+          symbol: FEATURE_SYMBOLS
+          key: tubular_ion_transport
+          lines: "52-58"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      Slc12a1: 1
+      Slc12a3: 1
+      Slc9a3: 1
+      Slc4a1: 1
+      Slc4a4: 1
+      Slc5a2: 1
+      Slc22a2: 1
+      Slc22a6: 1
+      Slc22a7: 1
+      Slc22a8: 1
+      Slc34a1: 1
+      Slc34a3: 1
+      Kcnj1: 1
+      Kcnj10: 1
+      Kcnj16: 1
+      Kcnma1: 1
+      Atp1a1: 1
+      Atp1b1: 1
+      Fxyd2: 1
+      Clcnkb: 1
+      Scnn1a: 1
+      Scnn1b: 1
+      Scnn1g: 1
+      Aqp1: 1
+      Aqp2: 1
+      Aqp3: 1
+      Trpv5: 1
+      Trpv6: 1
+      Calb1: 1
+      Pvalb: 1
+    minimum_present: null
+
+  human_dct_ncc_wnk_prereg_9:
+    description: "Human-cased pre-registered DCT/NCC-WNK set in the Phase-7 grounding script."
+    species: human
+    provenance:
+      extracted_from:
+        - file: scripts/phase7_grounding_fast.py
+          symbol: prereg
+          key: DCT_NCC_WNK_axis
+          lines: "107-110"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      WNK1: 1
+      WNK4: 1
+      STK39: 1
+      SLC12A3: 1
+      KCNJ10: 1
+      KCNJ16: 1
+      SCNN1A: 1
+      SCNN1B: 1
+      SCNN1G: 1
+    minimum_present: null
+
+  human_oxidative_stress_prereg_8:
+    description: "Human-cased pre-registered oxidative-stress set in the Phase-7 grounding script."
+    species: human
+    provenance:
+      extracted_from:
+        - file: scripts/phase7_grounding_fast.py
+          symbol: prereg
+          key: Oxidative_stress
+          lines: "111-113"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      NFE2L2: 1
+      SOD1: 1
+      SOD2: 1
+      CAT: 1
+      GPX1: 1
+      PRDX1: 1
+      PRDX2: 1
+      HMOX1: 1
+    minimum_present: null
+
+  human_ecm_remodeling_prereg_8:
+    description: "Human-cased pre-registered ECM-remodeling set in the Phase-7 grounding script."
+    species: human
+    provenance:
+      extracted_from:
+        - file: scripts/phase7_grounding_fast.py
+          symbol: prereg
+          key: ECM_remodeling
+          lines: "114-116"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      COL1A1: 1
+      COL1A2: 1
+      COL3A1: 1
+      FN1: 1
+      MMP2: 1
+      MMP9: 1
+      TIMP1: 1
+      SPARC: 1
+    minimum_present: null
+
+  human_lipid_metabolism_prereg_7:
+    description: "Human-cased pre-registered lipid-metabolism set in the Phase-7 grounding script."
+    species: human
+    provenance:
+      extracted_from:
+        - file: scripts/phase7_grounding_fast.py
+          symbol: prereg
+          key: Lipid_metabolism
+          lines: "117-119"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      PPARA: 1
+      PPARG: 1
+      SREBF1: 1
+      SREBF2: 1
+      ACACA: 1
+      FASN: 1
+      CPT1A: 1
+    minimum_present: null
+
+  human_calcium_handling_prereg_8:
+    description: "Human-cased pre-registered calcium-handling set in the Phase-7 grounding script."
+    species: human
+    provenance:
+      extracted_from:
+        - file: scripts/phase7_grounding_fast.py
+          symbol: prereg
+          key: Calcium_handling
+          lines: "120-122"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      ATP2B1: 1
+      ATP2B4: 1
+      ITPR1: 1
+      ITPR2: 1
+      RYR1: 1
+      RYR2: 1
+      CAMK2A: 1
+      CAMK2D: 1
+    minimum_present: null
+
+  human_inflammation_prereg_7:
+    description: "Human-cased pre-registered inflammation set in the Phase-7 grounding script."
+    species: human
+    provenance:
+      extracted_from:
+        - file: scripts/phase7_grounding_fast.py
+          symbol: prereg
+          key: Inflammation
+          lines: "123-125"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      IL6: 1
+      TNF: 1
+      IL1B: 1
+      CCL2: 1
+      NFKB1: 1
+      NFKB2: 1
+      RELA: 1
+    minimum_present: null
+
+  human_apoptosis_prereg_6:
+    description: "Human-cased pre-registered apoptosis set in the Phase-7 grounding script."
+    species: human
+    provenance:
+      extracted_from:
+        - file: scripts/phase7_grounding_fast.py
+          symbol: prereg
+          key: Apoptosis
+          lines: "126-128"
+      literature: []
+      frozen: false
+      in_test: false
+    genes:
+      BCL2: 1
+      BAX: 1
+      CASP3: 1
+      CASP9: 1
+      TP53: 1
+      CYCS: 1
+    minimum_present: null
+
+  human_recurrence_meta_test_fixture_3:
+    description: "Human-cased test fixture gene set for the recurrence-meta scorer."
+    species: human
+    provenance:
+      extracted_from:
+        - file: tests/test_recurrence_meta.py
+          symbol: score_gene_set argument
+          key: null
+          lines: "143"
+      literature: []
+      frozen: false
+      in_test: true
+      note: "'ABSENT' is a deliberate non-gene sentinel used to test dropout."
+    genes:
+      SLC12A3: 1
+      STK39: 1
+      ABSENT: 1
+    minimum_present: null
+
+  aldosterone_axis_test_fixture_5:
+    description: "Test fixture panel for the aldosterone-axis scorer."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: tests/test_aldosterone_axis.py
+          symbol: gene_symbol fixture
+          key: null
+          lines: "15"
+      literature: []
+      frozen: false
+      in_test: true
+    genes:
+      Sgk1: 1
+      Scnn1a: 1
+      Slc12a3: 1
+      Hsd11b2: 1
+      Nr3c2: 1
+    minimum_present: null
+
+  celltype_decomposition_test_fixture_5:
+    description: "Test fixture gene table for the celltype decomposition scorer."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: tests/test_celltype_decomposition.py
+          symbol: gs fixture
+          key: null
+          lines: "19"
+      literature: []
+      frozen: false
+      in_test: true
+    genes:
+      Slc12a3: 1
+      Wnk1: 1
+      Stk39: 1
+      Pecam1: 1
+      Kdr: 1
+    minimum_present: null
+
+  ppar_ribosome_test_fixture_8:
+    description: "Test fixture symbol list for the external OSD validation module."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: tests/test_osd_external_validation.py
+          symbol: mgi_symbol fixture
+          key: null
+          lines: "20"
+      literature: []
+      frozen: false
+      in_test: true
+    genes:
+      Ppara: 1
+      Acox1: 1
+      Cpt1a: 1
+      Rpl3: 1
+      Rps4x: 1
+      Mrpl1: 1
+      Col1a1: 1
+      Slc12a3: 1
+    minimum_present: null
+
+  mechanism_axis_test_fixture_3:
+    description: "Test fixture mechanism gene set (with Tlr4 as protected gene)."
+    species: mouse
+    provenance:
+      extracted_from:
+        - file: tests/test_mechanism_axis.py
+          symbol: genes fixture
+          key: null
+          lines: "54-55"
+      literature: []
+      frozen: false
+      in_test: true
+    genes:
+      Tlr4: 1
+      Tgfb1: 1
+      Myd88: 1
+    minimum_present: null

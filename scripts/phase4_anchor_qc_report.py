@@ -1,21 +1,5 @@
 # scripts/phase4_anchor_qc_report.py
-"""
-Phase 4 (prereg documentation): Anchor QC report.
-
-Goal: produce a small report showing anchors are "stable" across groups
-and optionally not-DE (if you provide a gene-level DE table).
-
-Inputs:
-  - anchors.txt from Phase 3.3
-  - meta_phase1.tsv.gz
-  - OPTIONAL: gene_DE.tsv with columns: gene, log2FC(or logFC), FDR(or adj.P.Val)
-
-Outputs:
-  data/results/phase4_anchor_qc/
-    anchors_preregistered.txt
-    anchor_qc.tsv
-    anchor_qc_summary.json
-"""
+"""Phase 4: report anchor cross-group stability and optional not-DE status into phase4_anchor_qc/."""
 
 from __future__ import annotations
 import argparse

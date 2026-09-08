@@ -1,18 +1,5 @@
 # src/validation/external_replication.py
-"""
-Protocol-guarded independent external cohort analysis.
-
-OSD-102 is the primary LAR-Young-like replication partner. OSD-513 is secondary
-and limited to sex-robustness/sex-stratification checks. OSD-163 and OSD-253 are
-context-mapping cohorts for the biology-first remodeling panel; they are not
-used as strict one-to-one replication cohorts for RRRM-2 gene claims. OSD-568 is
-explicitly excluded from validation claims in this remediation pass.
-
-This module does not require ComBat-seq. Each external cohort is analyzed
-independently and compared against pre-registered direction, q-value, and
-pathway criteria. Multi-study pooling is handled separately by
-src.validation.multi_study_pool.
-"""
+"""Cohort roles: OSD-102 primary, OSD-513 sex checks, OSD-163/253 context, OSD-568 excluded."""
 
 from __future__ import annotations
 

@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Create manuscript-ready displays from frozen OSD-462 Stage 0 outputs.
-
-This script is deliberately a reporting layer. It reads the Stage 0 TSV
-artifacts, validates their internal contracts, and changes no sample, feature,
-or assay qualification.
-"""
+"""Build manuscript displays from frozen OSD-462 Stage 0 TSVs; reporting only, changes no qualification."""
 
 from __future__ import annotations
 

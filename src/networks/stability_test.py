@@ -27,12 +27,7 @@ DEFAULT_GATES: dict[str, dict[str, float]] = {
 
 
 def gates_from_config(config: dict) -> dict[str, dict[str, float]]:
-    """Extract stability gates from config/contrast_vector_framework.yaml.
-
-    The YAML uses explicit keys (``stability_median`` / ``stability_lower``)
-    while the in-memory gate application uses the shorter ``median`` /
-    ``lower`` names.
-    """
+    """Read stability gates from config/contrast_vector_framework.yaml into median/lower keys."""
     resolutions = (config or {}).get("resolutions", {})
     if not isinstance(resolutions, dict):
         return DEFAULT_GATES
@@ -125,11 +120,7 @@ def estimate_agc_stability(
     n_iterations: int = 2000,
     rng: np.random.Generator | None = None,
 ) -> StabilityReport:
-    """Compute bootstrap-vs-full-sample angular stability of A^a_GC.
-
-    ``agc_builder(indices)`` should rebuild A^a_GC on the resampled rows.
-    Calling it with ``None`` returns the full-sample (no-resample) vector.
-    """
+    """Bootstrap-vs-full angular stability of A^a_GC (``agc_builder(None)`` = full sample)."""
     if rng is None:
         rng = np.random.default_rng()
 

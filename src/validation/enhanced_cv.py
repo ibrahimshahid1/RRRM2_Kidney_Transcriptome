@@ -1,12 +1,5 @@
 # src/validation/enhanced_cv.py
-"""
-Phase 8b: leakage-safe enhanced predictive validation.
-
-For every fold, this module computes the network pool, skeleton, LIONESS or
-alternative sample-specific weights, feature selection, scaling, PCA, and model
-fit inside the fold. It preserves expression-only baselines and evaluates
-multiple LIONESS pooling modes and feature sets.
-"""
+"""Phase 8b leakage-safe CV: skeleton, weights, selection, scaling, PCA and fit inside each fold."""
 
 from __future__ import annotations
 

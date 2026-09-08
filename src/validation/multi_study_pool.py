@@ -1,14 +1,5 @@
 # src/validation/multi_study_pool.py
-"""
-Pre-registered OSD-102 + OSD-771 LAR-Young pooling.
-
-This is separate from independent external replication. Pooling is restricted to
-RRRM-2/OSD-771 LAR-Young and individual OSD-102 FLT/GC mice. ComBat-seq with
-study as batch and treatment preserved is required before any pooled-network
-claim. PCA checks must show that study separation is reduced while treatment
-signal is not erased; otherwise the module recommends fixed-effects or
-meta-analysis and forbids pooled network validation.
-"""
+"""Pre-registered OSD-102 + OSD-771 LAR-Young pooling; forbidden unless ComBat-seq PCA passes."""
 
 from __future__ import annotations
 

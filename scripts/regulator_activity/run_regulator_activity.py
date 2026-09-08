@@ -112,11 +112,7 @@ def layer_a_kinase(phospho_path: Path, ksnet_path: Path, outdir: Path) -> dict:
 # Layer B -- TF / pathway activity (decoupler, network-dependent priors)
 
 def _load_rna_effects(spec: dict[str, str]) -> pd.DataFrame:
-    """Build a contrasts x genes matrix from per-cohort gene-effect tables.
-
-    Each file must be a TSV with a gene-id column and a flight-effect column;
-    the loader auto-detects common column names.
-    """
+    """Build a contrasts x genes matrix from per-cohort TSVs, auto-detecting id and effect columns."""
     gene_cands = ["gene", "gene_id", "ensembl_gene_id", "ensembl"]
     eff_cands = ["effect", "logFC", "log2fc", "flight_effect", "iss_t_effect",
                  "stat", "t"]

@@ -1,17 +1,5 @@
 # src/enrichment/regression_enrichment.py
-"""
-Phase 7 supplement: Run gene-set enrichment on regression-significant genes
-(from Phase 6 full_regression) instead of rewiring-top-decile.
-
-This tests: "Are genes with significant arm×flight or age×flight interaction
-enriched for DCT/NCC-WNK or other predefined pathways?"
-
-Usage:
-    python -m src.enrichment.regression_enrichment \
-        --reg_dir data/results/<run>/phase6_regression \
-        --outdir data/results/<run>/phase7_regression_enrichment \
-        --map data/processed/resources/id_map.tsv
-"""
+"""Phase 7 supplement: gene-set enrichment over Phase 6 regression-significant genes."""
 from __future__ import annotations
 import argparse
 from pathlib import Path

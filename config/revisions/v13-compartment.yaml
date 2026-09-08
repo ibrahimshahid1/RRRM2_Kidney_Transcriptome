@@ -1,0 +1,48 @@
+schema_version: 1
+
+id: v13-compartment
+title: v13 compartment adversarial closure audit
+workflow: C
+status: complete
+lock_date: 2026-08-02
+
+question: >-
+  Once the exact v13 label permutation is fixed, does the podocyte-leading
+  compartment result survive an adversarial closure audit of artifact,
+  contributor, observability, Grey60, and clinical-axis explanations?
+
+conclusion: >-
+  The audit is parent-protein annotation enrichment in whole kidney. It does
+  not identify a phosphosite's cell of origin and does not repair the perfect
+  condition-to-reporter-block alias in OSD-462. The 2026-08-02 stop rule
+  retired further OSD-462 compartment mining.
+
+spec_config: config/v13_compartment_adversarial_audit.yaml
+docs:
+  - docs/V13_COMPARTMENT_ADVERSARIAL_AUDIT_PLAN_2026-08-02.md
+  - docs/POST_V13_DIRECTION_DECISION_2026-08-11.md
+
+results_root: data/results/v13-compartment
+reference_run: data/results/run_20260802_v13_compartment_adversarial
+figures_root: figures/v13
+
+requires:
+  data:
+    - data/external
+  r: false
+
+stages:
+  - id: audit
+    title: Reference-only set preparation and effect-aware post-processing
+    needs: []
+    runner: python
+    entry: scripts/v13/compartment_adversarial_audit.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--exact-dir"
+      - "data/results/run_20260802_v13_compartment_exact"
+      - "--output-dir"
+      - "{run_dir}"
+    optional: false
+    outputs: []

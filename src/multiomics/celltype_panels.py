@@ -26,8 +26,7 @@ KIDNEY_PANELS: dict[str, list[str]] = {
                           "Itgam", "Csf1r"],
 }
 
-# Compartment scores used by the memo Section 8.2.3 split (re-uses project
-# mechanism sets where available; symbols below are the marker proxies here).
+# Compartment marker proxies for the memo Section 8.2.3 split, reusing project mechanism sets.
 COMPARTMENT_PANELS = ("dct_transport", "dct_identity", "stromal_fibroblast",
                       "macrophage_immune", "endothelial")
 
@@ -35,11 +34,7 @@ COMPARTMENT_PANELS = ("dct_transport", "dct_identity", "stromal_fibroblast",
 def panel_flight_effect(gene_stat: pd.DataFrame, panels: dict[str, list[str]],
                         *, gene_col: str = "gene", stat_col: str = "stat",
                         min_genes: int = 2) -> pd.DataFrame:
-    """Mean flight stat per panel from a (gene symbol, stat) table.
-
-    Returns one row per panel with the mean stat, n mapped genes, and the genes
-    found. Panels with < ``min_genes`` mapped are still reported with NaN mean.
-    """
+    """Mean flight stat per panel; panels with < ``min_genes`` mapped report a NaN mean."""
     s = gene_stat.set_index(gene_col)[stat_col]
     s = s[~s.index.duplicated()].astype(float)
     rows = []
@@ -66,11 +61,7 @@ def zscore_rows(mat: pd.DataFrame) -> pd.DataFrame:
 def per_sample_panel_scores(vst: pd.DataFrame, panels: dict[str, list[str]],
                             sym_to_ens: dict[str, set[str]],
                             *, min_genes: int = 2) -> pd.DataFrame:
-    """Per-sample mean-z panel scores from an ENSMUSG-indexed VST matrix.
-
-    Returns panels x samples. ``vst`` rows are ENSMUSG ids; ``sym_to_ens`` maps
-    a lowercase symbol to its ENSMUSG id set.
-    """
+    """Per-sample mean-z panel scores (panels x samples) from an ENSMUSG-indexed VST matrix."""
     out = {}
     for name, members in panels.items():
         ids = sorted({e for g in members for e in sym_to_ens.get(g.lower(), set())}
@@ -84,10 +75,7 @@ def per_sample_panel_scores(vst: pd.DataFrame, panels: dict[str, list[str]],
 def decide_scenario(dct_transport_eff: float, dct_identity_eff: float,
                     stromal_eff: float, immune_eff: float,
                     *, drop: float = -0.15, stable: float = 0.15) -> dict:
-    """Classify the bulk-RNA ambiguity per memo Section 8.3.
-
-    ``drop``/``stable`` are flight-effect thresholds on the mean-z panel score.
-    """
+    """Classify bulk-RNA ambiguity per memo Section 8.3 using drop/stable mean-z thresholds."""
     transport_down = dct_transport_eff <= drop
     identity_down = dct_identity_eff <= drop
     identity_stable = dct_identity_eff >= stable * -1  # i.e. not strongly down

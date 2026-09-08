@@ -1,0 +1,54 @@
+schema_version: 1
+
+id: network-rewiring
+title: RRRM-2 RNA network rewiring pipeline
+workflow: A
+status: retired
+lock_date: null
+
+question: >-
+  After accounting for kidney cell composition, do spaceflight-associated
+  changes in gene co-expression network structure identify "silent shifter"
+  genes that rewire without differential expression?
+
+conclusion: >-
+  Negative, and documented as negative. Under the leakage-safe cross-validation
+  rerun with every transform computed inside folds, network features did not
+  beat expression baselines. METHODOLOGY.md states it plainly: "The audited run
+  is negative." The postmortem is latex_paper/network_journey_retrospective.tex.
+
+spec_config: config/hyperparameters.yaml
+docs:
+  - METHODOLOGY.md
+  - FILE_SUMMARY.md
+  - docs/statistical_assessment_v5.md
+  - docs/annotated_issues_v5.md
+  - docs/provenance_audit_2026-06-06.md
+
+results_root: data/results/network-rewiring
+reference_run: data/results/run_20260505_remediated_2500g
+figures_root: null
+
+requires:
+  data:
+    - data/raw
+  r: true
+
+stages:
+  - id: all-phases
+    title: Phases 0,1,2,3,5,6,7 — deconvolution through biological grounding
+    needs: []
+    runner: python
+    entry: src/run_all_phases.py
+    args: ["--run-id", "{run_id}", "--execute"]
+    optional: false
+    outputs: []
+
+  - id: external-validation
+    title: Protocol-gated external OSD validation and context mapping
+    needs: [all-phases]
+    runner: python
+    entry: src/run_all_phases.py
+    args: ["--run-id", "{run_id}", "--external-validation-only", "--execute"]
+    optional: true
+    outputs: []

@@ -210,13 +210,7 @@ def q_label(q: float) -> str:
 
 
 def fig_cross_cohort_recurrence(run_root: Path, out_dir: Path) -> bool:
-    """Clean replacement for the legacy cross-cohort figure.
-
-    The older static Figure 1 mixed leave-one-pathway-out diagnostics with the
-    headline OSD-513 cosine, which left a stale label in the rendered panel.
-    This version uses the canonical TSV artifacts and labels each statistic
-    explicitly.
-    """
+    """Cross-cohort recurrence figure from canonical TSV artifacts, with explicit stat labels."""
     cross_path = (
         PROJECT_ROOT
         / "data/results/run_20260518_201823_2500g/contrast_vectors/"

@@ -1,26 +1,5 @@
 #!/usr/bin/env python3
-"""
-Cross-cohort spaceflight kidney distal-nephron suppression classifier.
-
-Goal (STS / v11 extension): turn the interpretive multi-omics result into a
-*portable, validated artifact*. Train a flight-vs-ground detector on bulk mouse
-kidney RNA and test whether it generalizes across independent cohorts (different
-strains, labs, missions) with LEAVE-ONE-COHORT-OUT (LOCO) validation.
-
-Honesty guardrails baked in:
-  1. Features are z-scored WITHIN each cohort, so the model cannot win on
-     cohort-level (batch/strain) mean shifts.
-  2. Validation is LOCO: the held-out cohort's batch is never seen in training.
-  3. Three specificity controls:
-       (a) an a-priori biological signature score (no training),
-       (b) size-matched RANDOM gene panels (does any panel do this well?),
-       (c) within-cohort label PERMUTATION null (is the AUC above chance?).
-  4. Within-cohort 5-fold CV AUC is reported alongside LOCO to show, honestly,
-     how much generalization is lost across cohorts.
-
-Cohorts (kidney, on disk): OSD-102, OSD-163, OSD-253, OSD-462, OSD-513.
-Outputs -> data/results/run_20260701_sf_classifier/
-"""
+"""LOCO-validated flight-vs-ground kidney RNA classifier with within-cohort z-scoring and specificity nulls."""
 import os, json, warnings
 import numpy as np
 import pandas as pd

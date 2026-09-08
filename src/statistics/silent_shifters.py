@@ -1,18 +1,5 @@
 # src/statistics/silent_shifters.py
-"""
-Phase 5: DE-aware silent shifter generation.
-
-Definitions:
-  * candidate rewired genes: top rewiring quantile, regardless of DE.
-  * DE-supported genes: high rewiring with differential-expression support.
-  * strict silent shifters: high rewiring and bounded/small mean-expression
-    change (shrunken |log2FC| < threshold, most of the 95% CI lies inside a
-    small-effect interval, and DE FDR is not significant).
-  * supported strict subset: strict silent shifters with Phase 6 support.
-
-Missing DE is an error by default. Older rewiring-only behavior can be requested
-only with --allow_missing_de and is labelled exploratory.
-"""
+"""Phase 5: DE-aware silent-shifter tiers; missing DE errors unless --allow_missing_de."""
 
 from __future__ import annotations
 

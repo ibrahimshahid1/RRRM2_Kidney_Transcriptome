@@ -1,35 +1,5 @@
 #!/usr/bin/env python3
-"""Stage 0: observed effect size for the known-positive axis.
-
-Why this exists
----------------
-A power simulation needs a reference effect size. The ECM/remodeling axis is the
-one program already reported as recurrent across this corpus (signed Stouffer
-p = 7.0e-4 in prior repository analyses), so it is the natural anchor: if the
-random-effects pooled Hedges g for the *known positive* falls below the
-detectable threshold implied by the design, the four-axis confirmatory study is
-not viable and no further Stage 0 work is warranted.
-
-Signed Stouffer tests direction and is considerably more powerful than a
-random-effects meta of magnitudes. It therefore does not tell you the effect
-size, which is the quantity that governs power for the axis-ranking design.
-
-Method
-------
-Per cohort: per-sample mean z-score across axis genes (z computed within cohort
-on VST values), then Hedges g for flight versus ground control, then a
-DerSimonian-Laird random-effects pool across cohorts with I-squared.
-
-Boundary
---------
-This is a design-calibration estimate, not a biological claim. Cohorts failing
-the Stage 0B coverage-confounding gate are reported but flagged, and the pooled
-estimate is given both with and without them.
-
-Usage
------
-    python3 scripts/stage0/axis_effect_size_anchor.py
-"""
+"""Stage 0: pooled Hedges g for the known-positive ECM axis as a design calibration, not a biological claim."""
 
 from __future__ import annotations
 

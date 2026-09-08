@@ -199,9 +199,7 @@ def recurrence_fig(out_dir):
     ncc_rna = float(ncc_row["osd462_rna_effect"])
     ncc_prot = float(ncc_row["protein_flight_effect"])
     ncc_sites = phos[phos["gene_symbol"] == "Slc12a3"]
-    # Context-only residue-indexed features.  The T53 row is a T53/Y65
-    # phosphoform and the S383 row is an S382/S383 phosphoform; neither is an
-    # isolated canonical-site measurement.
+    # Context-only: the T53 and S383 rows are co-modified phosphoforms, not isolated canonical sites.
     ncc_context = ncc_sites[ncc_sites["site_position"].astype(str).eq("53")]
     ncc_phos = float(ncc_context["phospho_effect"].mean())
     spak_context = phos[

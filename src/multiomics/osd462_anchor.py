@@ -37,10 +37,7 @@ class TmtTable:
 
 
 def _classify_header(header: str, sample_label: str) -> dict | None:
-    """Map a row-3 machine header + row-2 sample label to channel metadata.
-
-    Returns ``None`` for non-quantitative columns (metadata columns).
-    """
+    """Map a row-3 machine header and row-2 label to channel metadata; None for metadata columns."""
     if not isinstance(header, str) or "~" not in header:
         return None
     low = header.lower()
@@ -71,23 +68,7 @@ def parse_tmt_sheet(
     extra_meta_cols: Sequence[str] | None = None,
     header_row: int = 3,
 ) -> TmtTable:
-    """Parse one TMT workbook sheet into a :class:`TmtTable`.
-
-    Parameters
-    ----------
-    path, sheet
-        Workbook path and sheet name.
-    gene_col
-        Name of the gene-symbol column in the row-``header_row`` header.
-    peptide_cols
-        Mapping ``{PLEX1: <peptide col name>, PLEX2: <peptide col name>}``.
-    id_col
-        Optional protein-id column to retain.
-    extra_meta_cols
-        Additional metadata column names to retain (e.g. site position).
-    header_row
-        1-based index of the machine-header row (3 for these workbooks).
-    """
+    """Parse one TMT workbook sheet into a :class:`TmtTable` (``header_row`` is 1-based, 3 here)."""
     import openpyxl
 
     path = Path(path)
@@ -195,19 +176,7 @@ def compute_flight_effect(
     min_channels_per_condition: int = 2,
     channel_center: bool = True,
 ) -> pd.DataFrame:
-    """Per-row Flight - Ground flight effect, estimated within each plex.
-
-    For each plex the effect is ``mean(log2 FL) - mean(log2 GC)`` over the
-    available channels; the two plex estimates are then averaged.  Optional
-    per-channel med=ian centering (``channel_center``) performs standard TMT
-    sample-loading normalization within each plex; because the differencing is
-    within plex, both the per-plex normalization constant and (after centering)
-    per-channel loading cancel.
-
-    Returns one row per input row with the flight effect, per-plex effects,
-    plex coverage, peptide counts, and a mean-abundance column used for
-    matched-null binning.
-    """
+    """Per-row Flight - Ground effect averaged across plexes, optionally channel-median centered."""
     centers = {p: (_plex_channel_centers(table, p) if channel_center else None)
                for p in (PLEX1, PLEX2)}
 
@@ -257,15 +226,7 @@ def compute_site_flight_effect_lm(
     min_per_condition: int = 3,
     channel_center: bool = True,
 ) -> pd.DataFrame:
-    """Per-row FL - GC effect with CI from a plex-adjusted linear model.
-
-    For each row, log2 scaled FL/GC channels (both plexes) are fit with
-    ``y ~ flight + plex``; the flight coefficient is the plex-corrected
-    FL - GC effect.  By default, per-channel median centering performs the same
-    within-plex TMT loading normalization used for protein effects.  Returns
-    effect, SE, 95% CI, two-sided p, and channel counts.  Suitable for the
-    small phosphosite tables where a per-site interval is wanted.
-    """
+    """Per-row FL - GC effect, SE, CI and p from a per-site ``y ~ flight + plex`` linear model."""
     from scipy.stats import t as t_dist
 
     centers = {p: (_plex_channel_centers(table, p) if channel_center else None)
@@ -344,12 +305,7 @@ def collapse_to_gene(
     effect_col: str = "flight_effect",
     require_both_plex: bool = True,
 ) -> pd.DataFrame:
-    """Collapse multiple protein rows per gene symbol into one gene-level row.
-
-    Many-to-one collisions (isoforms / shared symbols) are resolved by a
-    peptide-weighted mean of the flight effect; peptide counts are summed and
-    the number of collapsed rows is logged in ``n_protein_rows``.
-    """
+    """Collapse protein rows to one row per gene by peptide-weighted mean of the flight effect."""
     df = effects.copy()
     if require_both_plex:
         df = df[df["plex_coverage"] == 2]
@@ -449,14 +405,7 @@ def matched_null_test(
     rng: np.random.Generator | None = None,
     alpha: float = 0.05,
 ) -> MatchedNullResult:
-    """Stratum-matched random-gene-set null for a gene-set statistic.
-
-    ``pool`` is the background of all genes (with effects + match columns);
-    ``target_mask`` selects the gene set; ``stat_fn`` maps a sub-frame of
-    ``pool`` to a scalar; ``strata`` is the matched-sampling stratum per pool
-    row.  Each null draw samples, within each stratum, the same number of genes
-    the target set has there, then recomputes ``stat_fn``.
-    """
+    """Stratum-matched random-gene-set null: each draw resamples the target's per-stratum counts."""
     if rng is None:
         rng = np.random.default_rng()
     pool = pool.reset_index(drop=True)
@@ -509,12 +458,7 @@ def pathway_effect_vector(
     gene_sets: dict[str, list[str]],
     min_genes: int = 3,
 ) -> tuple[pd.Series, pd.DataFrame]:
-    """Mean gene effect per pathway -> ordered pathway vector + coverage table.
-
-    ``gene_effect`` is indexed by the same id space as the gene-set members
-    (e.g. ENSMUSG).  Pathways with fewer than ``min_genes`` mapped, finite
-    members are dropped from the vector.
-    """
+    """Mean gene effect per pathway; pathways with < ``min_genes`` finite members are dropped."""
     records = []
     values = {}
     for name, members in gene_sets.items():

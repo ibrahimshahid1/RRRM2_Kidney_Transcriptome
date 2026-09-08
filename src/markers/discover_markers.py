@@ -27,10 +27,7 @@ def build_design_matrix(
     cell_cols: list[str],
     drop_segment: str | None = None,
 ) -> tuple[np.ndarray, int, list[str]]:
-    """Build design matrix with target segment as the coefficient of interest.
-
-    Returns (X, target_col_idx, column_names).
-    """
+    """Build design matrix with the target segment as coefficient; returns (X, col_idx, names)."""
     n = len(meta)
     parts = [np.ones((n, 1))]
     col_names = ["intercept"]
@@ -196,10 +193,7 @@ def discover_segment_markers(
     max_panel: int = 200,
     seed: int = 42,
 ) -> tuple[pd.DataFrame, list[str]]:
-    """Discover marker genes for a single segment.
-
-    Returns (results_df, panel_genes).
-    """
+    """Discover marker genes for one segment; returns (results_df, panel_genes)."""
     from scipy.stats import pearsonr as _pearsonr
 
     rng = np.random.default_rng(seed)

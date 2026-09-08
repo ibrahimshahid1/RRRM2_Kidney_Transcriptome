@@ -101,13 +101,7 @@ def load_mechanism_sets(symbols: bool = False) -> dict[str, dict]:
 
 
 def build_symbol_to_ensembl() -> dict[str, str]:
-    """Symbol (lowercase) -> ENSMUSG, OSD-462 DE table preferred, id_map fallback.
-
-    The OSD-462 differential-expression table provides an authoritative
-    SYMBOL<->ENSEMBL bridge for this organism/build; we prefer it and fall back
-    to the project id_map for symbols it does not contain.  One-to-many
-    collisions keep the first occurrence (logged by the caller).
-    """
+    """Map lowercase symbol -> ENSMUSG, preferring the OSD-462 DE table over id_map; first hit wins on collisions."""
     de = pd.read_csv(RNA_DE, usecols=["ENSEMBL", "SYMBOL"], dtype=str)
     de = de.dropna(subset=["ENSEMBL", "SYMBOL"])
     bridge: dict[str, str] = {}

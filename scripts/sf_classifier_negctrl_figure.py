@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""Feature-specificity negative control (random-gene score null) + summary figure.
-
-OSD-105 muscle (a non-kidney TISSUE control) is not on disk, so the download-free
-negative control here is a FEATURE-specificity control: do random size-matched
-up/down gene sets reach the a-priori signature's cross-cohort AUC? If not, the
-biological signature is specifically informative, not a generic property of any
-gene set. (A non-kidney tissue control remains a recommended one-time add.)
-"""
+"""Random-gene-panel feature-specificity null and summary figure; not a non-kidney tissue control."""
 import os, json, warnings
 import numpy as np, pandas as pd
 from sklearn.metrics import roc_auc_score

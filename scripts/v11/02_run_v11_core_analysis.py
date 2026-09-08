@@ -717,9 +717,7 @@ def approximate_bayes_linear(y, X, n_draws=10000, seed=20260526):
 
 
 def run_mediation(root: Path):
-    # Stage 0 invalidated the outcome used by the historical mediation:
-    # position-indexed T53 and S383 rows are co-modified phosphoforms, and no
-    # isolated canonical NCC/SPAK feature qualifies. Fail closed.
+    # Stage 0 invalidated this mediation outcome: T53/S383 are co-modified phosphoforms. Fail closed.
     reason = (
         "not_run: zero isolated canonical OSD-462 NCC/SPAK assay features; "
         "historical ncc_activity_score_regulatory is invalid as an activity outcome"

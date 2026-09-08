@@ -87,16 +87,7 @@ def load_family(path: Path, minimum_defined: int = 8):
 
 
 def add_disjoint_podocyte_variants(family, definition_audit):
-    """Add two conservative high-specificity podocyte sensitivity sets.
-
-    The original atlas-defined family remains intact.  The two added sets use
-    exactly the original high-specificity podocyte definition after removing
-    (i) the six frozen barrier-core genes or (ii) those six plus the two
-    expanded barrier markers.  Keeping the original family members and adding
-    both sensitivities makes max-|T| inference conservative over the complete
-    51-evaluable-set family rather than treating either sensitivity as a
-    separately corrected test.
-    """
+    """Add barrier-depleted podocyte sensitivity sets into the same corrected max-|T| family, not as separate tests."""
 
     if PODOCYTE_HIGH_SPECIFICITY not in family:
         raise ValueError(

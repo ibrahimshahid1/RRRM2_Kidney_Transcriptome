@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Reconstruct GSE228367 subtype pseudobulks from official raw 10x matrices.
-
-The author-separated RDS objects supply cell membership only. This helper
-matches those cells to the NK1--NK3 filtered 10x H5 matrices in the official
-GEO raw archive, verifies complete barcode coverage and integer counts, then
-emits gene-symbol-collapsed count and detection pseudobulks for edgeR.
-"""
+"""Rebuild GSE228367 subtype pseudobulks from raw 10x matrices, verifying barcode coverage and integer counts."""
 
 from __future__ import annotations
 

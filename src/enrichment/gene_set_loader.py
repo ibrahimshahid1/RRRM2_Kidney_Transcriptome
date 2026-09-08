@@ -1,21 +1,5 @@
 # src/enrichment/gene_set_loader.py
-"""
-Gene set loader for enrichment analysis.
-
-Fetches gene set collections from Enrichr (via gseapy), caches locally
-for reproducibility, and supports offline .gmt files.
-
-Symbol resolution uses the Ensembl-backed id_map.json (built by
-src.data.build_id_map via the Ensembl REST API) instead of the
-old title-casing heuristic.
-
-Usage:
-    from src.enrichment.gene_set_loader import load_gene_sets
-
-    sets, libs = load_gene_sets()
-    # sets : dict[set_name → list[mouse_symbol]]
-    # libs : dict[set_name → library_name]
-"""
+"""Load Enrichr, .gmt, and curated-YAML gene sets, resolving symbols via the Ensembl id_map."""
 from __future__ import annotations
 
 import json
@@ -42,11 +26,7 @@ DEFAULT_LIBRARIES: list[str] = [
 # Ensembl-backed symbol resolution
 
 def load_id_map(path: Path | None = None) -> dict[str, str]:
-    """Load the Ensembl→Symbol JSON map and build a case-insensitive
-    symbol → canonical symbol lookup.
-
-    Returns dict: lowercase_symbol → canonical_mouse_symbol
-    """
+    """Load the Ensembl->Symbol map as a lowercase-symbol to canonical-mouse-symbol lookup."""
     if path is None:
         path = DEFAULT_ID_MAP
 
@@ -72,11 +52,7 @@ def load_id_map(path: Path | None = None) -> dict[str, str]:
 
 
 def resolve_symbol(sym: str, lookup: dict[str, str]) -> str:
-    """Resolve a gene symbol to its canonical mouse form using the
-    Ensembl-backed id_map.
-
-    Falls back to the original string if not found.
-    """
+    """Resolve a gene symbol to canonical mouse form via the id_map, falling back to the input."""
     canonical = lookup.get(sym.lower())
     if canonical:
         return canonical
@@ -89,11 +65,7 @@ def load_curated_from_yaml(
     yaml_path: Path | None = None,
     id_map_path: Path | None = None,
 ) -> dict[str, list[str]]:
-    """Load curated gene sets from config/gene_sets.yaml and resolve
-    each symbol against the Ensembl-backed id_map.
-
-    Returns: dict[set_name → list[resolved_mouse_symbol]]
-    """
+    """Load curated gene sets from config/gene_sets.yaml, resolving symbols via the id_map."""
     if yaml_path is None:
         yaml_path = DEFAULT_CURATED_YAML
     if id_map_path is None:
@@ -164,13 +136,7 @@ def load_curated_from_yaml(
 def load_segment_marker_panels(
     marker_dir: Path | None = None,
 ) -> dict[str, list[str]]:
-    """Load data-driven marker panels from Phase 1.5b (discover_markers.py).
-
-    Each segment has a <SEGMENT>_marker_panel.txt file containing one gene
-    per line.  These are loaded as 'segment_markers::SEGMENT' gene sets.
-
-    Also checks the run-specific results directory.
-    """
+    """Load Phase 1.5b per-segment marker panels as 'segment_markers::SEGMENT' gene sets."""
     import os
 
     sets: dict[str, list[str]] = {}
@@ -264,29 +230,7 @@ def load_gene_sets(
     include_segment_markers: bool = True,
     segment_marker_dir: Path | None = None,
 ) -> tuple[dict[str, list[str]], dict[str, str]]:
-    """
-    Load gene sets from Enrichr libraries, .gmt files, and/or curated YAML.
-
-    All symbols are resolved to canonical mouse form using the Ensembl-backed
-    id_map.json (if available).  Falls back to raw strings if unavailable.
-
-    Parameters
-    ----------
-    libraries : list of Enrichr library names (None → DEFAULT_LIBRARIES)
-    gmt_files : list of paths to .gmt files
-    cache_dir : directory for caching Enrichr downloads
-    id_map_path : path to id_map.json (None → default location)
-    curated_yaml : path to curated gene sets YAML (None → config/gene_sets.yaml)
-    min_size, max_size : gene-set size filter (inclusive)
-    include_curated : also include curated sets from YAML
-
-    Returns
-    -------
-    gene_sets : dict[str, list[str]]
-        set_name → list of mouse gene symbols
-    set_to_library : dict[str, str]
-        set_name → source library name
-    """
+    """Load size-filtered Enrichr/.gmt/YAML gene sets; returns (gene_sets, set_to_library)."""
     if cache_dir is None:
         cache_dir = DEFAULT_CACHE
     cache_dir.mkdir(parents=True, exist_ok=True)

@@ -46,13 +46,7 @@ def load_lincs_gene_info(path: str | Path = GENE_INFO) -> pd.DataFrame:
 
 
 def load_ortholog_map(path: str | Path | None) -> dict[str, str]:
-    """Load an optional mouse->human symbol map.
-
-    Expected columns are flexible but should contain mouse and human symbol
-    names.  If no path is supplied or the file is absent, an empty map is
-    returned and the query builder falls back to conservative uppercase symbol
-    matching.
-    """
+    """Load an optional mouse->human symbol map; an absent file falls back to uppercase matching."""
     if path is None:
         return {}
     p = Path(path)
@@ -156,11 +150,7 @@ def decode_bytes(values) -> list[str]:
 
 
 def connectivity_score(values: np.ndarray, up_local: np.ndarray, down_local: np.ndarray) -> np.ndarray:
-    """Approximate signed CMap score for signature rows.
-
-    Positive means the signature mimics the mouse flight meta-signature
-    (up-query genes high and down-query genes low); negative means reversal.
-    """
+    """Approximate signed CMap score; positive mimics the flight signature, negative reverses."""
     up = values[:, up_local]
     down = values[:, down_local]
     return np.nanmean(up, axis=1) - np.nanmean(down, axis=1)

@@ -1,16 +1,5 @@
 # src/networks/procrustes.py
-"""
-Phase 3.3: Procrustes alignment + cosine-distance rewiring (multi-seed)
-
-- Loads configured anchors from config/anchor_genes.yaml
-- Resolves symbols to Ensembl IDs through id_map.tsv
-- Aligns embeddings per seed via orthogonal Procrustes
-- Computes rewiring = 1 − cosine_similarity
-- Reports seed mean/std + rank variance
-
-Usage:
-    python -m src.networks.procrustes
-"""
+"""Phase 3.3: multi-seed Procrustes alignment and 1 - cosine rewiring over configured anchors."""
 from __future__ import annotations
 
 import os
@@ -85,11 +74,7 @@ def load_configured_anchor_indices(
 
 
 def orthogonal_procrustes_align(B: np.ndarray, A: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Rotate B to best match A using orthogonal Procrustes:
-      find R minimizing ||B R - A||_F
-      return (B_aligned, R)
-    """
+    """Rotate B onto A by orthogonal Procrustes; returns (B_aligned, R)."""
     try:
         from scipy.linalg import orthogonal_procrustes
     except Exception as e:
