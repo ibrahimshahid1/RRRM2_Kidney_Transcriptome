@@ -21,7 +21,7 @@ docs:
   - docs/ANALYSIS_TRIAGE_AND_NETWORK_REFRAME_2026-07-29.md
 
 results_root: data/results/contrast-vectors
-reference_run: data/results/run_20260518_172747_contrast_vectors
+reference_run: data/archive/results/run_20260518_172747_contrast_vectors
 figures_root: null
 
 requires:

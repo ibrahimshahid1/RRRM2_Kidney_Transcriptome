@@ -26,7 +26,7 @@ docs:
   - docs/v13_reporting.md
 
 results_root: data/results/v13-phospho
-reference_run: data/results/run_20260729_v13_continuous_phospho_exact_final
+reference_run: data/archive/results/run_20260729_v13_continuous_phospho_exact_final
 figures_root: figures/v13
 
 requires:

@@ -23,12 +23,12 @@ docs:
   - docs/PUBLICATION_STRATEGY_AFTER_GREY60_NOGO_2026-07-29.md
 
 results_root: data/results/grey60
-reference_run: data/results/run_20260729_grey60_adversarial
+reference_run: data/archive/results/run_20260729_grey60_adversarial
 figures_root: null
 
 requires:
   data:
-    - data/results/run_20260505_remediated_2500g
+    - data/archive/results/run_20260505_remediated_2500g
   r: true
 
 stages:

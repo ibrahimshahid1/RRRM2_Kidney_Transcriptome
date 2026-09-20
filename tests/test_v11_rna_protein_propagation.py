@@ -6,7 +6,7 @@ from src.v11.matched_null import ols_slope, prepare_matched_pool, run_matched_nu
 from src.v11.rna_protein_propagation import classify_gene, direction
 
 
-RUN_ROOT = "data/results/run_20260606_v11_layer_specificity"
+RUN_ROOT = "data/archive/results/run_20260606_v11_layer_specificity"
 
 
 def test_ols_slope_recovers_intercept_inclusive_slope():

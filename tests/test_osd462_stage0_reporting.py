@@ -11,7 +11,7 @@ SCRIPT_PATH = (
     REPO_ROOT / "scripts" / "osd462" / "09_stage0_manuscript_reporting.py"
 )
 STAGE0_DIR = (
-    REPO_ROOT / "data" / "results" / "run_20260728_osd462_stage0"
+    REPO_ROOT / "data" / "archive" / "results" / "run_20260728_osd462_stage0"
 )
 
 

@@ -28,7 +28,7 @@ docs:
   - docs/MANUSCRIPT_V1_V12_CROSS_VERSION_AUDIT_2026-07-29.md
 
 results_root: data/results/v11-core
-reference_run: data/results/run_20260526_v11_dct1_phospho_mediation
+reference_run: data/archive/results/run_20260526_v11_dct1_phospho_mediation
 figures_root: null
 
 requires:

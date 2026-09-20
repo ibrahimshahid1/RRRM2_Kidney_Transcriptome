@@ -14,7 +14,7 @@ from src.v11.h2_composition_aware_phospho import covariate_diagnostics, fixed_se
 from src.v11.publication_figures import axis_has_visible_data, fig_h2_primary_enrichment, legend_overlaps_visible_data, plt, qa_axis
 
 
-RUN_ROOT = "data/results/run_20260526_v11_dct1_phospho_mediation"
+RUN_ROOT = "data/archive/results/run_20260526_v11_dct1_phospho_mediation"
 
 
 def test_v11_fisher_table_uses_directional_greater_alternative():

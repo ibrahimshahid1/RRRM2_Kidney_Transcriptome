@@ -30,7 +30,7 @@ docs:
   - docs/PODOCYTE_CROSS_MISSION_PAPER_BLUEPRINT_2026-08-11.md
 
 results_root: data/results/clinical-axes
-reference_run: data/results/run_20260811_clinical_renal_axes_cross_mission
+reference_run: data/archive/results/run_20260811_clinical_renal_axes_cross_mission
 figures_root: figures/clinical_renal_axes_cross_mission
 
 requires:

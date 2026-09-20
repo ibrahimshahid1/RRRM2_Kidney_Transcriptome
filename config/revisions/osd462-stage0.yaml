@@ -29,7 +29,7 @@ docs:
   - docs/osd462_data_manifest.md
 
 results_root: data/results/osd462-stage0
-reference_run: data/results/run_20260728_osd462_stage0
+reference_run: data/archive/results/run_20260728_osd462_stage0
 figures_root: figures/v13
 
 requires:

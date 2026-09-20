@@ -3,6 +3,7 @@ data/processed/
 data/external/
 data/networks/
 data/results/
+data/archive/
 
 # Keep the raw-data README.
 data/raw/*

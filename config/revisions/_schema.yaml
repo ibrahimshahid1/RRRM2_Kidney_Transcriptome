@@ -20,7 +20,7 @@ conclusion: >-                     # what it actually concluded; null if not run
 spec_config: config/<file>.yaml    # frozen machine-readable spec, or null
 docs: []                           # plan / decision records, in reading order
 results_root: data/results/<id>    # class-level results folder for NEW runs
-reference_run: data/results/run_...   # the historical locked run, or null
+reference_run: data/archive/results/run_...   # the historical locked run, or null
 figures_root: figures/<id>         # or null
 
 requires:                          # preflight checks before any stage runs

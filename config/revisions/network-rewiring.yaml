@@ -26,7 +26,7 @@ docs:
   - docs/provenance_audit_2026-06-06.md
 
 results_root: data/results/network-rewiring
-reference_run: data/results/run_20260505_remediated_2500g
+reference_run: data/archive/results/run_20260505_remediated_2500g
 figures_root: null
 
 requires:

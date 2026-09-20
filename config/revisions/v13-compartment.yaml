@@ -23,7 +23,7 @@ docs:
   - docs/POST_V13_DIRECTION_DECISION_2026-08-11.md
 
 results_root: data/results/v13-compartment
-reference_run: data/results/run_20260802_v13_compartment_adversarial
+reference_run: data/archive/results/run_20260802_v13_compartment_adversarial
 figures_root: figures/v13
 
 requires:
@@ -41,7 +41,7 @@ stages:
       - "--config"
       - "{spec_config}"
       - "--exact-dir"
-      - "data/results/run_20260802_v13_compartment_exact"
+      - "data/archive/results/run_20260802_v13_compartment_exact"
       - "--output-dir"
       - "{run_dir}"
     optional: false
