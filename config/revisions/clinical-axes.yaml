@@ -19,7 +19,16 @@ conclusion: >-
   opposite-direction lead. In the 49-set compartment family only podocyte
   high_specificity clears (g = 0.689, maxT 0.0189). The declared structural
   negative control ranks 4th at g = 0.549, above podocyte tiers built by
-  removing structural genes; this remains the open question.
+  removing structural genes. K0 resolves that open question by mutual
+  adjustment (HC3, blocked by mission, 100k label permutations): the podocyte
+  flight coefficient attenuates from g = 0.198 (95% CI 0.023-0.374) to 0.112
+  (CI -0.031-0.255, maxT FWER 0.061) when the disjoint structural score is a
+  covariate, while the reciprocal structural coefficient collapses to 0.031
+  (CI -0.130-0.192) when adjusted for podocyte. The podocyte program carries
+  the larger, direction-preserved share, but the adjusted interval crosses zero
+  and does not clear the max-|T| family - so the signal is a shared structural
+  drift with a podocyte-leaning tail, not a family-wise-separable podocyte
+  program. Report as a bounded observation, not a standalone podocyte headline.
 
 spec_config: config/clinical_renal_axes_cross_mission.yaml
 docs:
@@ -125,6 +134,24 @@ stages:
     args: ["--config", "{spec_config}", "--results", "{run_dir}"]
     optional: false
     outputs: []
+
+  - id: podocyte-scaffold-specificity
+    title: "K0 - podocyte high-specificity score adjusted for the structural scaffold (+ reciprocal, direct contrast, maxT over the family)"
+    needs: [compartment-context]
+    runner: python
+    entry: scripts/clinical_axes/run_podocyte_scaffold_specificity.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--results"
+      - "{run_dir}"
+      - "--permutations"
+      - "100000"
+    optional: false
+    outputs:
+      - podocyte_scaffold_meta.tsv
+      - podocyte_scaffold_permutation.tsv
+      - podocyte_scaffold_leave_one_mission.tsv
 
   - id: osd656-urine
     title: OSD-656 human urine context (non-inferential by design)
