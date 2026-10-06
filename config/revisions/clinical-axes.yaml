@@ -360,6 +360,71 @@ stages:
       - podocyte_sensitivities/podocyte_sensitivity_gates.json
       - podocyte_sensitivities/idmap_sensitivity.tsv
 
+  - id: recovery-persistence-power
+    title: "G2 power simulation of the preregistered decision rule (reads no expression data)"
+    needs: []
+    runner: python
+    entry: scripts/clinical_axes/run_recovery_persistence.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--prereg"
+      - "config/clinical_axes_recovery_persistence.yaml"
+      - "--results"
+      - "{run_dir}/g2_power"
+      - "--power-only"
+    optional: true
+    requires:
+      - config/clinical_axes_recovery_persistence.yaml
+    outputs:
+      - g2_power/recovery_persistence/persistence_power.tsv
+
+  - id: recovery-persistence
+    title: "G2 - persistence of the terminal shift through live return (OSD-771 ISS-T vs LAR joint HC3 + Freedman-Lane, margin sweep; OSD-513 descriptive; refuses an uncommitted prereg)"
+    needs: []
+    runner: python
+    entry: scripts/clinical_axes/run_recovery_persistence.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--prereg"
+      - "config/clinical_axes_recovery_persistence.yaml"
+      - "--results"
+      - "{run_dir}"
+    optional: false
+    requires:
+      - config/clinical_axes_recovery_persistence.yaml
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/processed/resources/id_map_reconstructed.tsv
+      - data/raw/metadata/s_OSD-771.txt
+    outputs:
+      - recovery_persistence/persistence_contrasts.tsv
+      - recovery_persistence/persistence_margin_sweep.tsv
+      - recovery_persistence/persistence_arm_effects.tsv
+
+  - id: recovery-persistence-idmap
+    title: "G2 primary and key-secondary classifications under the baseline and runner-up gene maps"
+    needs: []
+    runner: python
+    entry: scripts/clinical_axes/run_recovery_persistence.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--prereg"
+      - "config/clinical_axes_recovery_persistence.yaml"
+      - "--results"
+      - "{run_dir}/g2_idmap"
+      - "--idmap-sensitivity"
+    optional: false
+    requires:
+      - config/clinical_axes_recovery_persistence.yaml
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/processed/resources/id_map_reconstructed.tsv
+      - data/processed/resources/id_map.tsv
+      - data/raw/metadata/s_OSD-771.txt
+    outputs:
+      - g2_idmap/recovery_persistence/idmap_sensitivity.tsv
+
   - id: osd656-urine
     title: OSD-656 human urine context (non-inferential by design)
     needs: [cross-mission]
