@@ -176,7 +176,10 @@ moderator_cohorts:
     selection: LAR Space Flight versus LAR Ground Control, age-blocked
 
 gene_mapping:
-  path: data/processed/resources/id_map.tsv
+  # Reconstructed baseline map (config/gene_map_reconstruction.yaml; built by
+  # scripts/clinical_axes/build_reconstructed_id_map.py). The raw Ensembl-116 map,
+  # data/processed/resources/id_map.tsv, is the runner-up used for reconstruction sensitivity.
+  path: data/processed/resources/id_map_reconstructed.tsv
   annotation_fallback: data/external/osdr/OSD-462/GLDS-462_rna_seq_differential_expression_totRNA_GLbulkRNAseq.csv
   ensembl_column: ensembl_gene_id
   symbol_column: mgi_symbol

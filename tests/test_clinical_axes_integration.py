@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
+from conftest import requires_paths
 
 from src.clinical_axes.analysis import combined_score_design
 from src.clinical_axes.data import load_primary_missions
@@ -14,6 +15,29 @@ from scripts.clinical_axes.run_compartment_context import (
 
 REPO = Path(__file__).resolve().parents[1]
 CONFIG = REPO / "config/clinical_renal_axes_cross_mission.yaml"
+_PATH_KEYS = ("vst", "counts", "runsheet", "sample_table", "metadata", "qc")
+
+
+def _primary_data_paths() -> list[str]:
+    """Every raw input the five primary missions and the gene map read.
+
+    Derived from the frozen config so the skip condition cannot drift from what
+    ``load_primary_missions`` actually opens.
+    """
+    if not CONFIG.exists():
+        return [str(CONFIG.relative_to(REPO))]
+    config = yaml.safe_load(CONFIG.read_text())
+    paths = [
+        spec[key]
+        for spec in config["primary_missions"].values()
+        for key in _PATH_KEYS
+        if key in spec
+    ]
+    paths.append(config["gene_mapping"]["path"])
+    return paths
+
+
+DATA_INPUTS = requires_paths(str(CONFIG.relative_to(REPO)), *_primary_data_paths())
 
 
 def _load():
@@ -21,6 +45,7 @@ def _load():
     return config, load_primary_missions(config, REPO)
 
 
+@DATA_INPUTS
 def test_frozen_primary_contrasts_resolve_to_expected_biological_animals():
     _, missions = _load()
     expected = {
@@ -41,6 +66,7 @@ def test_frozen_primary_contrasts_resolve_to_expected_biological_animals():
         assert list(data.counts.columns) == list(data.metadata.index)
 
 
+@DATA_INPUTS
 def test_every_frozen_axis_meets_declared_coverage_in_every_primary_mission():
     config, missions = _load()
     scores, design, coverage, _ = combined_score_design(

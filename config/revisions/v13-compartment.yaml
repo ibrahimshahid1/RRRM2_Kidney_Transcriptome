@@ -31,18 +31,35 @@ requires:
     - data/external
   r: false
 
+# The audit post-processes the archived exact run and the legacy OSD-462 / Grey60
+# diagnostics named below. Those run directories are not in a fresh checkout and
+# regenerating them is out of scope, so `rrrm2 doctor` reports this revision as
+# BLOCKED until they are restored. Marker-tier preparation (the audit script's
+# `prepare` subcommand) is registered as the optional clinical-axes stage
+# `marker-tiers`; it is NOT repeated here.
 stages:
   - id: audit
-    title: Reference-only set preparation and effect-aware post-processing
+    title: Effect-aware post-processing of the archived exact run (legacy inputs required)
     needs: []
     runner: python
     entry: scripts/v13/compartment_adversarial_audit.py
     args:
       - "--config"
       - "{spec_config}"
+      - "postprocess"
       - "--exact-dir"
       - "data/archive/results/run_20260802_v13_compartment_exact"
       - "--output-dir"
       - "{run_dir}"
     optional: false
+    requires:
+      - data/archive/results/run_20260802_v13_compartment_exact
+      - data/results/run_20260729_v13_continuous_phospho_exact_final
+      - data/results/run_20260729_v13_intensity_confound_audit
+      - data/results/run_20260729_osd462_reporter_position
+      - data/results/run_20260729_osd462_layer_block_shift
+      - data/results/run_20260729_grey60_adversarial/internal/influence/gene_contrasts.tsv
+      - data/results/run_20260728_osd462_stage0/reporting/osd462_slc12a3_stk39_phosphoform_provenance_compact.tsv
+      - data/results/codex_review_osd462/osd462_anchor/protein_effects_gene_anyplex.tsv
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
     outputs: []

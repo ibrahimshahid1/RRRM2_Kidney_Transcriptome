@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 import os
@@ -18,17 +18,39 @@ from .registry import Revision, Stage
 
 @dataclass
 class Preflight:
-    """Result of checking that a revision can run at all."""
+    """Result of checking that a revision can run at all.
+
+    ``blocked_stages`` maps each stage that cannot run (missing entry script or
+    missing stage-level ``requires`` path) to the reasons. With
+    ``optional_as_warnings`` an optional stage's missing ``requires`` are kept
+    out of ``problems`` and reported in ``degraded_stages`` / ``warnings``.
+    """
 
     ok: bool
     problems: list[str]
     warnings: list[str]
+    blocked_stages: dict[str, list[str]] = field(default_factory=dict)
+    degraded_stages: dict[str, list[str]] = field(default_factory=dict)
 
 
-def preflight(revision: Revision, *, stages: list[Stage] | None = None) -> Preflight:
-    """Check interpreters, entry scripts, spec config, and declared data inputs."""
+def preflight(
+    revision: Revision,
+    *,
+    stages: list[Stage] | None = None,
+    optional_as_warnings: bool = False,
+) -> Preflight:
+    """Check interpreters, entry scripts, spec config, and declared data inputs.
+
+    Revision-level ``requires.data`` and stage-level ``requires`` are literal
+    repo-relative paths. A missing stage input is reported as
+    ``stage <id>: missing required input <path>``; ``optional_as_warnings``
+    (used by ``rrrm2 doctor``) downgrades that to a warning for optional stages,
+    because an unmet optional stage never blocks a default run.
+    """
     problems: list[str] = []
     warnings: list[str] = []
+    blocked: dict[str, list[str]] = {}
+    degraded: dict[str, list[str]] = {}
     stages = stages if stages is not None else list(revision.stages)
 
     if revision.spec_config and not (REPO_ROOT / revision.spec_config).exists():
@@ -43,7 +65,17 @@ def preflight(revision: Revision, *, stages: list[Stage] | None = None) -> Prefl
 
     for st in stages:
         if not st.entry_path.exists():
-            problems.append(f"stage {st.id}: entry not found: {st.entry}")
+            message = f"stage {st.id}: entry not found: {st.entry}"
+            problems.append(message)
+            blocked.setdefault(st.id, []).append(message)
+        for path in st.missing_requires():
+            message = f"stage {st.id}: missing required input {path}"
+            if st.optional and optional_as_warnings:
+                warnings.append(f"{message} (optional stage, skipped by default)")
+                degraded.setdefault(st.id, []).append(message)
+            else:
+                problems.append(message)
+                blocked.setdefault(st.id, []).append(message)
 
     if any(st.runner == "rscript" for st in stages) and shutil.which("Rscript") is None:
         problems.append(
@@ -56,7 +88,8 @@ def preflight(revision: Revision, *, stages: list[Stage] | None = None) -> Prefl
             f"revision status is {revision.status!r} — "
             "its outputs are historical and must not be cited as current results"
         )
-    return Preflight(ok=not problems, problems=problems, warnings=warnings)
+    return Preflight(ok=not problems, problems=problems, warnings=warnings,
+                     blocked_stages=blocked, degraded_stages=degraded)
 
 
 def new_run_id(tag: str | None = None) -> str:

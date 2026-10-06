@@ -1,5 +1,37 @@
 # Analysis plan changelog
 
+## 2026-10-06 — G1/G2 run and results
+
+Run `data/results/clinical-axes/20261006T004825Z_g1g2` (lock `e574feb`, code
+`f04f84d`) reproduced every published target under the reconstructed gene map.
+G1: ROBUST_DIRECTION (items 1-7) and DEFINITION_ROBUST (item 8, 8/8 rebuilds),
+no verdict flips under the runner-up map. K0 Freedman-Lane P1 maxT 0.042
+(baseline) / 0.056 (runner-up); verdict unchanged by rule. G2: podocyte
+persistence INCONCLUSIVE (as powered); structural interaction p 0.009 (maxT
+0.024), margin label INCONCLUSIVE after Holm. Results:
+`docs/CLINICAL_AXES_PODOCYTE_SENSITIVITIES_AND_RECOVERY_PERSISTENCE_2026-10-06.md`.
+The published "structural control ranks 4th" is map-dependent (2nd here; ranks
+2-5 within 0.02) and is restated accordingly.
+
+## 2026-10-06 — preregistration of 157-gene sensitivities and recovery persistence
+
+After a month away and a fresh environment, all inputs were re-acquired (OSDR S3
+mirror; Mouse Kidney Atlas from Zenodo 10.5281/zenodo.17395591, MD5 match) and
+the frozen marker tiers rebuilt exactly. The lost id_map was replaced by a
+pre-declared reconstruction (`config/gene_map_reconstruction.yaml`) that
+reproduces the published podocyte, structural and K0 numbers; raw Ensembl 116 is
+the runner-up, and every new verdict is computed under both.
+
+Two follow-ups are locked before computation
+(`docs/CLINICAL_AXES_G1_G2_PREREGISTRATION_2026-10-06.md`):
+`config/clinical_axes_podocyte_sensitivities.yaml` (G1 items 1-8 on the 157-gene
+set; item 9, a second atlas, deferred) and
+`config/clinical_axes_recovery_persistence.yaml` (G2, persistence through the
+OSD-771 live-animal-return arm with a margin sweep). K0's family-wise
+permutation was found to use independent shuffles per model; Freedman-Lane
+joint permutation is the K0 primary scheme going forward, and by rule cannot
+upgrade the K0 verdict.
+
 ## 2026-08-02 — compartment-wide adversarial closure audit
 
 After Grey60 and the DCT2/CNT-ASDN headline failed their locked gates, the

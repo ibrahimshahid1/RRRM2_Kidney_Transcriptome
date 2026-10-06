@@ -23,8 +23,8 @@ results_root: data/results/<id>    # class-level results folder for NEW runs
 reference_run: data/archive/results/run_...   # the historical locked run, or null
 figures_root: figures/<id>         # or null
 
-requires:                          # preflight checks before any stage runs
-  data: []                         # paths that must exist
+requires:                          # revision-level preflight checks before any stage runs
+  data: []                         # repo-relative paths that must exist (blocks every stage)
   r: false                         # true when a stage shells out to Rscript
 
 stages:                            # ordered; each is one executable step
@@ -37,3 +37,22 @@ stages:                            # ordered; each is one executable step
                                    # {repo}, {reference_run} are substituted
     optional: false                # true = skipped unless --with-optional
     outputs: []                    # representative artifacts, for `rrrm2 show`
+    requires: []                   # inputs THIS stage reads that the pipeline does not
+                                   # build earlier in the same run. Literal repo-relative
+                                   # paths only (no {placeholders}, no absolute paths).
+                                   # `rrrm2 run` preflight reports a missing path as
+                                   #   "stage <id>: missing required input <path>"
+                                   # `rrrm2 doctor` marks the revision BLOCKED when a
+                                   # required stage has a missing input and names the
+                                   # blocked stages; for an `optional: true` stage a
+                                   # missing input is only a warning.
+
+# Output-directory rule (enforced by tests/test_rrrm2_registry.py): within one
+# revision, no two stages may run the same `entry` with the same output directory
+# (the value after --results, --outdir or --output-dir, placeholders resolved).
+# Two such stages overwrite each other's files. Give the second stage its own
+# subfolder, e.g. `--results {run_dir}/disjoint_podocyte_family`.
+#
+# Stages that write into data/processed (reference builds, e.g. clinical-axes
+# `atlas-pseudobulk` and `marker-tiers`) must be `optional: true` and must say so
+# in their title, because they replace frozen inputs rather than adding a run.
