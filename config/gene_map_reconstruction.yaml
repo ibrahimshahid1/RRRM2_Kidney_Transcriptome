@@ -1,0 +1,41 @@
+# Reconstructed Ensembl -> MGI symbol map for the clinical-axes / compartment analyses.
+#
+# The ~14k-gene id_map used for the 2026-08-11 frozen results was not tracked and is
+# unrecoverable. It was reconstructed on 2026-10-06 by a pre-declared rule: among four
+# candidate maps, choose the one with the smallest maximum absolute deviation D from 27
+# already-published target quantities (podocyte HS g/CI/mission effects, structural g/CI,
+# K0 P0/P1/S1, K4 target, the four 4-axis estimates), requiring the published 49-set family.
+#
+#   candidate   D        evaluable sets
+#   M_m9        0.00044  49   <- selected (this file)
+#   M_full      0.05238  49   <- runner-up; used for the reconstruction sensitivity
+#   M_pc        0.00243  48   (disqualified: family changes)
+#   M_osdr      0.01329  48   (disqualified: family changes)
+#
+# Caveat: the nine exclusions below were reverse-engineered from the published podocyte
+# HS and principal-cell broad_enriched values, so agreement on those rows is partly by
+# construction. Quantities NOT used in the fit (K0 P0/P1/S1 and max-T, structural g/CI,
+# disjoint variants, barrier adjustment, gene-coherence 105/69/23) still reproduce.
+# Interpretation: Ensembl release 116 assigns symbols to these non-coding genes that the
+# older release behind the original map did not, so they never matched atlas tier symbols.
+source_map:
+  path: data/processed/resources/id_map.tsv
+  builder: scripts/build_id_map.py   # Ensembl REST, release 116, 24,059-gene universe
+  sha256: 98e622bcfc6239ef3c5c0587c14155ab25e953962877e56bc403c376da44c125
+output_map:
+  path: data/processed/resources/id_map_reconstructed.tsv
+  columns: [ensembl_gene_id, mgi_symbol]
+  sha256: d36462df6802d7acdc8e40d7fb5d7093f9355cfd5ab7da965b6f7bd75378f302
+rule:
+  - drop rows whose mgi_symbol is empty (166 retired IDs)
+  - drop the excluded_ids below
+excluded_ids:
+  ENSMUSG00000020992: {symbol: 4930512B01Rik, biotype: lncRNA}
+  ENSMUSG00000085261: {symbol: Gm13814, biotype: lncRNA}
+  ENSMUSG00000085444: {symbol: Gm13936, biotype: lncRNA}
+  ENSMUSG00000085526: {symbol: Gm16083, biotype: lncRNA}
+  ENSMUSG00000086283: {symbol: 2810433D01Rik, biotype: lncRNA}
+  ENSMUSG00000103292: {symbol: Gm35048, biotype: TEC}
+  ENSMUSG00000105550: {symbol: Gm35585, biotype: lncRNA}
+  ENSMUSG00000108461: {symbol: AV356131, biotype: lncRNA}
+  ENSMUSG00000110462: {symbol: Gm35572, biotype: lncRNA}
