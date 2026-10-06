@@ -1,0 +1,103 @@
+# Preregistration: recovery / persistence of the terminal-flight shift (G2).
+# Written and committed BEFORE any OSD-771-LAR or OSD-513 effect was computed for the podocyte set,
+# the structural sets, the K0 contrast or any compartment set. The script refuses to run on real
+# data while this file has uncommitted changes.
+analysis_id: clinical_axes_recovery_persistence_v1
+parent_config: config/clinical_renal_axes_cross_mission.yaml
+status: preregistered_secondary_analysis
+lock_date: 2026-10-06          # lock_commit = the commit that first adds this file
+seed_offsets: {freedman_lane: 700, bootstrap: 701, power_simulation: 702, posterior: 703}
+
+gene_map:
+  baseline: data/processed/resources/id_map_reconstructed.tsv   # config/gene_map_reconstruction.yaml
+  baseline_sha256: d36462df6802d7acdc8e40d7fb5d7093f9355cfd5ab7da965b6f7bd75378f302
+  runner_up: data/processed/resources/id_map.tsv
+  runner_up_sha256: 98e622bcfc6239ef3c5c0587c14155ab25e953962877e56bc403c376da44c125
+  reconstruction_sensitivity: >-
+    The primary and key-secondary classifications are computed under baseline AND runner_up
+    (idmap_sensitivity.tsv). A classification that differs between maps is reported as "not robust
+    to gene-ID reconstruction" and the more conservative label (INCONCLUSIVE) governs.
+
+cohorts:
+  primary_within_mission: {mission: OSD-771, arms: [ISS-T, LAR], groups: [FLT, GC], blocks: arm_x_age,
+                           n_per_cell: 5, excluded_groups: [BSL, VIV]}
+  descriptive_single_cohort: {mission: OSD-513, n_flight: 9, n_control: 9}
+  not_done: ["REML/mKH across recovery cohorts (k=2, df=1)", "confirmatory 7-cohort meta-regression"]
+targets:
+  primary: podocyte__high_specificity
+  key_secondary: [structural_disjoint, D_podocyte_minus_structural_disjoint]
+  secondary: [P1_type_adjusted_podocyte]
+  exploratory: all 49 evaluable compartment sets; 4 frozen axes as context
+eligibility: genes CPM-eligible in BOTH arms (each arm's own FLT/GC rule) and in VST; set needs >=8
+scoring: mean signed gene z; z over the 40-animal joint analysis set (never within blocks)
+model: score ~ 0 + block(arm x age) + flight_ISS-T + flight_LAR; OLS; HC3; per-arm df 17; Satterthwaite for contrasts
+contrasts: {interaction: theta_LAR - theta_ISS-T, margin: theta_LAR - 0.5*theta_ISS-T}
+inference:
+  permutation: Freedman-Lane residual permutation within arm x age blocks, 100000, same permutation across sets
+  single_arm: exact enumeration (63,504 per OSD-771 arm; 48,620 OSD-513), exact maxT across the 49-set family
+  ratio: Fieller 90/95% (primary interval for rho); stratified bootstrap 10000 within 8 cells (secondary)
+  bayesian_descriptive: "flat-prior normal draws: P(rho>=0.5), P(theta_LAR<=0)"
+
+classification:   # applied to primary and key secondary; exploratory labels are descriptive
+  NOT_EVALUABLE_TECHNICAL: LAR primary coverage metric flagged by the frozen QC rule
+  NOT_EVALUABLE_NO_TERMINAL_EFFECT: HC3 95% CI of theta_ISS-T includes 0, or sign differs from pooled terminal
+  PERSISTS: FL one-sided p(margin>0) <= 0.05 AND HC3 90% CI lower(margin) > 0
+  DECAYS: FL one-sided p(margin<0) <= 0.05 AND HC3 90% CI upper(margin) < 0  (sublabel REVERSED if theta_LAR 95% CI upper < 0)
+  INCONCLUSIVE: otherwise, including FL/HC3 disagreement
+
+# Added at the user's request (2026-10-06): a fixed margin sweep, computed and reported for every run
+# regardless of the primary label. Only kappa = 0.5 sets the classification; the other margins are
+# secondary and descriptive. kappa = 0 asks "any retention" (theta_LAR > 0); kappa = 1 asks "no decay"
+# (equivalent to the interaction test). The Fieller 90% lower bound on rho is reported as the largest
+# margin compatible with persistence at one-sided 5%.
+margin_sweep:
+  kappas: [0.0, 0.25, 0.5, 0.75, 1.0]
+  primary_kappa: 0.5
+  role: secondary_descriptive
+  applies_to: [podocyte__high_specificity, structural_disjoint, D_podocyte_minus_structural_disjoint]
+
+multiplicity:
+  primary: single target, no correction
+  key_secondary: Holm across the 2 margin tests per direction; interaction maxT over {T1,T2,T3}
+  exploratory: interaction maxT + BH over 49 sets; single-arm exact maxT; labels descriptive
+  margin_sweep: >-
+    no correction across kappa (descriptive; no sweep label is a finding); within each kappa the
+    per-target rules above apply (Holm for the two key-secondary margins), so the kappa = 0.5 sweep
+    label equals the classification. label_unadjusted is also reported.
+confounds_stated: [recovery aliased with 32 vs 53-56 d flight, on-ISS vs on-Earth euthanasia/handling,
+                   re-entry and landing; winner's-curse inflation of theta_ISS-T for the selected podocyte set
+                   biases rho downward; OSD-513 is ~1 d post-landing with a 3 d ground-control offset]
+power_analytic:   # SD units of the score; normal approximation
+  se_theta_per_arm: 0.447
+  se_interaction: 0.632
+  mde80_interaction_two_sided: 1.77
+  power_complete_reversal: {theta_0.689: 0.19, theta_1.174: 0.46}
+  se_margin: 0.50
+  # margin-test power alone (ignores the terminal-effect gate):
+  margin_test_power_persist_if_full_persistence: {theta_0.689: 0.17, theta_1.174: 0.32}
+  margin_test_power_decay_if_complete_reversal: {theta_0.689: 0.17, theta_1.174: 0.32}
+  theta_needed_for_80pct_margin_power: 2.49
+  single_arm_LAR_mde80: 1.25    # power 0.34 / 0.75 if theta_LAR = 0.689 / 1.174
+  osd513_mde80: 1.32
+power_simulated:  # full decision rule incl. the terminal-effect gate; 4000 sims x 999 FL perms, seed offset 702
+  source: recovery-persistence-power stage (persistence_power.tsv), computed before lock with no expression data
+  label_probabilities:   # theta_ISS-T (SD units) / rho = theta_LAR/theta_ISS-T -> P(PERSISTS, DECAYS, INCONCLUSIVE, NOT_EVALUABLE)
+    theta_0.689: {rho_1: [0.009, 0.006, 0.229, 0.756], rho_0.5: [0.002, 0.023, 0.235, 0.740],
+                  rho_0: [0.001, 0.069, 0.180, 0.750], rho_-0.5: [0.000, 0.145, 0.110, 0.746]}
+    theta_1.174: {rho_1: [0.117, 0.001, 0.512, 0.369], rho_0.5: [0.009, 0.032, 0.586, 0.372],
+                  rho_0: [0.001, 0.213, 0.421, 0.366], rho_-0.5: [0.000, 0.495, 0.135, 0.370]}
+  p_terminal_effect_established: {theta_0.689: 0.25, theta_1.174: 0.63}
+  expected_modal_label: >-
+    NOT_EVALUABLE_NO_TERMINAL_EFFECT if the true ISS-T effect is ~0.69 SD (p ~0.75); INCONCLUSIVE
+    (p ~0.42-0.59) if it is ~1.17 SD (the observed OSD-771 podocyte mission effect). A PERSISTS label is
+    unlikely even under full persistence (p ~0.12 at 1.17 SD). Any label other than PERSISTS/DECAYS is the
+    expected outcome of an underpowered design and is not evidence for or against persistence.
+reporting_language:
+  PERSISTS: ">=50% of the ISS-terminal transcript shift remained after 32 d flight + 24 d Earth recovery; recovery, exposure length and euthanasia setting are aliased."
+  DECAYS: "the LAR shift was <50% of terminal; this cannot be attributed to recovery rather than shorter exposure or on-orbit handling."
+  INCONCLUSIVE: "LAR estimate X (CI); the design could not distinguish persistence from decay (MDE ~1.8 SD for the interaction)."
+  never: ["'persisted' for a non-significant interaction", "the podocyte program as 'separable' or 'the headline'"]
+provenance_disclosure: >-
+  Known before lock: LAR and OSD-513 4-axis effects (LAR barrier -0.658 [-1.58, 0.26], i.e. barrier genes
+  higher in LAR flight; OSD-513 fibrosis +1.150, distal +1.651); ISS-T podocyte HS mission effect 1.174.
+  Not computed by anyone before lock: any LAR/OSD-513 compartment, podocyte, structural or K0 effect.

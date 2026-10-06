@@ -1,5 +1,24 @@
 # Analysis plan changelog
 
+## 2026-10-06 — preregistration of 157-gene sensitivities and recovery persistence
+
+After a month away and a fresh environment, all inputs were re-acquired (OSDR S3
+mirror; Mouse Kidney Atlas from Zenodo 10.5281/zenodo.17395591, MD5 match) and
+the frozen marker tiers rebuilt exactly. The lost id_map was replaced by a
+pre-declared reconstruction (`config/gene_map_reconstruction.yaml`) that
+reproduces the published podocyte, structural and K0 numbers; raw Ensembl 116 is
+the runner-up, and every new verdict is computed under both.
+
+Two follow-ups are locked before computation
+(`docs/CLINICAL_AXES_G1_G2_PREREGISTRATION_2026-10-06.md`):
+`config/clinical_axes_podocyte_sensitivities.yaml` (G1 items 1-8 on the 157-gene
+set; item 9, a second atlas, deferred) and
+`config/clinical_axes_recovery_persistence.yaml` (G2, persistence through the
+OSD-771 live-animal-return arm with a margin sweep). K0's family-wise
+permutation was found to use independent shuffles per model; Freedman-Lane
+joint permutation is the K0 primary scheme going forward, and by rule cannot
+upgrade the K0 verdict.
+
 ## 2026-08-02 — compartment-wide adversarial closure audit
 
 After Grey60 and the DCT2/CNT-ASDN headline failed their locked gates, the

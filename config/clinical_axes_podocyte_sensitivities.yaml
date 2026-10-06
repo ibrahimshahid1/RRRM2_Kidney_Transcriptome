@@ -1,0 +1,80 @@
+# Preregistration: sensitivities of the 157-gene podocyte high-specificity result (G1).
+# Written and committed BEFORE any of items 1, 3-8 was computed on the 157-gene set.
+# Scripts refuse to run on real data while this file has uncommitted changes.
+analysis_id: clinical_axes_podocyte_sensitivities_v1
+parent_config: config/clinical_renal_axes_cross_mission.yaml
+status: post_hoc_sensitivities_preregistered_before_computation
+lock_date: 2026-10-06          # lock_commit = the commit that first adds this file
+seed_base_from_parent: true
+seed_offsets: {median_family: 101, common_family: 102, median_common_family: 103,
+               lomo_family: [601, 602, 603, 604, 605], atlas_loso: 800, second_atlas: 900}
+
+gene_map:
+  baseline: data/processed/resources/id_map_reconstructed.tsv   # config/gene_map_reconstruction.yaml
+  baseline_sha256: d36462df6802d7acdc8e40d7fb5d7093f9355cfd5ab7da965b6f7bd75378f302
+  runner_up: data/processed/resources/id_map.tsv                # raw Ensembl 116
+  runner_up_sha256: 98e622bcfc6239ef3c5c0587c14155ab25e953962877e56bc403c376da44c125
+  reconstruction_sensitivity: >-
+    Every item verdict and the overall classification are computed under baseline AND runner_up
+    (idmap_sensitivity.tsv). A verdict that differs between maps is reported as "not robust to
+    gene-ID reconstruction" and the more conservative verdict governs.
+
+# Reference values are read from the Phase-0 reproduction run under the baseline map, never typed.
+reference_run: data/results/_phase0_idmap/M_m9
+reference_values: read from the Phase-0 reference run outputs (never typed constants)
+
+targets:
+  primary: podocyte__high_specificity
+  descriptive_comparators: [broad_structural_scaffold_control__all, structural_disjoint]
+  k0_models: [P0, P1, S0, S1, D]      # HC3 per mission -> REML/mKH; observed only
+retention_ratio_min: 0.50             # parent yaml LOGO rule; Grey60 gates D/F precedent
+gate_rule_default: "estimate has the sign of the reference AND estimate/reference >= 0.50"
+
+items:
+  1_signed_median:    {gate: "median pooled estimate > 0", descriptive: [ci, max_t_fwer, rank_abs_t]}
+  2_common_intersection: {gate: "pooled estimate > 0",
+                          contract: "equals strict-matching full_common_observable target within 1e-6"}
+  3_leave_one_mission: {gate: "all 5 LOMO estimates > 0", descriptive: [lomo_ci, lomo_max_t_fwer_fixed_49]}
+  4_gene_influence:
+    gates: {logo_all_direction: true, logo_min_retention: 0.50, max_single_gene_signed_share: 0.25}
+    secondary_bounds_v13_precedent: {top1_positive_share_max: 0.10, top10_positive_share_max: 0.50}
+    descriptive: [leave_top_k_curve, k50, k_ci0, n_eff, absolute_share]
+  5_osd462_preparation: {variants: [mRNA, UPX], gate: gate_rule_default}
+  6_osd253_rerun_control: {variant: rerun_white, gate: gate_rule_default}
+  7_osd163_mapping_rate: {primary_method: label_blind_residualization, secondary: ancova_descriptive,
+                          gate: gate_rule_default}
+  8_atlas_loso:
+    gate: "every QC-passing rebuild with >=8 podocyte HS genes: gate_rule_default"
+    thresholds: unchanged_frozen
+    split_by: podocyte_contributing     # 4 of 8 Origin studies contribute podocytes
+    not_evaluable: "rebuild with <8 podocyte HS genes -> NOT_EVALUABLE (not a failure)"
+    disclosure: >-
+      Dropping one of the 4 podocyte-contributing studies makes the >=0.75 detection rule
+      effectively 3-of-3 and leaves source-study QC at its minimum of 3.
+    descriptive: [jaccard, rank_abs_t, max_t_fwer, k0_p1]
+  9_second_atlas:
+    status: DEFERRED   # user decision 2026-10-06; plan preserved in docs/DEFERRED_SECOND_ATLAS_VALIDATION_2026-10-06.md
+    reference: tabula_muris_senis_droplet_kidney
+    evaluability: ">=3 mice with >=25 podocytes; else age-group units; else NOT_EVALUABLE"
+    gates: ["TMS podocyte HS estimate: gate_rule_default", "consensus set estimate > 0"]
+
+overall:
+  ROBUST_DIRECTION: items 1-7 all pass
+  FRAGILE: any of items 1-7 fails (name the items)
+  DEFINITION_ROBUST: item 8 passes (item 9 deferred)
+
+k0_rule: >-
+  No sensitivity or permutation-scheme change can upgrade K0's verdict (HC3 P1 CI crosses 0 ->
+  bounded observation). If P1 <= 0 in any variant, report "podocyte-leaning tail not robust to <variant>".
+  K0 primary permutation going forward: freedman_lane_joint; legacy 0.061 retained for audit. A corrected
+  family-wise p below 0.05 may be reported only as "P1 is unusual within {P1, S1, D} under a corrected
+  null, but its interval crosses zero; still a bounded observation."
+multiplicity: sensitivities are not new discovery families; only family-wide maxT within each variant is reported
+
+provenance_disclosure: >-
+  Known before lock: 4-axis results and their sensitivities; 49-set primary (0.689/0.0189), mission
+  effects; disjoint/C3H/Podxl-Nid1; K0 (0.198->0.112, FWER 0.061, legacy permutation); K0 joint/Freedman-Lane
+  FWERs under the runner-up map only (P1 0.0536 / 0.0563); K4 target 0.6926 (= item 2); an approximate LOMO
+  preview from mission g's (0.842/0.616/0.692/0.738/0.553); atlas leave-one-study-out tier rebuilds
+  (gene membership only, no flight scoring). The gene-map baseline was chosen by a pre-declared fidelity
+  rule using only published numbers.
