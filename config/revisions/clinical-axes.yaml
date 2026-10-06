@@ -360,6 +360,57 @@ stages:
       - podocyte_sensitivities/podocyte_sensitivity_gates.json
       - podocyte_sensitivities/idmap_sensitivity.tsv
 
+  - id: atlas-loso-markers
+    title: "G1 item 8 - leave-one-atlas-source-study-out marker rebuild, scored on the five missions (refuses an uncommitted prereg)"
+    needs: [compartment-context]
+    runner: python
+    entry: scripts/clinical_axes/run_atlas_loso_markers.py
+    args:
+      - "--prereg"
+      - "config/clinical_axes_podocyte_sensitivities.yaml"
+      - "--results"
+      - "{run_dir}/atlas_loso"
+      - "--reference-meta"
+      - "{run_dir}/compartment_context_meta_results.tsv"
+      - "--permutations"
+      - "100000"
+    optional: false
+    requires:
+      - config/clinical_axes_podocyte_sensitivities.yaml
+      - data/processed/v13_dct_reference/mouse_kidney_atlas/atlas_pseudobulk_counts.tsv.gz
+      - data/processed/v13_dct_reference/mouse_kidney_atlas/atlas_pseudobulk_sample_metadata.tsv
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/processed/gene_sets/KEGG_2019_Mouse.json
+      - data/raw/metadata/s_OSD-771.txt
+    outputs:
+      - atlas_loso/atlas_loso_summary.tsv
+
+  - id: atlas-loso-markers-idmap
+    title: "G1 item 8 under the runner-up gene map (reconstruction sensitivity)"
+    needs: []
+    runner: python
+    entry: scripts/clinical_axes/run_atlas_loso_markers.py
+    args:
+      - "--prereg"
+      - "config/clinical_axes_podocyte_sensitivities.yaml"
+      - "--results"
+      - "{run_dir}/atlas_loso_idmap_runner_up"
+      - "--gene-map"
+      - "data/processed/resources/id_map.tsv"
+      - "--permutations"
+      - "100000"
+    optional: false
+    requires:
+      - config/clinical_axes_podocyte_sensitivities.yaml
+      - data/processed/v13_dct_reference/mouse_kidney_atlas/atlas_pseudobulk_counts.tsv.gz
+      - data/processed/v13_dct_reference/mouse_kidney_atlas/atlas_pseudobulk_sample_metadata.tsv
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/processed/gene_sets/KEGG_2019_Mouse.json
+      - data/processed/resources/id_map.tsv
+      - data/raw/metadata/s_OSD-771.txt
+    outputs:
+      - atlas_loso_idmap_runner_up/atlas_loso_summary.tsv
+
   - id: recovery-persistence-power
     title: "G2 power simulation of the preregistered decision rule (reads no expression data)"
     needs: []
