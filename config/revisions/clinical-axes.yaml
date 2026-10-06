@@ -45,9 +45,74 @@ figures_root: figures/clinical_renal_axes_cross_mission
 requires:
   data:
     - data/external/osdr
+    - data/processed/resources/id_map.tsv
+    - data/processed/resources/id_map_reconstructed.tsv
   r: false
 
+# Stage-level `requires` list inputs a stage reads that no earlier stage in the
+# same run produces (see config/revisions/_schema.yaml). Reference-build stages
+# (atlas-pseudobulk, marker-tiers) are listed FIRST and are optional: they
+# rewrite files under data/processed that every other stage reads, so with
+# --with-optional they run before everything else. Run them on their own with
+# `rrrm2 run clinical-axes --stage marker-tiers`.
 stages:
+  - id: gene-map-reconstruction
+    title: "Reference build - WRITES TO data/processed: reconstructed baseline gene map (Ensembl 116 minus 9 non-coding symbols)"
+    needs: []
+    runner: python
+    entry: scripts/clinical_axes/build_reconstructed_id_map.py
+    args: ["--config", "config/gene_map_reconstruction.yaml"]
+    optional: true
+    requires:
+      - config/gene_map_reconstruction.yaml
+      - data/processed/resources/id_map.tsv
+    outputs:
+      - data/processed/resources/id_map_reconstructed.tsv
+
+  - id: atlas-pseudobulk
+    title: "Reference build - WRITES TO data/processed: atlas pseudobulk and compartment expression from mka.h5ad"
+    needs: []
+    runner: python
+    entry: scripts/subtype_reference/03_atlas_pseudobulk.py
+    args:
+      - "--config"
+      - "config/dct_subtype_reference_freeze_v1.yaml"
+      - "--input"
+      - "data/external/single_cell_atlases/mouse_kidney_atlas/mka.h5ad"
+      - "--output-dir"
+      - "data/processed/v13_dct_reference/mouse_kidney_atlas"
+      - "--reference-label"
+      - "mouse_kidney_atlas"
+      - "--source-study-column"
+      - "Origin"
+      - "--cell-type-column"
+      - "Celltype_finest"
+      - "--fallback-cell-type-column"
+      - "Celltype"
+    optional: true
+    requires:
+      - config/dct_subtype_reference_freeze_v1.yaml
+      - data/external/single_cell_atlases/mouse_kidney_atlas/mka.h5ad
+    outputs:
+      - data/processed/v13_dct_reference/mouse_kidney_atlas/atlas_compartment_expression.tsv.gz
+
+  - id: marker-tiers
+    title: "Reference build - WRITES TO data/processed: frozen 51-set marker tiers from atlas expression and KEGG"
+    needs: []
+    runner: python
+    entry: scripts/v13/compartment_adversarial_audit.py
+    args:
+      - "--config"
+      - "config/v13_compartment_adversarial_audit.yaml"
+      - "prepare"
+    optional: true
+    requires:
+      - config/v13_compartment_adversarial_audit.yaml
+      - data/processed/v13_dct_reference/mouse_kidney_atlas/atlas_compartment_expression.tsv.gz
+      - data/processed/gene_sets/KEGG_2019_Mouse.json
+    outputs:
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+
   - id: cross-mission
     title: Primary four-axis random-effects meta-analysis under blocked permutation
     needs: []
@@ -55,6 +120,8 @@ stages:
     entry: scripts/clinical_axes/run_cross_mission.py
     args: ["--config", "{spec_config}", "--outdir", "{run_dir}"]
     optional: false
+    requires:
+      - data/raw/metadata/s_OSD-771.txt
     outputs:
       - primary_meta_results.tsv
 
@@ -65,6 +132,8 @@ stages:
     entry: scripts/clinical_axes/run_sensitivities.py
     args: ["--config", "{spec_config}", "--results", "{run_dir}"]
     optional: false
+    requires:
+      - data/raw/metadata/s_OSD-771.txt
     outputs: []
 
   - id: compartment-context
@@ -80,11 +149,14 @@ stages:
       - "--permutations"
       - "100000"
     optional: false
+    requires:
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/raw/metadata/s_OSD-771.txt
     outputs:
       - compartment_context_meta_results.tsv
 
   - id: podocyte-disjoint
-    title: Compartment family with disjoint podocyte tier variants
+    title: Compartment family with disjoint podocyte tier variants (own subfolder; never overwrites compartment-context)
     needs: [compartment-context]
     runner: python
     entry: scripts/clinical_axes/run_compartment_context.py
@@ -92,12 +164,57 @@ stages:
       - "--config"
       - "{spec_config}"
       - "--results"
-      - "{run_dir}"
+      - "{run_dir}/disjoint_podocyte_family"
       - "--permutations"
       - "100000"
       - "--add-podocyte-disjoint-variants"
     optional: false
-    outputs: []
+    requires:
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/raw/metadata/s_OSD-771.txt
+    outputs:
+      - disjoint_podocyte_family/compartment_context_meta_results.tsv
+
+  - id: podocyte-disjoint-c3h
+    title: Disjoint podocyte variants with the OSD-253 control contrast replaced by C3H/HeJ (sensitivity)
+    needs: []
+    runner: python
+    entry: scripts/clinical_axes/run_compartment_context.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--results"
+      - "{run_dir}/disjoint_podocyte_family_c3h"
+      - "--osd253-strain"
+      - "C3H/HeJ"
+      - "--add-podocyte-disjoint-variants"
+      - "--permutations"
+      - "100000"
+    optional: false
+    requires:
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/raw/metadata/s_OSD-771.txt
+    outputs:
+      - disjoint_podocyte_family_c3h/compartment_context_meta_results.tsv
+
+  - id: podxl-nid1
+    title: K3 - podocyte high-specificity set with Podxl and Nid1 forced in (observability sensitivity)
+    needs: []
+    runner: python
+    entry: scripts/clinical_axes/run_podocyte_podxl_nid1_sensitivity.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--results"
+      - "{run_dir}/podxl_nid1_forced_sensitivity"
+      - "--permutations"
+      - "100000"
+    optional: false
+    requires:
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/raw/metadata/s_OSD-771.txt
+    outputs:
+      - podxl_nid1_forced_sensitivity/set_meta_results.tsv
 
   - id: gene-coherence
     title: Within-panel podocyte gene coherence
@@ -106,6 +223,9 @@ stages:
     entry: scripts/clinical_axes/run_podocyte_gene_coherence.py
     args: ["--config", "{spec_config}", "--results", "{run_dir}"]
     optional: false
+    requires:
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/raw/metadata/s_OSD-771.txt
     outputs: []
 
   - id: matched-null
@@ -115,6 +235,9 @@ stages:
     entry: scripts/clinical_axes/run_matched_panel_null.py
     args: ["--config", "{spec_config}", "--results", "{run_dir}"]
     optional: false
+    requires:
+      - data/processed/v13_dct_reference/mouse_kidney_atlas/atlas_compartment_expression.tsv.gz
+      - data/raw/metadata/s_OSD-771.txt
     outputs: []
 
   - id: strict-matching
@@ -124,6 +247,10 @@ stages:
     entry: scripts/clinical_axes/run_strict_podocyte_matching_audit.py
     args: ["--config", "{spec_config}", "--results", "{run_dir}"]
     optional: false
+    requires:
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/processed/v13_dct_reference/mouse_kidney_atlas/atlas_compartment_expression.tsv.gz
+      - data/raw/metadata/s_OSD-771.txt
     outputs: []
 
   - id: barrier-adjustment
@@ -133,11 +260,14 @@ stages:
     entry: scripts/clinical_axes/run_barrier_specificity_adjustment.py
     args: ["--config", "{spec_config}", "--results", "{run_dir}"]
     optional: false
+    requires:
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/raw/metadata/s_OSD-771.txt
     outputs: []
 
   - id: podocyte-scaffold-specificity
     title: "K0 - podocyte high-specificity score adjusted for the structural scaffold (+ reciprocal, direct contrast, maxT over the family)"
-    needs: [compartment-context]
+    needs: []
     runner: python
     entry: scripts/clinical_axes/run_podocyte_scaffold_specificity.py
     args:
@@ -147,11 +277,88 @@ stages:
       - "{run_dir}"
       - "--permutations"
       - "100000"
+      - "--seed"
+      - "0"
     optional: false
+    requires:
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/raw/metadata/s_OSD-771.txt
     outputs:
       - podocyte_scaffold_meta.tsv
       - podocyte_scaffold_permutation.tsv
       - podocyte_scaffold_leave_one_mission.tsv
+
+  - id: compartment-context-median
+    title: "G1 item 1 - 49-set family with signed-median scoring (refuses an uncommitted prereg)"
+    needs: [compartment-context]
+    runner: python
+    entry: scripts/clinical_axes/run_compartment_context.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--results"
+      - "{run_dir}/compartment_context_median"
+      - "--permutations"
+      - "100000"
+      - "--method"
+      - "median"
+    optional: false
+    requires:
+      - config/clinical_axes_podocyte_sensitivities.yaml
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/raw/metadata/s_OSD-771.txt
+    outputs:
+      - compartment_context_median/compartment_context_meta_results.tsv
+
+  - id: compartment-context-common
+    title: "G1 item 2 - 49-set family restricted to genes eligible in all five missions (refuses an uncommitted prereg)"
+    needs: [compartment-context]
+    runner: python
+    entry: scripts/clinical_axes/run_compartment_context.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--results"
+      - "{run_dir}/compartment_context_common"
+      - "--permutations"
+      - "100000"
+      - "--gene-universe"
+      - "common"
+    optional: false
+    requires:
+      - config/clinical_axes_podocyte_sensitivities.yaml
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/raw/metadata/s_OSD-771.txt
+    outputs:
+      - compartment_context_common/compartment_context_meta_results.tsv
+
+  - id: podocyte-sensitivities
+    title: "G1 items 2-7 - preregistered sensitivities of podocyte high-specificity, structural comparators and K0, under the baseline and runner-up gene maps"
+    needs: [compartment-context, compartment-context-median]
+    runner: python
+    entry: scripts/clinical_axes/run_podocyte_sensitivities.py
+    args:
+      - "--config"
+      - "{spec_config}"
+      - "--results"
+      - "{run_dir}"
+      - "--prereg"
+      - "config/clinical_axes_podocyte_sensitivities.yaml"
+      - "--lomo-permutations"
+      - "100000"
+      - "--gene-maps"
+      - "data/processed/resources/id_map_reconstructed.tsv"
+      - "data/processed/resources/id_map.tsv"
+    optional: false
+    requires:
+      - config/clinical_axes_podocyte_sensitivities.yaml
+      - data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv
+      - data/processed/resources/id_map.tsv
+      - data/raw/metadata/s_OSD-771.txt
+    outputs:
+      - podocyte_sensitivities/podocyte_sensitivity_summary.tsv
+      - podocyte_sensitivities/podocyte_sensitivity_gates.json
+      - podocyte_sensitivities/idmap_sensitivity.tsv
 
   - id: osd656-urine
     title: OSD-656 human urine context (non-inferential by design)
@@ -160,11 +367,13 @@ stages:
     entry: scripts/clinical_axes/run_osd656_urine_context.py
     args: ["--config", "{spec_config}", "--output-dir", "{run_dir}/osd656_context"]
     optional: true
+    requires:
+      - data/external/human_spaceflight/OSD-656/LSDS-64_Multiplex_urine.immune.AlamarPanel_SUBMITTED.xlsx
     outputs: []
 
   - id: figures
     title: Publication figures
-    needs: [compartment-context, sensitivities]
+    needs: [cross-mission, compartment-context, sensitivities, matched-null, barrier-adjustment]
     runner: python
     entry: scripts/clinical_axes/plot_results.py
     args: ["--results", "{run_dir}", "--figures", "{figures_root}"]
