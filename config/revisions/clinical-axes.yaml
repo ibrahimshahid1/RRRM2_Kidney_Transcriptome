@@ -14,21 +14,29 @@ question: >-
 conclusion: >-
   Across 5 terminal missions and 83 animals, three of four frozen axes are
   no-go. Glomerular barrier identity loss pools to g = -0.716 (mHK 95% CI
-  -1.361 to -0.072, maxT 0.0018, I2 = 0%) — the opposite direction to the
+  -1.361 to -0.072, maxT 0.0018, I2 = 0%) - the opposite direction to the
   declared "identity loss", so that hypothesis is rejected with an
   opposite-direction lead. In the 49-set compartment family only podocyte
-  high_specificity clears (g = 0.689, maxT 0.0189). The declared structural
-  negative control ranks 4th at g = 0.549, above podocyte tiers built by
-  removing structural genes. K0 resolves that open question by mutual
-  adjustment (HC3, blocked by mission, 100k label permutations): the podocyte
-  flight coefficient attenuates from g = 0.198 (95% CI 0.023-0.374) to 0.112
-  (CI -0.031-0.255, maxT FWER 0.061) when the disjoint structural score is a
-  covariate, while the reciprocal structural coefficient collapses to 0.031
-  (CI -0.130-0.192) when adjusted for podocyte. The podocyte program carries
-  the larger, direction-preserved share, but the adjusted interval crosses zero
-  and does not clear the max-|T| family - so the signal is a shared structural
-  drift with a podocyte-leaning tail, not a family-wise-separable podocyte
-  program. Report as a bounded observation, not a standalone podocyte headline.
+  high_specificity clears (g = 0.689, maxT 0.0189); the broad structural
+  control sits in the next tier (g = 0.549; ranks 2-5 lie within 0.02 and
+  their order depends on the reconstructed gene map). K0 resolves that open
+  question by mutual adjustment (HC3, blocked by mission): the podocyte flight
+  coefficient attenuates from 0.198 to 0.112 score units (CI -0.031 to 0.255)
+  when the disjoint structural score is a covariate, while the reciprocal
+  structural coefficient collapses to 0.031 (CI -0.130 to 0.192). The
+  corrected Freedman-Lane joint permutation gives P1 maxT 0.042 on the baseline
+  map and 0.056 on the runner-up (legacy 0.061); the interval still crosses
+  zero, so by preregistered rule the signal is a shared structural drift with a
+  podocyte-leaning tail, not a separable podocyte program. G1 (preregistered
+  2026-10-06): the podocyte direction and magnitude are ROBUST to signed-median
+  scoring, common genes, leave-one-mission, gene influence, OSD-462
+  preparation, OSD-253 control choice, OSD-163 mapping rate and all 8
+  leave-one-atlas-study-out marker rebuilds, under both gene maps; several
+  variant intervals cross zero and the family-wise margin is thin. G2: within
+  RRRM-2 the podocyte shift is INCONCLUSIVE for persistence through live return
+  (ISS-T g 1.17 vs LAR g 0.14; interaction -0.28, 95% CI -0.62 to 0.06), as
+  powered; the disjoint structural shift is smaller in LAR (interaction p 0.009,
+  maxT 0.024), with recovery aliased to shorter flight and on-Earth euthanasia.
 
 spec_config: config/clinical_renal_axes_cross_mission.yaml
 docs:
@@ -37,6 +45,9 @@ docs:
   - docs/PODOCYTE_K1_K4_ADVERSARIAL_AUDIT_2026-08-11.md
   - docs/PODOCYTE_STRICT_MATCHING_AUDIT_2026-08-11.md
   - docs/PODOCYTE_CROSS_MISSION_PAPER_BLUEPRINT_2026-08-11.md
+  - docs/CLINICAL_AXES_G1_G2_PREREGISTRATION_2026-10-06.md
+  - docs/CLINICAL_AXES_PODOCYTE_SENSITIVITIES_AND_RECOVERY_PERSISTENCE_2026-10-06.md
+  - docs/DEFERRED_SECOND_ATLAS_VALIDATION_2026-10-06.md
 
 results_root: data/results/clinical-axes
 reference_run: data/archive/results/run_20260811_clinical_renal_axes_cross_mission

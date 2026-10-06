@@ -1,5 +1,18 @@
 # Analysis plan changelog
 
+## 2026-10-06 — G1/G2 run and results
+
+Run `data/results/clinical-axes/20261006T004825Z_g1g2` (lock `e574feb`, code
+`f04f84d`) reproduced every published target under the reconstructed gene map.
+G1: ROBUST_DIRECTION (items 1-7) and DEFINITION_ROBUST (item 8, 8/8 rebuilds),
+no verdict flips under the runner-up map. K0 Freedman-Lane P1 maxT 0.042
+(baseline) / 0.056 (runner-up); verdict unchanged by rule. G2: podocyte
+persistence INCONCLUSIVE (as powered); structural interaction p 0.009 (maxT
+0.024), margin label INCONCLUSIVE after Holm. Results:
+`docs/CLINICAL_AXES_PODOCYTE_SENSITIVITIES_AND_RECOVERY_PERSISTENCE_2026-10-06.md`.
+The published "structural control ranks 4th" is map-dependent (2nd here; ranks
+2-5 within 0.02) and is restated accordingly.
+
 ## 2026-10-06 — preregistration of 157-gene sensitivities and recovery persistence
 
 After a month away and a fresh environment, all inputs were re-acquired (OSDR S3

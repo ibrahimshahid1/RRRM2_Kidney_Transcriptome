@@ -1,5 +1,10 @@
 # Strongest current-data paper: cross-mission podocyte-associated kidney RNA
 
+> **Addendum 2026-10-06.** Superseded on the headline by K0 (shared structural drift with a podocyte-leaning
+> tail; bounded observation). The sensitivities this blueprint listed as complete had been run on the 4 axes and
+> the 6-gene barrier core; they have now been run on the 157-gene set. See
+> `docs/CLINICAL_AXES_PODOCYTE_SENSITIVITIES_AND_RECOVERY_PERSISTENCE_2026-10-06.md`.
+
 Date: 2026-08-11  
 Decision: **proceed as the strongest current-data biological manuscript**  
 Scope: five terminal mouse spaceflight missions; bulk kidney RNA  

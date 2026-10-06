@@ -25,7 +25,7 @@ list of executable stages.
 |---|---|---|---|
 | `subtype-reference` | C | locked | Flight-blind DCT2/CNT (27) and ASDN (29) sets, frozen at SHA-256 `ed64f0e0…` |
 | `v13-phospho` | C | locked | `claim_tier = neither`; DCT2/CNT non-evaluable, ASDN failed the selectivity gate |
-| `clinical-axes` | D | complete | 3 of 4 axes no-go; barrier axis rejects in the opposite direction; podocyte tier leads but the structural control ranks 4th |
+| `clinical-axes` | D | complete | 3 of 4 axes no-go; barrier axis rejects in the opposite direction; podocyte tier leads, direction robust (G1), but not separable from structural drift (K0); recovery persistence inconclusive (G2) |
 | `osd462-stage0` | B | complete | Condition perfectly aliased with reporter block; zero isolated canonical NCC/SPAK phosphoforms |
 | `v13-compartment` | C | complete | Parent-protein annotation enrichment only; does not localise cell of origin |
 | `grey60` | A | blocked | No-go; rescue explicitly retired |
