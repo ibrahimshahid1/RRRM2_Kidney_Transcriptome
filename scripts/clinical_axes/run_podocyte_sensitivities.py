@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 from copy import deepcopy
 from dataclasses import dataclass, field
+import datetime
 import hashlib
 import json
 import math
@@ -1417,6 +1418,8 @@ def _jsonable(value: Any) -> Any:
         return None if not math.isfinite(float(value)) else float(value)
     if isinstance(value, Path):
         return str(value)
+    if isinstance(value, datetime.date):  # YAML parses unquoted dates (lock_date)
+        return value.isoformat()
     if value is pd.NA:
         return None
     return value

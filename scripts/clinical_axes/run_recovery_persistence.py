@@ -1138,7 +1138,7 @@ def run_power_only(args: argparse.Namespace) -> pd.DataFrame:
         "noise": "N(0,1) per animal plus fixed arm x age block means; n_per_cell 5",
         "software": _software(),
     }
-    (outdir / "persistence_power_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (outdir / "persistence_power_manifest.json").write_text(json.dumps(manifest, indent=2, default=str) + "\n")
     return table
 
 

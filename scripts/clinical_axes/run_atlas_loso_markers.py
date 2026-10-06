@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 from copy import deepcopy
+import datetime
 import json
 from pathlib import Path
 import re
@@ -718,6 +719,8 @@ def _json_default(value: Any):
         return bool(value)
     if value is pd.NA:
         return None
+    if isinstance(value, datetime.date):  # YAML parses unquoted dates (lock_date)
+        return value.isoformat()
     raise TypeError(f"not JSON serializable: {type(value)}")
 
 

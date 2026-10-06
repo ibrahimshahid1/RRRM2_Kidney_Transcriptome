@@ -1031,3 +1031,9 @@ def test_real_skip_scoring_cli_writes_a_blind_tier_table(tmp_path, monkeypatch):
     assert manifest["baseline_contract"]["tiers_identical_to_frozen"] is True
     assert manifest["baseline_contract"]["expression_max_abs_diff"] <= 1e-9
     assert summary["gate_pass"].isna().all() and summary["estimate"].isna().all()
+
+
+def test_json_default_serializes_preregistration_dates():
+    prereg = yaml.safe_load((REPO / "config/clinical_axes_podocyte_sensitivities.yaml").read_text())
+    encoded = json.loads(json.dumps(prereg, default=rl._json_default))
+    assert encoded["lock_date"] == "2026-10-06"

@@ -954,3 +954,12 @@ def test_item2_podocyte_common_intersection_equals_strict_matching_target():
     assert sorted(common_family[PODOCYTE_SET]["subdomains"]["atlas_markers"]["genes"]) == target
     for column in ("estimate", "ci_low_mkh", "ci_high_mkh", "p_mkh"):
         assert abs(float(ours[column]) - float(strict[column])) < 1e-6, column
+
+
+def test_manifest_serializes_the_committed_preregistration():
+    """YAML parses the unquoted ``lock_date`` as a date; the manifest must still serialize it."""
+    import json
+
+    prereg = yaml.safe_load((REPO / "config/clinical_axes_podocyte_sensitivities.yaml").read_text())
+    encoded = json.loads(json.dumps(driver._jsonable({"preregistration": prereg})))
+    assert encoded["preregistration"]["lock_date"] == "2026-10-06"
