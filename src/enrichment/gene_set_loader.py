@@ -3,16 +3,28 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 from pathlib import Path
+import sys
+import tempfile
 
 import yaml
 
 from src.common import REPO_ROOT
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_CACHE = REPO_ROOT / "data" / "processed" / "gene_sets"
 DEFAULT_CURATED_YAML = REPO_ROOT / "config" / "gene_sets.yaml"
 DEFAULT_ID_MAP = REPO_ROOT / "data" / "processed" / "resources" / "id_map.json"
 DEFAULT_SEGMENT_MARKERS = REPO_ROOT / "data" / "processed" / "segment_markers"
+
+# Enrichr is fetched over HTTPS only. gseapy 1.1.1 hardcodes http://maayanlab.cloud,
+# which an HTTPS-only egress proxy refuses, so the direct request below is primary
+# and gseapy is only a fallback.
+ENRICHR_URL = "https://maayanlab.cloud/Enrichr"
+ENRICHR_TIMEOUT_S = 60.0
 
 # Default Enrichr libraries (mouse-specific first)
 DEFAULT_LIBRARIES: list[str] = [
@@ -174,29 +186,159 @@ def load_segment_marker_panels(
 
 # Enrichr fetcher
 
-def fetch_enrichr_library(name: str, cache_dir: Path) -> dict[str, list[str]]:
-    """Fetch an Enrichr gene-set library; cache as JSON for offline reuse."""
-    cache_file = cache_dir / f"{name}.json"
+class GeneSetFetchError(RuntimeError):
+    """An Enrichr library could not be obtained (or was empty).
 
-    if cache_file.exists():
+    An empty gene-set library silently turns an enrichment analysis into "nothing
+    is enriched", so a failed fetch is an error, never an empty result.
+    """
+
+
+def parse_enrichr_text(text: str) -> dict[str, list[str]]:
+    """Parse Enrichr ``mode=text`` output into ``{term: [gene, ...]}``.
+
+    Each line is ``term<TAB>description<TAB>gene<TAB>gene...``. Weighted libraries
+    write ``GENE,weight``; the weight is dropped, matching ``gseapy.get_library``.
+    Blank lines and terms with no genes are skipped; gene order and any duplicate
+    genes are kept as published.
+    """
+    library: dict[str, list[str]] = {}
+    for line in text.splitlines():
+        fields = line.strip().split("\t")
+        term = fields[0].strip()
+        if not term:
+            continue
+        genes = [g.split(",")[0] for g in fields[2:]]
+        genes = [g for g in genes if g]
+        if genes:
+            library[term] = genes
+    return library
+
+
+def _fetch_enrichr_https(name: str, timeout: float) -> dict[str, list[str]]:
+    """Fetch a library with ``requests`` over HTTPS (honours HTTPS_PROXY and the CA env)."""
+    import requests
+
+    response = requests.get(
+        f"{ENRICHR_URL}/geneSetLibrary",
+        params={"mode": "text", "libraryName": name},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    return parse_enrichr_text(response.content.decode("utf-8"))
+
+
+def _fetch_enrichr_gseapy(name: str, timeout: float) -> dict[str, list[str]]:
+    """Fallback: ``gseapy.get_library`` (plain HTTP in gseapy 1.1.1; fails behind an HTTPS-only proxy)."""
+    import gseapy as gp
+
+    return gp.get_library(name=name)
+
+
+def _read_library_cache(cache_file: Path) -> dict[str, list[str]] | None:
+    """Return the cached library, or None when the cache is absent or unusable.
+
+    An empty or unreadable cache is reported loudly and ignored (never returned),
+    so a poisoned ``{}`` file from an earlier failed run cannot mask a real fetch.
+    """
+    if not cache_file.exists():
+        return None
+    try:
+        with open(cache_file) as handle:
+            cached = json.load(handle)
+    except (OSError, ValueError) as exc:
+        logger.error("Ignoring unreadable gene-set cache %s: %s", cache_file, exc)
+        return None
+    if not isinstance(cached, dict) or not any(cached.values()):
+        logger.error("Ignoring empty gene-set cache %s; re-fetching from Enrichr", cache_file)
+        return None
+    return cached
+
+
+def _write_library_cache(cache_file: Path, library: dict[str, list[str]]) -> None:
+    """Write the cache atomically, so an interrupted run never leaves a partial file."""
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(dir=cache_file.parent, prefix=cache_file.name, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as handle:
+            json.dump(library, handle, indent=1)
+        os.replace(tmp_name, cache_file)
+    except BaseException:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
+
+
+def fetch_enrichr_library(
+    name: str,
+    cache_dir: Path,
+    *,
+    strict: bool = True,
+    timeout: float = ENRICHR_TIMEOUT_S,
+) -> dict[str, list[str]]:
+    """Fetch an Enrichr gene-set library; cache as JSON for offline reuse.
+
+    Order: a non-empty cache file, then a direct HTTPS request, then gseapy. A
+    library is cached only when it is non-empty. When every source fails the error
+    is logged and, with ``strict`` (the default), ``GeneSetFetchError`` is raised;
+    ``strict=False`` returns ``{}`` after the error log and never writes a cache.
+    """
+    cache_file = Path(cache_dir) / f"{name}.json"
+
+    cached = _read_library_cache(cache_file)
+    if cached is not None:
         print(f"  Loading from cache: {cache_file.name}")
-        with open(cache_file) as f:
-            return json.load(f)
+        return cached
 
+    failures: list[str] = []
+    for label, fetch in (("https", _fetch_enrichr_https), ("gseapy", _fetch_enrichr_gseapy)):
+        try:
+            library = fetch(name, timeout)
+        except ImportError as exc:
+            failures.append(f"{label}: {exc} (pip install {exc.name or label})")
+            continue
+        except Exception as exc:  # network, TLS, proxy refusal, HTTP status, parse
+            failures.append(f"{label}: {type(exc).__name__}: {exc}")
+            continue
+        if not library or not any(library.values()):
+            failures.append(f"{label}: returned an empty library")
+            continue
+        _write_library_cache(cache_file, library)
+        print(f"  Fetched via {label} and cached: {len(library)} gene sets")
+        return library
+
+    message = (
+        f"Could not fetch Enrichr library {name!r}; refusing to continue with an "
+        f"empty library and nothing was cached. Attempts: " + " | ".join(failures)
+    )
+    logger.error(message)
+    if strict:
+        raise GeneSetFetchError(message)
+    return {}
+
+
+def list_enrichr_libraries(timeout: float = ENRICHR_TIMEOUT_S) -> list[str]:
+    """Names of the active Enrichr libraries (HTTPS first, gseapy as fallback)."""
+    failures: list[str] = []
+    try:
+        import requests
+
+        response = requests.get(f"{ENRICHR_URL}/datasetStatistics", timeout=timeout)
+        response.raise_for_status()
+        names = [row["libraryName"] for row in response.json()["statistics"]]
+        if names:
+            return sorted(names)
+        failures.append("https: empty library list")
+    except Exception as exc:
+        failures.append(f"https: {type(exc).__name__}: {exc}")
     try:
         import gseapy as gp
-        lib: dict[str, list[str]] = gp.get_library(name=name)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        with open(cache_file, "w") as f:
-            json.dump(lib, f, indent=1)
-        print(f"  Fetched and cached: {len(lib)} gene sets")
-        return lib
-    except ImportError:
-        print("  WARNING: gseapy not installed — run: pip install gseapy")
-        return {}
-    except Exception as e:
-        print(f"  WARNING: Could not fetch '{name}': {e}")
-        return {}
+
+        return sorted(gp.get_library_name())
+    except Exception as exc:
+        failures.append(f"gseapy: {type(exc).__name__}: {exc}")
+    message = "Could not list Enrichr libraries. Attempts: " + " | ".join(failures)
+    logger.error(message)
+    raise GeneSetFetchError(message)
 
 
 # GMT file loader
@@ -229,8 +371,15 @@ def load_gene_sets(
     include_curated: bool = True,
     include_segment_markers: bool = True,
     segment_marker_dir: Path | None = None,
+    strict: bool = True,
 ) -> tuple[dict[str, list[str]], dict[str, str]]:
-    """Load size-filtered Enrichr/.gmt/YAML gene sets; returns (gene_sets, set_to_library)."""
+    """Load size-filtered Enrichr/.gmt/YAML gene sets; returns (gene_sets, set_to_library).
+
+    ``strict`` (default) raises ``GeneSetFetchError`` when a requested Enrichr
+    library cannot be obtained, instead of quietly analysing without it. With
+    ``strict=False`` the library is skipped after an error log and the failed
+    names are re-listed in a final error line.
+    """
     if cache_dir is None:
         cache_dir = DEFAULT_CACHE
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -245,10 +394,12 @@ def load_gene_sets(
     set_to_library: dict[str, str] = {}
 
     # 1) Enrichr libraries
+    failed_libraries: list[str] = []
     for lib_name in libraries:
         print(f"Gene set library: {lib_name}")
-        raw = fetch_enrichr_library(lib_name, cache_dir)
+        raw = fetch_enrichr_library(lib_name, cache_dir, strict=strict)
         if not raw:
+            failed_libraries.append(lib_name)
             continue
 
         # Resolve symbols via Ensembl id_map (no more title-casing hack)
@@ -310,6 +461,12 @@ def load_gene_sets(
         if panels:
             print(f"Gene set library: segment_markers — {n_seg} data-driven panels")
 
+    if failed_libraries:
+        logger.error(
+            "Enrichr libraries NOT loaded (results exclude them): %s",
+            ", ".join(failed_libraries),
+        )
+
     print(f"\nTotal gene sets loaded: {len(gene_sets)}")
     return gene_sets, set_to_library
 
@@ -325,10 +482,9 @@ if __name__ == "__main__":
     ap.add_argument("--cache", default=str(DEFAULT_CACHE))
     args = ap.parse_args()
 
-    if args.list:
-        try:
-            import gseapy as gp
-            names = gp.get_library_name()
+    try:
+        if args.list:
+            names = list_enrichr_libraries()
             mouse = [n for n in names if "mouse" in n.lower()]
             print(f"--- Mouse-specific ({len(mouse)}) ---")
             for n in sorted(mouse):
@@ -336,9 +492,12 @@ if __name__ == "__main__":
             print(f"\n--- All ({len(names)}) ---")
             for n in sorted(names):
                 print(f"  {n}")
-        except ImportError:
-            print("gseapy not installed — run: pip install gseapy")
 
-    if args.fetch is not None:
-        libs = args.fetch if args.fetch else DEFAULT_LIBRARIES
-        load_gene_sets(libraries=libs, cache_dir=Path(args.cache))
+        if args.fetch is not None:
+            libs = args.fetch if args.fetch else DEFAULT_LIBRARIES
+            load_gene_sets(libraries=libs, cache_dir=Path(args.cache))
+    except GeneSetFetchError:
+        # the cause was already logged at ERROR level by the fetcher
+        print("ERROR: Enrichr fetch failed (details above); nothing was cached.",
+              file=sys.stderr)
+        sys.exit(1)

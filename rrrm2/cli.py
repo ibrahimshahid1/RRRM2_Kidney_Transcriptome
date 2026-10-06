@@ -61,7 +61,8 @@ def _show_revision(rev: Revision, as_json: bool) -> int:
             "results_root": rev.results_root, "reference_run": rev.reference_run,
             "stages": [{"id": s.id, "title": s.title, "runner": s.runner,
                         "entry": s.entry, "needs": list(s.needs),
-                        "optional": s.optional, "outputs": list(s.outputs)}
+                        "optional": s.optional, "outputs": list(s.outputs),
+                        "requires": list(s.requires)}
                        for s in rev.stages],
         }, indent=2))
         return 0
@@ -98,6 +99,9 @@ def _show_revision(rev: Revision, as_json: bool) -> int:
         needs = f"  needs: {', '.join(st.needs)}" if st.needs else ""
         print(f"  {st.id:<22} {st.runner:<8} {st.title} {flag}")
         print(f"  {'':22} {st.entry}{needs}")
+        for path in st.requires:
+            mark = " " if (REPO_ROOT / path).exists() else "?"
+            print(f"  {'':22}  {mark} requires {path}")
     print()
 
     root = rev.results_root_path
@@ -281,7 +285,13 @@ def cmd_panels(args: argparse.Namespace) -> int:
 # --- doctor -----------------------------------------------------------------
 
 def cmd_doctor(args: argparse.Namespace) -> int:
-    """Report interpreter, data, and per-revision runnability."""
+    """Report interpreter, data, and per-revision runnability.
+
+    A revision is ``blocked`` when a required stage lacks an input (revision-level
+    ``requires.data`` or stage-level ``requires``); the blocked stages are named.
+    A missing input of an *optional* stage is only a warning, because optional
+    stages never run by default.
+    """
     print(f"repo root   {REPO_ROOT}")
     python = runner.default_python()
     print(f"python      {python}")
@@ -295,16 +305,25 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     print("\nrevision runnability")
     registry = load_registry()
     blocked = 0
+    n_blocked_stages = 0
+    pad = " " * 20
     for rev in sorted(registry.values(), key=lambda r: r.id):
-        check = runner.preflight(rev)
+        check = runner.preflight(rev, optional_as_warnings=True)
         if check.ok:
             print(f"  {rev.id:<20} ok")
         else:
             blocked += 1
             print(f"  {rev.id:<20} blocked")
             for p in check.problems:
-                print(f"  {'':20}   - {p}")
-    print(f"\n{len(registry) - blocked}/{len(registry)} revisions runnable here.")
+                print(f"  {pad}   - {p}")
+            if check.blocked_stages:
+                n_blocked_stages += len(check.blocked_stages)
+                print(f"  {pad}   blocked stages: {', '.join(check.blocked_stages)}")
+        for reasons in check.degraded_stages.values():
+            for reason in reasons:
+                print(f"  {pad}   ~ {reason} (optional stage, skipped by default)")
+    print(f"\n{len(registry) - blocked}/{len(registry)} revisions runnable here"
+          f" ({n_blocked_stages} required stage(s) blocked by missing inputs).")
     return 0
 
 

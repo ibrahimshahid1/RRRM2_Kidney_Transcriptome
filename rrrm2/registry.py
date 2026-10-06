@@ -13,6 +13,11 @@ from .paths import REPO_ROOT, REVISIONS_DIR
 VALID_STATUS = frozenset({"locked", "complete", "retired", "exploratory", "blocked"})
 VALID_RUNNER = frozenset({"python", "rscript"})
 
+# Arguments whose value names the directory a stage writes into. Two stages
+# that run the same entry script into the same directory overwrite each other's
+# files (the `podocyte-disjoint` bug), so the registry tests key on this.
+OUTPUT_DIR_FLAGS = ("--results", "--outdir", "--output-dir")
+
 
 class RegistryError(ValueError):
     """A revision file is malformed or internally inconsistent."""
@@ -30,10 +35,44 @@ class Stage:
     needs: tuple[str, ...] = ()
     optional: bool = False
     outputs: tuple[str, ...] = ()
+    requires: tuple[str, ...] = ()
 
     @property
     def entry_path(self) -> Path:
         return REPO_ROOT / self.entry
+
+    def output_dir_template(self) -> str | None:
+        """Raw (unsubstituted) value after ``--results``/``--outdir``/``--output-dir``.
+
+        Returns ``None`` when the stage passes none of those flags, i.e. it
+        writes wherever the entry script's own default points.
+        """
+        found: str | None = None
+        for i, arg in enumerate(self.args):
+            for flag in OUTPUT_DIR_FLAGS:
+                if arg == flag and i + 1 < len(self.args):
+                    found = self.args[i + 1]
+                elif arg.startswith(flag + "="):
+                    found = arg.split("=", 1)[1]
+        return found
+
+    def output_dir(self, subs: dict[str, str]) -> str | None:
+        """The stage's output directory with placeholders substituted."""
+        template = self.output_dir_template()
+        if template is None:
+            return None
+        try:
+            return template.format(**subs)
+        except KeyError as exc:
+            raise RegistryError(
+                f"stage {self.id!r} uses unknown placeholder {exc.args[0]!r} "
+                f"in output directory {template!r}"
+            ) from exc
+
+    def missing_requires(self, root: Path | None = None) -> list[str]:
+        """Declared ``requires`` paths that do not exist under ``root``."""
+        base = root or REPO_ROOT
+        return [r for r in self.requires if not (base / r).exists()]
 
     def resolved_args(self, subs: dict[str, str]) -> list[str]:
         """Substitute ``{run_dir}``-style placeholders into the argument list."""
@@ -134,6 +173,24 @@ def _stage_from_dict(rev_id: str, raw: dict[str, Any]) -> Stage:
             f"{rev_id}/{raw['id']}: runner {runner!r} is not one of "
             f"{sorted(VALID_RUNNER)}"
         )
+    raw_requires = raw.get("requires") or ()
+    if isinstance(raw_requires, (str, bytes)) or not isinstance(raw_requires, (list, tuple)):
+        raise RegistryError(
+            f"{rev_id}/{raw['id']}: requires must be a list of repo-relative paths"
+        )
+    requires = tuple(str(r) for r in raw_requires)
+    for path in requires:
+        # Literal repo-relative paths only: no placeholders, no absolute paths.
+        if "{" in path or "}" in path:
+            raise RegistryError(
+                f"{rev_id}/{raw['id']}: requires entry {path!r} must be a literal "
+                "path (placeholders are not substituted)"
+            )
+        if Path(path).is_absolute():
+            raise RegistryError(
+                f"{rev_id}/{raw['id']}: requires entry {path!r} must be "
+                "relative to the repository root"
+            )
     return Stage(
         id=raw["id"],
         title=raw["title"],
@@ -143,6 +200,7 @@ def _stage_from_dict(rev_id: str, raw: dict[str, Any]) -> Stage:
         needs=tuple(raw.get("needs") or ()),
         optional=bool(raw.get("optional", False)),
         outputs=tuple(raw.get("outputs") or ()),
+        requires=requires,
     )
 
 
