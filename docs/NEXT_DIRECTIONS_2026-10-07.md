@@ -88,8 +88,13 @@ three carry the ISS-T/LAR split. Three questions:
 - **Main figure:** a recurrence map. Rows are the prior claims, the 4 axes, and the structural and
   podocyte sets. Columns are the missions plus a calibrated meta column and I². Each row carries its
   verdict.
-- **Named methods result:** group-level n is 1 vs 1 in every mission. The control-vs-control
-  calibration is the most transferable contribution to the field.
+- **Named methods result:** animals provide biological replication within each cohort, but each
+  mission's exposure environment and matched control environment are each realized once (one cohort,
+  one dissection day, one processing batch per group). Cohort-level handling, habitat and batch
+  deviations therefore cannot be estimated from within-mission animal replication. The project
+  estimates them from control-versus-control contrasts across missions. This calibration is the most
+  transferable contribution to the field. Do not phrase it as "n = 1 vs 1": the animal-level contrast
+  does have within-study replication.
 - **Disclose the provenance chain:** targeted axes → compartment scan → podocyte → G1/K0/G2 → reader
   post-hoc checks → G3.
 - **Venue:** npj Microgravity is realistic. Communications Biology if the ledger and the calibration
@@ -109,8 +114,10 @@ three carry the ISS-T/LAR split. Three questions:
   only if OSD-163 passes. These are the same animals in a second assay, so p-values are never combined.
 
 **7. Watch, defer or drop.**
-- **Watch:** corrected labels for the RRRM-1 kidney single-cell data, and Bion-M2 and Siew GCR kidney
-  deposits.
+- **Watch:** a corrected deposit of the RRRM-1 live-return kidney single-cell data, and Bion-M2 and
+  Siew GCR kidney deposits. GSE295428's "Kidney, LAR" samples were tested on 2026-10-07 and are
+  duplicated spleen libraries; see `docs/strategy/2026-10-07/GSE295428_FEASIBILITY.md`. Report the
+  duplicate upload to GEO and the authors.
 - **Defer:** the second atlas (item 9), unless a reviewer asks; G1 already has 8/8 rebuilds.
 - **Drop:** GSE235042, the hindlimb-unloading kidney study (n = 3 per group, FPKM only, sex unknown).
 
@@ -128,6 +135,8 @@ three carry the ISS-T/LAR split. Three questions:
 
 - Tag the freeze and commit the run manifests.
 - Refresh the README, the technical audit and owner_decisions:
+  - the CPM eligibility rule uses FLT/GC membership, so call it "arm-aware", not "label-blind"
+    (`PROJECT_TECHNICAL_AUDIT_2026-08-25.md` line 595);
   - structural I² is 0.67%, not 67.3%;
   - the structural control ranks 2nd, not 4th;
   - "no sixth mission" is wrong;
