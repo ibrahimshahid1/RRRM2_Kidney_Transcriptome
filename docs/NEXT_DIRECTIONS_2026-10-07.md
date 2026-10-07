@@ -1,5 +1,8 @@
 # Next directions after the G1/G2 results
 
+> **Superseded for planning by `docs/RESEARCH_PLAN_2026-10.md`** (v1.1, 2026-10-07). Kept as the decision
+> record that led to it.
+
 **Date:** 2026-10-07
 **Status:** recommendation for the project owner
 **Basis:**
@@ -23,8 +26,9 @@ animals).
 **What the readers and reviewer added:**
 - **The significance margin is thin.** Bonferroni over the 53 tests actually examined gives about
   p 0.05, and dropping the top 5 genes takes the lower bound below zero.
-- **The attribution to spaceflight is exposed.** Each group is one dissection day and one processing
-  batch. Against vivarium controls, the podocyte effect is 0.28 (−0.45, 1.01).
+- **The attribution to spaceflight is exposed.** Each group is one cohort, and in OSD-771 group is also
+  confounded with the ERCC spike-in batch (dissection dates partly overlap). Against vivarium controls,
+  the podocyte effect is 0.28 (−0.45, 1.01).
 - **The G2 "rebound" and the exploratory recovery hits are artifacts**, of group batch and on-orbit
   handling respectively.
 - **Siew 2024 already reports qualitative nephron structural remodeling**, and its PODXL/NID1 vote
@@ -89,8 +93,8 @@ three carry the ISS-T/LAR split. Three questions:
   podocyte sets. Columns are the missions plus a calibrated meta column and I². Each row carries its
   verdict.
 - **Named methods result:** animals provide biological replication within each cohort, but each
-  mission's exposure environment and matched control environment are each realized once (one cohort,
-  one dissection day, one processing batch per group). Cohort-level handling, habitat and batch
+  mission's exposure environment and matched control environment are each realized once (one cohort
+  per group; in OSD-771 also one ERCC spike-in batch per group). Cohort-level handling, habitat and batch
   deviations therefore cannot be estimated from within-mission animal replication. The project
   estimates them from control-versus-control contrasts across missions. This calibration is the most
   transferable contribution to the field. Do not phrase it as "n = 1 vs 1": the animal-level contrast
