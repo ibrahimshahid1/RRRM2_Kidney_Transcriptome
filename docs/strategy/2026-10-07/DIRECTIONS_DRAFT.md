@@ -166,4 +166,10 @@ kidney deposits, and Siew GCR kidney data (OSD-706..712).
   sampling panels need a justification independent of these data, such as published marker lists.
 - **Every external addition is underpowered.** OSD-457, GSE235042 and the duration grid are
   descriptive.
-- **Novelty risk for a "systemic structural/ECM drift" framing.** See `reader_priorart.md`.
+- **Novelty (verified from the Siew 2024 full text; see the `reader_priorart.md` addendum).**
+  - Structural remodeling is prior art in qualitative form: Siew reports focal adhesion, tight junction
+    and actin enrichment.
+  - The podocyte direction conflicts with Siew's PODXL/NID1 vote count. Frame it as a different
+    estimand.
+  - The novel contribution is the preregistered, calibrated cross-mission "what recurs" estimate.
+    D3's framing should explicitly test Siew's claims for recurrence.
