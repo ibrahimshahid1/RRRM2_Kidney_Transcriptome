@@ -1,0 +1,50 @@
+{
+  "reference_label": "mouse_kidney_atlas",
+  "n_cells": 141401,
+  "n_genes_selected_count_matrix": 16711,
+  "selected_count_matrix_shape": [
+    141401,
+    16711
+  ],
+  "adata_shape": [
+    141401,
+    3000
+  ],
+  "adata_raw_shape": [
+    141401,
+    16711
+  ],
+  "n_cells_mapped": 132275,
+  "mapping_fraction": 0.9354601452606417,
+  "minimum_mapping_fraction_required": 0.9,
+  "n_pseudobulks_included": 65,
+  "source_studies_by_compartment": {
+    "DCT2_CNT_atlas": 7,
+    "DCT_general": 7,
+    "endothelial": 8,
+    "fibroblast": 5,
+    "immune": 7,
+    "intercalated_cell": 7,
+    "podocyte": 4,
+    "principal_cell": 7,
+    "proximal_tubule": 7,
+    "thick_ascending_limb": 6
+  },
+  "minimum_source_studies_per_compartment_required": 3,
+  "required_compartments": [
+    "proximal_tubule",
+    "thick_ascending_limb",
+    "DCT_general",
+    "DCT2_CNT_atlas",
+    "principal_cell",
+    "intercalated_cell",
+    "podocyte",
+    "endothelial",
+    "fibroblast",
+    "immune"
+  ],
+  "source_study_column": "Origin",
+  "count_source": "raw.X",
+  "integer_like_counts": true,
+  "limitations": "This atlas summary supports broad-expression and major-compartment QC. It does not independently validate DCT1/DCT2/CNT identity unless those author labels are present in the source metadata. Origin identifies a source study, not an animal or donor."
+}

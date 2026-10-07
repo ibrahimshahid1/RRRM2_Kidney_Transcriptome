@@ -1,0 +1,27 @@
+group	target_path	url	size_bytes	gate	role
+a6_heart	data/external/osdr/OSD-580/OSD-580_metadata_OSD-580-ISA.zip	osdr:580:OSD-580_metadata_OSD-580-ISA.zip	314709	docs/registrations/A6_PREDICTIONS.md	metadata
+a6_heart	data/external/osdr/OSD-580/GLDS-573_rna_seq_RSEM_Unnormalized_Counts.csv	osdr:580:GLDS-573_rna_seq_RSEM_Unnormalized_Counts.csv	13257204	docs/registrations/A6_PREDICTIONS.md	data
+a6_heart	data/external/osdr/OSD-580/GLDS-573_rna_seq_Normalized_Counts.csv	osdr:580:GLDS-573_rna_seq_Normalized_Counts.csv	31495854	docs/registrations/A6_PREDICTIONS.md	data
+a6_heart	data/external/osdr/OSD-580/GLDS-573_rna_seq_bulkRNASeq_v1_runsheet.csv	osdr:580:GLDS-573_rna_seq_bulkRNASeq_v1_runsheet.csv	32876	docs/registrations/A6_PREDICTIONS.md	data
+a6_heart	data/external/osdr/OSD-580/GLDS-573_rna_seq_SampleTable_GLbulkRNAseq.csv	osdr:580:GLDS-573_rna_seq_SampleTable_GLbulkRNAseq.csv	5216	docs/registrations/A6_PREDICTIONS.md	data
+a6_brain	data/external/osdr/OSD-561/OSD-561_metadata_OSD-561-ISA.zip	osdr:561:OSD-561_metadata_OSD-561-ISA.zip	187288	docs/registrations/A6_PREDICTIONS.md	metadata
+a6_brain	data/external/osdr/OSD-561/GLDS-556_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv	osdr:561:GLDS-556_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv	11977129	docs/registrations/A6_PREDICTIONS.md	data
+a6_brain	data/external/osdr/OSD-561/GLDS-556_rna_seq_RSEM_Unnormalized_Counts_rRNArm_GLbulkRNAseq.csv	osdr:561:GLDS-556_rna_seq_RSEM_Unnormalized_Counts_rRNArm_GLbulkRNAseq.csv	5180392	docs/registrations/A6_PREDICTIONS.md	data
+a6_brain	data/external/osdr/OSD-561/GLDS-556_rna_seq_bulkRNASeq_v2_runsheet.csv	osdr:561:GLDS-556_rna_seq_bulkRNASeq_v2_runsheet.csv	10946	docs/registrations/A6_PREDICTIONS.md	data
+a6_brain	data/external/osdr/OSD-561/GLDS-556_rna_seq_qc_metrics_GLbulkRNAseq.csv	osdr:561:GLDS-556_rna_seq_qc_metrics_GLbulkRNAseq.csv	32803	docs/registrations/A6_PREDICTIONS.md	data
+a6_brain	data/external/osdr/OSD-562/OSD-562_metadata_OSD-562-ISA.zip	osdr:562:OSD-562_metadata_OSD-562-ISA.zip	191083	docs/registrations/A6_PREDICTIONS.md	metadata
+a6_brain	data/external/osdr/OSD-562/GLDS-557_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv	osdr:562:GLDS-557_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv	12446422	docs/registrations/A6_PREDICTIONS.md	data
+a6_brain	data/external/osdr/OSD-562/GLDS-557_rna_seq_RSEM_Unnormalized_Counts_rRNArm_GLbulkRNAseq.csv	osdr:562:GLDS-557_rna_seq_RSEM_Unnormalized_Counts_rRNArm_GLbulkRNAseq.csv	5343294	docs/registrations/A6_PREDICTIONS.md	data
+a6_brain	data/external/osdr/OSD-562/GLDS-557_rna_seq_bulkRNASeq_v2_runsheet.csv	osdr:562:GLDS-557_rna_seq_bulkRNASeq_v2_runsheet.csv	11460	docs/registrations/A6_PREDICTIONS.md	data
+a6_brain	data/external/osdr/OSD-562/GLDS-557_rna_seq_qc_metrics_GLbulkRNAseq.csv	osdr:562:GLDS-557_rna_seq_qc_metrics_GLbulkRNAseq.csv	33607	docs/registrations/A6_PREDICTIONS.md	data
+a6_brain	data/external/osdr/OSD-613/OSD-613_metadata_OSD-613-ISA.zip	osdr:613:OSD-613_metadata_OSD-613-ISA.zip	146807	docs/registrations/A6_PREDICTIONS.md	metadata
+a6_brain	data/external/osdr/OSD-613/GLDS-589_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv	osdr:613:GLDS-589_rna_seq_VST_Counts_rRNArm_GLbulkRNAseq.csv	8639668	docs/registrations/A6_PREDICTIONS.md	data
+a6_brain	data/external/osdr/OSD-613/GLDS-589_rna_seq_RSEM_Unnormalized_Counts_rRNArm_GLbulkRNAseq.csv	osdr:613:GLDS-589_rna_seq_RSEM_Unnormalized_Counts_rRNArm_GLbulkRNAseq.csv	4144005	docs/registrations/A6_PREDICTIONS.md	data
+a6_brain	data/external/osdr/OSD-613/GLDS-589_rna_seq_bulkRNASeq_v2_runsheet.csv	osdr:613:GLDS-589_rna_seq_bulkRNASeq_v2_runsheet.csv	7579	docs/registrations/A6_PREDICTIONS.md	data
+a6_brain	data/external/osdr/OSD-613/GLDS-589_rna_seq_qc_metrics_GLbulkRNAseq.csv	osdr:613:GLDS-589_rna_seq_qc_metrics_GLbulkRNAseq.csv	23417	docs/registrations/A6_PREDICTIONS.md	data
+a7_mhu3	data/external/osdr/OSD-457/OSD-457_metadata_OSD-457-ISA.zip	osdr:457:OSD-457_metadata_OSD-457-ISA.zip	658137		metadata
+a7_mhu3	data/external/osdr/OSD-457/GLDS-457_rna_seq_RSEM_Unnormalized_Counts_rRNArm_GLbulkRNAseq.csv	osdr:457:GLDS-457_rna_seq_RSEM_Unnormalized_Counts_rRNArm_GLbulkRNAseq.csv	30534355		data
+a7_mhu3	data/external/osdr/OSD-457/GLDS-457_rna_seq_bulkRNASeq_v2_runsheet.csv	osdr:457:GLDS-457_rna_seq_bulkRNASeq_v2_runsheet.csv	42709		data
+a7_mhu3	data/external/osdr/OSD-457/GLDS-457_rna_seq_qc_metrics_GLbulkRNAseq.csv	osdr:457:GLDS-457_rna_seq_qc_metrics_GLbulkRNAseq.csv	173456		data
+a8_osd163	data/external/osdr/OSD-163/proteomics/GLDS-163_proteomics_RR3_KDN_processed.zip	osdr:163:GLDS-163_proteomics_RR3_KDN_processed.zip	20855142	docs/registrations/A8_PREDICTIONS.md	data
+a8_osd102	data/external/osdr/OSD-102/proteomics/GLDS-102_proteomics_TMT_KDNL.processed.tar.gz	osdr:102:GLDS-102_proteomics_TMT_KDNL.processed.tar.gz	3041004464	docs/registrations/A8_OSD163_RESULT.md	data

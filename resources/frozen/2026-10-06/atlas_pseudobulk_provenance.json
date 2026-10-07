@@ -1,0 +1,18 @@
+{
+  "config": "config/dct_subtype_reference_freeze_v1.yaml",
+  "config_sha256": "a79a7be8da6b502b269cd9d8525b53468de751f84c6dc43c4498527368b5826e",
+  "input": "data/external/single_cell_atlases/mouse_kidney_atlas/mka.h5ad",
+  "input_sha256": "68ffe8c08ad48e5d4e8a3d107e7efdde58e9cb1993f23b24ec06343d7fe659ee",
+  "git_commit": "26c18906d09a4848b1c225573df3867238bceeb7",
+  "flight_result_inputs_used": [],
+  "command_parameters": {
+    "config": "config/dct_subtype_reference_freeze_v1.yaml",
+    "input": "data/external/single_cell_atlases/mouse_kidney_atlas/mka.h5ad",
+    "output_dir": "data/processed/v13_dct_reference/mouse_kidney_atlas",
+    "counts_layer": "counts",
+    "source_study_column": "Origin",
+    "cell_type_column": "Celltype_finest",
+    "fallback_cell_type_column": "Celltype",
+    "reference_label": "mouse_kidney_atlas"
+  }
+}

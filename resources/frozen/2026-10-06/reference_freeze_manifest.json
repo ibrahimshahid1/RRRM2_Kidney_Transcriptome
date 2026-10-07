@@ -1,0 +1,18 @@
+{
+  "analysis_id": "v13_compartment_adversarial_audit_20260802",
+  "created_utc": "2026-10-05T23:43:57.263385+00:00",
+  "stage": "reference_only_before_new_exact_effect_inference",
+  "config": "config/v13_compartment_adversarial_audit.yaml",
+  "config_sha256": "19c0eb663a1a13031ad4b1be899ee543ce60276688f6d658e9d964d0990a8d2a",
+  "inputs": {
+    "data/processed/v13_dct_reference/mouse_kidney_atlas/atlas_compartment_expression.tsv.gz": "6fb4fbafe0168f7848a20baaa4b0e5c2f2c3b06bad0ec02d5cac208f175abb16",
+    "data/processed/gene_sets/KEGG_2019_Mouse.json": "5a5cff3016ed6d4eb8eb9d30aa47cd5e4845471851aacb7e1fcb2a43afbe7b51"
+  },
+  "output": {
+    "data/processed/v13_compartment_audit/frozen_compartment_tiers.tsv": "f080a0d9725cd2095d53deb542fc1e6175fb5fa610979bc0f4103022ac25bac6",
+    "data/processed/v13_compartment_audit/frozen_compartment_tier_counts.tsv": "a49e48151d7500ff8f71a260b52785b6076edc73544737ef2c2980596fbc29f6"
+  },
+  "n_sets": 51,
+  "n_rows": 9468,
+  "terminology_boundary": "within_kidney_not_broad_not_kidney_organ_restricted"
+}

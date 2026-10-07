@@ -1,0 +1,161 @@
+Celltype_finest	Celltype	compartment	n_cells
+ATL	ATL		1173
+Asc-Vasa-Recta	Asc-Vasa-Recta	endothelial	421
+B lymph	B lymph	immune	135
+CD-Trans	CD-Trans	intercalated_cell	53
+CNT	CNT	DCT2_CNT_atlas	1642
+CTAL	CTAL	thick_ascending_limb	2012
+DCT	DCT	DCT_general	8519
+DCT-CNT	DCT-CNT	DCT2_CNT_atlas	393
+DTL	DTL		284
+DTL-ATL	DTL-ATL		1415
+Desc-Vasa-Recta	Desc-Vasa-Recta	endothelial	152
+Endo	DTL	endothelial	85
+Endo	Endo	endothelial	10267
+Fib	DCT	fibroblast	3
+Fib	Fib	fibroblast	825
+Fib	Glom-Endo	fibroblast	1
+Fib	ICB	fibroblast	1
+Fib	MTAL	fibroblast	2
+Fib	Macro	fibroblast	142
+Fib	PTS2	fibroblast	1
+Fib	PTS3	fibroblast	3
+Fib	PTS3T2	fibroblast	1
+Fib	Unknown	fibroblast	6
+Glom-Endo	Glom-Endo	endothelial	3017
+IC	ICA	intercalated_cell	399
+IC	ICB	intercalated_cell	856
+ICA	ICA	intercalated_cell	683
+ICB	ICB	intercalated_cell	664
+LOH	LOH		1545
+Lymphocytes	T lymph	immune	186
+MC	MC		316
+MD	MD		39
+MTAL	MTAL	thick_ascending_limb	1948
+Macro	Macro	immune	884
+Mp/DC	DC	immune	74
+NK	NK	immune	177
+Neutro	Neutro	immune	66
+PC	PC	principal_cell	2733
+PCT	PTS1	proximal_tubule	1895
+PCT	PTS2	proximal_tubule	1064
+PCT	PTS3	proximal_tubule	10
+PEC	PEC		75
+PST	PTS1	proximal_tubule	708
+PST	PTS2	proximal_tubule	4976
+PST	PTS3	proximal_tubule	1358
+PST	PTS3T2	proximal_tubule	58
+PT	B lymph	proximal_tubule	1
+PT	CNT	proximal_tubule	42
+PT	CTAL	proximal_tubule	8
+PT	DCT	proximal_tubule	102
+PT	DCT-CNT	proximal_tubule	4
+PT	Endo	proximal_tubule	2
+PT	Glom-Endo	proximal_tubule	2
+PT	ICA	proximal_tubule	1
+PT	ICB	proximal_tubule	10
+PT	MTAL	proximal_tubule	17
+PT	Macro	proximal_tubule	2
+PT	NK	proximal_tubule	1
+PT	PC	proximal_tubule	1
+PT	PTS1	proximal_tubule	3014
+PT	PTS2	proximal_tubule	2141
+PT	PTS3	proximal_tubule	1618
+PT	PTS3T2	proximal_tubule	5
+PT	T lymph	proximal_tubule	8
+PT	Unknown	proximal_tubule	31
+PTS1	ATL	proximal_tubule	1
+PTS1	CNT	proximal_tubule	3
+PTS1	CTAL	proximal_tubule	5
+PTS1	DCT	proximal_tubule	4
+PTS1	DCT-CNT	proximal_tubule	1
+PTS1	DTL-ATL	proximal_tubule	3
+PTS1	Endo	proximal_tubule	2
+PTS1	Fib	proximal_tubule	1
+PTS1	Glom-Endo	proximal_tubule	2
+PTS1	MTAL	proximal_tubule	1
+PTS1	PC	proximal_tubule	4
+PTS1	PTS1	proximal_tubule	5410
+PTS1	PTS2	proximal_tubule	1104
+PTS1	PTS3	proximal_tubule	20
+PTS1	PTS3T2	proximal_tubule	8
+PTS1	T lymph	proximal_tubule	2
+PTS1	Unknown	proximal_tubule	1
+PTS1-2	ATL	proximal_tubule	88
+PTS1-2	CNT	proximal_tubule	28
+PTS1-2	CTAL	proximal_tubule	5
+PTS1-2	DCT	proximal_tubule	32
+PTS1-2	DCT-CNT	proximal_tubule	6
+PTS1-2	DTL-ATL	proximal_tubule	7
+PTS1-2	Endo	proximal_tubule	15
+PTS1-2	Fib	proximal_tubule	10
+PTS1-2	ICA	proximal_tubule	2
+PTS1-2	ICB	proximal_tubule	11
+PTS1-2	MTAL	proximal_tubule	3
+PTS1-2	PC	proximal_tubule	5
+PTS1-2	PTS1	proximal_tubule	2606
+PTS1-2	PTS2	proximal_tubule	374
+PTS1-2	PTS3	proximal_tubule	183
+PTS1-2	PTS3T2	proximal_tubule	6
+PTS1-2	Per	proximal_tubule	1
+PTS1-2	Podo	proximal_tubule	11
+PTS1-2	Unknown	proximal_tubule	258
+PTS2	CNT	proximal_tubule	2
+PTS2	CTAL	proximal_tubule	2
+PTS2	DCT	proximal_tubule	1
+PTS2	DTL-ATL	proximal_tubule	3
+PTS2	Endo	proximal_tubule	2
+PTS2	Glom-Endo	proximal_tubule	1
+PTS2	ICA	proximal_tubule	1
+PTS2	MTAL	proximal_tubule	2
+PTS2	PC	proximal_tubule	2
+PTS2	PTS2	proximal_tubule	4098
+PTS2	PTS3	proximal_tubule	825
+PTS2	PTS3T2	proximal_tubule	35
+PTS2	Unknown	proximal_tubule	1
+PTS3	PTS2	proximal_tubule	75
+PTS3	PTS3	proximal_tubule	5264
+PTS3	PTS3T2	proximal_tubule	1772
+PTS3T2	PTS3T2	proximal_tubule	53
+Per	Per	fibroblast	75
+Peri_Stromal	Per	fibroblast	37
+Podo	Podo	podocyte	372
+Stroma	T lymph	fibroblast	490
+T lymph	T lymph	immune	821
+Unknown	ATL		348
+Unknown	Asc-Vasa-Recta	endothelial	26
+Unknown	B lymph	immune	39
+Unknown	CD-Trans	intercalated_cell	6
+Unknown	CNT	DCT2_CNT_atlas	2186
+Unknown	CTAL	thick_ascending_limb	1568
+Unknown	DC		16
+Unknown	DCT	DCT_general	7720
+Unknown	DCT-CNT	DCT2_CNT_atlas	406
+Unknown	DTL		3
+Unknown	DTL-ATL		504
+Unknown	Desc-Vasa-Recta	endothelial	15
+Unknown	Endo	endothelial	1414
+Unknown	Fib	fibroblast	234
+Unknown	Glom-Endo	endothelial	524
+Unknown	ICA	intercalated_cell	402
+Unknown	ICB	intercalated_cell	905
+Unknown	LOH		7
+Unknown	MD		7
+Unknown	MTAL	thick_ascending_limb	1867
+Unknown	Macro	immune	266
+Unknown	NK	immune	23
+Unknown	Neutro	immune	2
+Unknown	PC	principal_cell	2230
+Unknown	PEC		42
+Unknown	PTS1	proximal_tubule	4391
+Unknown	PTS2	proximal_tubule	18884
+Unknown	PTS3	proximal_tubule	8332
+Unknown	PTS3T2	proximal_tubule	2540
+Unknown	Per	fibroblast	41
+Unknown	Podo	podocyte	175
+Unknown	T lymph	immune	214
+Unknown	Unknown		3352
+Unknown	Vas-Afferens	endothelial	1
+Unknown	Vas-Efferens	endothelial	1
+Vas-Afferens	Vas-Afferens	endothelial	35
+Vas-Efferens	Vas-Efferens	endothelial	241

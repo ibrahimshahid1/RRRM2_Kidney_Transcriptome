@@ -1,0 +1,20 @@
+# Pinned environment for the clinical-axes analyses (Python 3.11).
+# These are the exact versions that produced the 2026-10-06 G1/G2 run. Use this file, not
+# requirements.txt, which also pulls legacy network-rewiring dependencies (rpy2, pecanpy, xgboost).
+# Do not upgrade numpy: anndata/scanpy releases that pull numpy 2 break scipy/statsmodels here.
+numpy==1.26.4
+pandas==2.1.4
+scipy==1.12.0
+statsmodels==0.14.1
+scikit-learn==1.4.0
+anndata==0.10.9
+h5py==3.16.0
+PyYAML==6.0.3
+requests==2.34.2
+gseapy==1.1.1
+openpyxl==3.1.5
+matplotlib==3.11.2
+seaborn==0.13.1
+networkx==3.2.1
+joblib==1.6.0
+pytest==9.1.1
