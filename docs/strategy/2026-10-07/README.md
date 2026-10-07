@@ -44,10 +44,10 @@ the limit and lost 7 of 10 results. Rules from now on:
 6. **One stage per workflow.** If a limit hits, at most one stage is lost, and it can be resumed from the
    committed files.
 
-## Remaining stages
+## Stages (all complete 2026-10-07)
 
-1. A prior-art reader (one Sonnet agent, scoped) writes `reader_priorart.md`. Commit.
-2. The coordinator writes `DIRECTIONS_DRAFT.md`: ranked directions, what to stop, and sequencing.
-   Commit.
-3. One adversarial judge (Opus) writes `DIRECTIONS_REVIEW.md`. Commit.
-4. The coordinator finalizes `docs/NEXT_DIRECTIONS_2026-10-07.md` for the owner.
+1. Prior-art reader (one Sonnet agent, about 82K tokens): `reader_priorart.md`. The coordinator added
+   facts verified from the Siew 2024 full text.
+2. Coordinator draft: `DIRECTIONS_DRAFT.md`.
+3. One adversarial judge (Opus, about 112K tokens): `DIRECTIONS_REVIEW.md`.
+4. Final recommendation: `docs/NEXT_DIRECTIONS_2026-10-07.md`.
